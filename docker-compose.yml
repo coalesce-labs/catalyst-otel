@@ -13,7 +13,7 @@ services:
       - "4317:4317"      # OTLP gRPC in
       - "4318:4318"      # OTLP HTTP  in
       - "8889:8889"      # Prometheus scrape out
-    restart: unless-stopped
+    restart: always
     networks:
       - otel-network
 
@@ -25,7 +25,7 @@ services:
       - prometheus-data:/prometheus
     ports:
       - "9099:9090"
-    restart: unless-stopped
+    restart: always
     depends_on: [otel-collector]
     networks:
       - otel-network
@@ -38,7 +38,7 @@ services:
     command: -config.file=/etc/loki/local-config.yaml
     volumes:
       - loki-data:/loki
-    restart: unless-stopped
+    restart: always
     networks:
       - otel-network
 
@@ -59,7 +59,7 @@ services:
       - ./dashboards/token-usage.json:/var/lib/grafana/dashboards/token-usage.json:ro
     ports:
       - "3000:3000"
-    restart: unless-stopped
+    restart: always
     depends_on: [prometheus, loki]
     networks:
       - otel-network

@@ -503,6 +503,8 @@
       "fieldConfig": {
         "defaults": {
           "color": {"mode": "palette-classic"},
+          "unit": "locale",
+          "decimals": 0,
           "mappings": []
         },
         "overrides": [
