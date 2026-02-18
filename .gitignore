@@ -43,4 +43,8 @@ loki_data/
 
 # Temporary files
 tmp/
-temp/ 
+temp/
+
+# Claude Code
+.claude/
+thoughts/

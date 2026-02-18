@@ -12,11 +12,13 @@ processors:
     attributes:
       - key: environment
         value: "production"
-        action: upsert
+        action: insert
 
 exporters:
   prometheus:
     endpoint: "0.0.0.0:8889"
+    resource_to_telemetry_conversion:
+      enabled: true
 
   debug:
     verbosity: normal
