@@ -31,98 +31,206 @@
       "collapsed": false
     },
     {
-      "id": 50,
-      "title": "Total Sessions",
-      "type": "stat",
-      "gridPos": {"h": 5, "w": 4, "x": 0, "y": 1},
-      "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "fieldConfig": {
-        "defaults": {
-          "color": {"fixedColor": "#8F3BB8", "mode": "fixed"},
-          "decimals": 0,
-          "unit": "locale",
-          "mappings": [],
-          "thresholds": {"mode": "absolute", "steps": [{"color": "#8F3BB8", "value": null}]}
-        },
-        "overrides": []
-      },
-      "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
-      "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "count(count by (session_id) (increase(claude_code_token_usage_tokens_total{job=\"otel-collector\"}[$__range]) > 0))", "refId": "A"}]
-    },
-    {
-      "id": 51,
-      "title": "Total Requests",
-      "type": "stat",
-      "gridPos": {"h": 5, "w": 5, "x": 4, "y": 1},
-      "datasource": {"type": "loki", "uid": "loki"},
-      "fieldConfig": {
-        "defaults": {
-          "color": {"fixedColor": "#3274D9", "mode": "fixed"},
-          "decimals": 1,
-          "unit": "short",
-          "mappings": [],
-          "thresholds": {"mode": "absolute", "steps": [{"color": "#3274D9", "value": null}]}
-        },
-        "overrides": []
-      },
-      "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["sum"], "fields": "", "values": false}, "textMode": "auto"},
-      "targets": [{"datasource": {"type": "loki", "uid": "loki"}, "expr": "sum(count_over_time({service_name=~\"claude-code.*\"} | event_name = `api_request` [$__range]))", "refId": "A"}]
-    },
-    {
       "id": 1,
       "title": "Total Tokens",
       "type": "stat",
-      "gridPos": {"h": 5, "w": 5, "x": 9, "y": 1},
-      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 5, "w": 6, "x": 0, "y": 1},
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": {"fixedColor": "#73BF69", "mode": "fixed"},
+          "color": {
+            "fixedColor": "#3274D9",
+            "mode": "fixed"
+          },
           "decimals": 0,
           "unit": "short",
           "mappings": [],
-          "thresholds": {"mode": "absolute", "steps": [{"color": "#73BF69", "value": null}]}
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "#3274D9", "value": null}
+            ]
+          }
         },
         "overrides": []
       },
-      "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
-      "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum(increase(claude_code_token_usage_tokens_total{job=\"otel-collector\"}[$__range]))", "refId": "A"}]
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range]))",
+          "refId": "A"
+        }
+      ]
     },
     {
       "id": 2,
-      "title": "Token Rate/sec (5m)",
+      "title": "Token Rate",
       "type": "stat",
-      "gridPos": {"h": 5, "w": 5, "x": 14, "y": 1},
-      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 5, "w": 6, "x": 6, "y": 1},
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": {"fixedColor": "#FF9830", "mode": "fixed"},
+          "color": {
+            "fixedColor": "#73BF69",
+            "mode": "fixed"
+          },
           "unit": "short",
-          "decimals": 1,
+          "custom": {
+            "suffix": "/sec"
+          },
           "mappings": [],
-          "thresholds": {"mode": "absolute", "steps": [{"color": "#FF9830", "value": null}]}
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "#73BF69", "value": null}
+            ]
+          }
         },
         "overrides": []
       },
-      "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
-      "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum(rate(claude_code_token_usage_tokens_total{job=\"otel-collector\"}[5m]))", "legendFormat": "tokens/sec", "refId": "A"}]
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(rate(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[5m]))",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Cache Efficiency",
+      "type": "gauge",
+      "gridPos": {"h": 5, "w": 6, "x": 12, "y": 1},
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "red", "value": null},
+              {"color": "yellow", "value": 50},
+              {"color": "green", "value": 80}
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "100 * sum(increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",type=\"cacheRead\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range])) / (sum(increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",type=\"cacheRead\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range])) + sum(increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",type=\"input\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range])))",
+          "refId": "A"
+        }
+      ]
     },
     {
       "id": 4,
-      "title": "API Cost",
+      "title": "Estimated Cost",
       "type": "stat",
-      "gridPos": {"h": 5, "w": 5, "x": 19, "y": 1},
-      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 5, "w": 6, "x": 18, "y": 1},
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": {"mode": "thresholds"},
+          "color": {
+            "mode": "thresholds"
+          },
           "unit": "currencyUSD",
           "mappings": [],
-          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 10}, {"color": "red", "value": 50}]}
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 10},
+              {"color": "red", "value": 50}
+            ]
+          }
         },
         "overrides": []
       },
-      "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
-      "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum(increase(claude_code_cost_usage_USD_total{job=\"otel-collector\"}[$__range]))", "refId": "A"}]
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(increase(claude_code_cost_usage_USD_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range]))",
+          "refId": "A"
+        }
+      ]
     },
     {
       "id": 101,
@@ -170,9 +278,9 @@
         "tooltip": {"mode": "multi", "sort": "desc"}
       },
       "targets": [
-        {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum(rate(claude_code_token_usage_tokens_total{job=\"otel-collector\"}[5m]))", "legendFormat": "Token Rate", "refId": "A"},
-        {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "avg_over_time(sum(rate(claude_code_token_usage_tokens_total{job=\"otel-collector\"}[5m]))[1m:15s])", "legendFormat": "1m Rolling Avg", "refId": "B"},
-        {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "avg_over_time(sum(rate(claude_code_token_usage_tokens_total{job=\"otel-collector\"}[5m]))[2h:5m])", "legendFormat": "2h Rolling Avg", "refId": "C"}
+        {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum(rate(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[5m]))", "legendFormat": "Token Rate", "refId": "A"},
+        {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "avg_over_time(sum(rate(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[5m]))[1m:15s])", "legendFormat": "1m Rolling Avg", "refId": "B"},
+        {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "avg_over_time(sum(rate(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[5m]))[2h:5m])", "legendFormat": "2h Rolling Avg", "refId": "C"}
       ]
     },
     {
@@ -186,7 +294,7 @@
       "id": 20,
       "title": "Cache Read Tokens",
       "type": "stat",
-      "gridPos": {"h": 4, "w": 5, "x": 0, "y": 17},
+      "gridPos": {"h": 4, "w": 6, "x": 0, "y": 17},
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "fieldConfig": {
         "defaults": {
@@ -196,18 +304,21 @@
           "mappings": [],
           "thresholds": {"mode": "absolute", "steps": [{"color": "#3274D9", "value": null}]}
         },
-        "overrides": []
+        "overrides": [
+          {"matcher": {"id": "byName", "options": "% of Total"}, "properties": [{"id": "unit", "value": "percent"}, {"id": "decimals", "value": 1}]}
+        ]
       },
-      "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "value"},
+      "options": {"colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "vertical", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "value_and_name"},
       "targets": [
-        {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum(increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",type=\"cacheRead\"}[$__range]))", "refId": "A"}
+        {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum(increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",type=\"cacheRead\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range]))", "legendFormat": "__auto", "refId": "A"},
+        {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "100 * sum(increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",type=\"cacheRead\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range])) / sum(increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range]))", "legendFormat": "% of Total", "refId": "B"}
       ]
     },
     {
       "id": 21,
       "title": "Cache Creation Tokens",
       "type": "stat",
-      "gridPos": {"h": 4, "w": 5, "x": 5, "y": 17},
+      "gridPos": {"h": 4, "w": 6, "x": 6, "y": 17},
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "fieldConfig": {
         "defaults": {
@@ -217,18 +328,21 @@
           "mappings": [],
           "thresholds": {"mode": "absolute", "steps": [{"color": "#B877D9", "value": null}]}
         },
-        "overrides": []
+        "overrides": [
+          {"matcher": {"id": "byName", "options": "% of Total"}, "properties": [{"id": "unit", "value": "percent"}, {"id": "decimals", "value": 1}]}
+        ]
       },
-      "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "value"},
+      "options": {"colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "vertical", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "value_and_name"},
       "targets": [
-        {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum(increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",type=\"cacheCreation\"}[$__range]))", "refId": "A"}
+        {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum(increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",type=\"cacheCreation\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range]))", "legendFormat": "__auto", "refId": "A"},
+        {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "100 * sum(increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",type=\"cacheCreation\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range])) / sum(increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range]))", "legendFormat": "% of Total", "refId": "B"}
       ]
     },
     {
       "id": 22,
       "title": "Output Tokens",
       "type": "stat",
-      "gridPos": {"h": 4, "w": 5, "x": 10, "y": 17},
+      "gridPos": {"h": 4, "w": 6, "x": 12, "y": 17},
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "fieldConfig": {
         "defaults": {
@@ -238,18 +352,21 @@
           "mappings": [],
           "thresholds": {"mode": "absolute", "steps": [{"color": "#73BF69", "value": null}]}
         },
-        "overrides": []
+        "overrides": [
+          {"matcher": {"id": "byName", "options": "% of Total"}, "properties": [{"id": "unit", "value": "percent"}, {"id": "decimals", "value": 1}]}
+        ]
       },
-      "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "value"},
+      "options": {"colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "vertical", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "value_and_name"},
       "targets": [
-        {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum(increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",type=\"output\"}[$__range]))", "refId": "A"}
+        {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum(increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",type=\"output\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range]))", "legendFormat": "__auto", "refId": "A"},
+        {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "100 * sum(increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",type=\"output\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range])) / sum(increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range]))", "legendFormat": "% of Total", "refId": "B"}
       ]
     },
     {
       "id": 23,
       "title": "Input Tokens",
       "type": "stat",
-      "gridPos": {"h": 4, "w": 5, "x": 15, "y": 17},
+      "gridPos": {"h": 4, "w": 6, "x": 18, "y": 17},
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "fieldConfig": {
         "defaults": {
@@ -259,18 +376,21 @@
           "mappings": [],
           "thresholds": {"mode": "absolute", "steps": [{"color": "#FF9830", "value": null}]}
         },
-        "overrides": []
+        "overrides": [
+          {"matcher": {"id": "byName", "options": "% of Total"}, "properties": [{"id": "unit", "value": "percent"}, {"id": "decimals", "value": 1}]}
+        ]
       },
-      "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "value"},
+      "options": {"colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "vertical", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "value_and_name"},
       "targets": [
-        {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum(increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",type=\"input\"}[$__range]))", "refId": "A"}
+        {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum(increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",type=\"input\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range]))", "legendFormat": "__auto", "refId": "A"},
+        {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "100 * sum(increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",type=\"input\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range])) / sum(increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range]))", "legendFormat": "% of Total", "refId": "B"}
       ]
     },
     {
       "id": 14,
       "title": "Token Rate by Type",
       "type": "timeseries",
-      "gridPos": {"h": 12, "w": 20, "x": 0, "y": 21},
+      "gridPos": {"h": 8, "w": 19, "x": 0, "y": 21},
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "fieldConfig": {
         "defaults": {
@@ -280,7 +400,7 @@
             "axisColorMode": "text",
             "drawStyle": "line",
             "fillOpacity": 80,
-            "lineInterpolation": "smooth",
+            "lineInterpolation": "linear",
             "lineWidth": 1,
             "showPoints": "never",
             "spanNulls": false,
@@ -300,16 +420,16 @@
         ]
       },
       "options": {
-        "legend": {"calcs": ["lastNotNull", "mean"], "displayMode": "table", "placement": "bottom", "showLegend": true},
+        "legend": {"calcs": ["sum", "mean"], "displayMode": "table", "placement": "bottom", "showLegend": true},
         "tooltip": {"mode": "multi", "sort": "desc"}
       },
-      "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (type) (rate(claude_code_token_usage_tokens_total{job=\"otel-collector\"}[5m]))", "legendFormat": "{{type}}", "refId": "A"}]
+      "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (type) (rate(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[5m]))", "legendFormat": "{{type}}", "refId": "A"}]
     },
     {
       "id": 15,
-      "title": "Token Distribution",
+      "title": "Token Type Distribution",
       "type": "piechart",
-      "gridPos": {"h": 8, "w": 4, "x": 20, "y": 17},
+      "gridPos": {"h": 16, "w": 5, "x": 19, "y": 21},
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "fieldConfig": {
         "defaults": {"color": {"mode": "palette-classic"}, "mappings": [], "unit": "locale", "decimals": 0},
@@ -326,16 +446,34 @@
         "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
         "tooltip": {"mode": "single", "sort": "none"}
       },
-      "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (type) (increase(claude_code_token_usage_tokens_total{job=\"otel-collector\"}[$__range]))", "legendFormat": "{{type}}", "refId": "A"}]
+      "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (type) (increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range]))", "legendFormat": "{{type}}", "refId": "A"}]
     },
     {
-      "id": 24,
-      "title": "Cost by Token Type",
-      "type": "piechart",
-      "gridPos": {"h": 8, "w": 4, "x": 20, "y": 25},
+      "id": 6,
+      "title": "Cumulative Token Usage",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 19, "x": 0, "y": 29},
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "fieldConfig": {
-        "defaults": {"color": {"mode": "palette-classic"}, "mappings": [], "unit": "currencyUSD", "decimals": 2},
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "drawStyle": "line",
+            "fillOpacity": 80,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {"group": "A", "mode": "normal"},
+            "thresholdsStyle": {"mode": "off"}
+          },
+          "mappings": [],
+          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]},
+          "unit": "locale",
+          "decimals": 0
+        },
         "overrides": [
           {"matcher": {"id": "byName", "options": "input"}, "properties": [{"id": "color", "value": {"fixedColor": "#FF9830", "mode": "fixed"}}]},
           {"matcher": {"id": "byName", "options": "output"}, "properties": [{"id": "color", "value": {"fixedColor": "#73BF69", "mode": "fixed"}}]},
@@ -344,106 +482,24 @@
         ]
       },
       "options": {
-        "legend": {"displayMode": "table", "placement": "bottom", "values": ["value", "percent"], "showLegend": true},
-        "pieType": "donut",
-        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
-        "tooltip": {"mode": "single", "sort": "none"}
+        "legend": {"calcs": ["lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true},
+        "tooltip": {"mode": "multi", "sort": "desc"}
       },
-      "targets": [
-        {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "(sum(increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",type=\"cacheRead\",model=~\".*opus.*\"}[$__range])) * 1.50 + sum(increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",type=\"cacheRead\",model=~\".*sonnet.*\"}[$__range])) * 0.30 + sum(increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",type=\"cacheRead\",model=~\".*haiku.*\"}[$__range])) * 0.08) / 1000000", "legendFormat": "cacheRead", "refId": "A"},
-        {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "(sum(increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",type=\"cacheCreation\",model=~\".*opus.*\"}[$__range])) * 18.75 + sum(increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",type=\"cacheCreation\",model=~\".*sonnet.*\"}[$__range])) * 3.75 + sum(increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",type=\"cacheCreation\",model=~\".*haiku.*\"}[$__range])) * 1.00) / 1000000", "legendFormat": "cacheCreation", "refId": "B"},
-        {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "(sum(increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",type=\"input\",model=~\".*opus.*\"}[$__range])) * 15.00 + sum(increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",type=\"input\",model=~\".*sonnet.*\"}[$__range])) * 3.00 + sum(increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",type=\"input\",model=~\".*haiku.*\"}[$__range])) * 0.80) / 1000000", "legendFormat": "input", "refId": "C"},
-        {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "(sum(increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",type=\"output\",model=~\".*opus.*\"}[$__range])) * 75.00 + sum(increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",type=\"output\",model=~\".*sonnet.*\"}[$__range])) * 15.00 + sum(increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",type=\"output\",model=~\".*haiku.*\"}[$__range])) * 4.00) / 1000000", "legendFormat": "output", "refId": "D"}
-      ]
+      "transformations": [{"id": "calculateField", "options": {"mode": "cumulativeTotal", "replaceFields": true}}],
+      "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (type) (rate(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[5m]))", "legendFormat": "{{type}}", "refId": "A"}]
     },
     {
       "id": 102,
       "title": "Model Analysis",
       "type": "row",
-      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 33},
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 37},
       "collapsed": false
-    },
-    {
-      "id": 25,
-      "title": "Opus Tokens",
-      "type": "stat",
-      "gridPos": {"h": 4, "w": 5, "x": 0, "y": 34},
-      "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "fieldConfig": {
-        "defaults": {
-          "color": {"mode": "fixed", "fixedColor": "#9B59B6"},
-          "unit": "short",
-          "decimals": 0,
-          "mappings": [],
-          "thresholds": {"mode": "absolute", "steps": [{"color": "#9B59B6", "value": null}]}
-        },
-        "overrides": []
-      },
-      "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "value"},
-      "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum(increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",model=~\".*opus.*\"}[$__range]))", "refId": "A"}]
-    },
-    {
-      "id": 26,
-      "title": "Sonnet Tokens",
-      "type": "stat",
-      "gridPos": {"h": 4, "w": 5, "x": 5, "y": 34},
-      "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "fieldConfig": {
-        "defaults": {
-          "color": {"mode": "fixed", "fixedColor": "#E67E22"},
-          "unit": "short",
-          "decimals": 0,
-          "mappings": [],
-          "thresholds": {"mode": "absolute", "steps": [{"color": "#E67E22", "value": null}]}
-        },
-        "overrides": []
-      },
-      "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "value"},
-      "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum(increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",model=~\".*sonnet.*\"}[$__range]))", "refId": "A"}]
-    },
-    {
-      "id": 27,
-      "title": "Haiku Tokens",
-      "type": "stat",
-      "gridPos": {"h": 4, "w": 5, "x": 10, "y": 34},
-      "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "fieldConfig": {
-        "defaults": {
-          "color": {"mode": "fixed", "fixedColor": "#3498DB"},
-          "unit": "short",
-          "decimals": 0,
-          "mappings": [],
-          "thresholds": {"mode": "absolute", "steps": [{"color": "#3498DB", "value": null}]}
-        },
-        "overrides": []
-      },
-      "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "value"},
-      "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum(increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",model=~\".*haiku.*\"}[$__range]))", "refId": "A"}]
-    },
-    {
-      "id": 28,
-      "title": "Total Model Cost",
-      "type": "stat",
-      "gridPos": {"h": 4, "w": 5, "x": 15, "y": 34},
-      "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "fieldConfig": {
-        "defaults": {
-          "color": {"mode": "fixed", "fixedColor": "#73BF69"},
-          "unit": "currencyUSD",
-          "decimals": 2,
-          "mappings": [],
-          "thresholds": {"mode": "absolute", "steps": [{"color": "#73BF69", "value": null}]}
-        },
-        "overrides": []
-      },
-      "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "value"},
-      "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum(increase(claude_code_cost_usage_USD_total{job=\"otel-collector\"}[$__range]))", "refId": "A"}]
     },
     {
       "id": 7,
       "title": "Tokens by Model Over Time",
       "type": "timeseries",
-      "gridPos": {"h": 12, "w": 20, "x": 0, "y": 38},
+      "gridPos": {"h": 8, "w": 19, "x": 0, "y": 38},
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -467,7 +523,7 @@
               "tooltip": false,
               "viz": false
             },
-            "lineInterpolation": "smooth",
+            "lineInterpolation": "linear",
             "lineWidth": 1,
             "pointSize": 5,
             "scaleDistribution": {
@@ -509,23 +565,41 @@
         ]
       },
       "options": {
-        "legend": {"calcs": ["lastNotNull", "mean"], "displayMode": "table", "placement": "bottom", "showLegend": true},
-        "tooltip": {"mode": "multi", "sort": "desc"}
+        "legend": {
+          "calcs": ["sum", "mean"],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
       },
-      "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (model) (rate(claude_code_token_usage_tokens_total{job=\"otel-collector\"}[5m]))", "legendFormat": "{{model}}", "refId": "A"}]
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (model) (rate(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[5m]))",
+          "legendFormat": "{{model}}",
+          "refId": "A"
+        }
+      ]
     },
     {
       "id": 8,
-      "title": "Token Distribution",
+      "title": "Model Distribution",
       "type": "piechart",
-      "gridPos": {"h": 8, "w": 4, "x": 20, "y": 34},
+      "gridPos": {"h": 16, "w": 5, "x": 19, "y": 38},
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "fieldConfig": {
         "defaults": {"color": {"mode": "palette-classic"}, "mappings": [], "unit": "locale", "decimals": 0},
         "overrides": [
-          {"matcher": {"id": "byRegexp", "options": ".*Haiku.*"}, "properties": [{"id": "color", "value": {"fixedColor": "#3498DB", "mode": "fixed"}}]},
-          {"matcher": {"id": "byRegexp", "options": ".*Sonnet.*"}, "properties": [{"id": "color", "value": {"fixedColor": "#E67E22", "mode": "fixed"}}]},
-          {"matcher": {"id": "byRegexp", "options": ".*Opus.*"}, "properties": [{"id": "color", "value": {"fixedColor": "#9B59B6", "mode": "fixed"}}]}
+          {"matcher": {"id": "byRegexp", "options": ".*haiku.*"}, "properties": [{"id": "color", "value": {"fixedColor": "#3498DB", "mode": "fixed"}}]},
+          {"matcher": {"id": "byRegexp", "options": ".*sonnet.*"}, "properties": [{"id": "color", "value": {"fixedColor": "#E67E22", "mode": "fixed"}}]},
+          {"matcher": {"id": "byRegexp", "options": ".*opus.*"}, "properties": [{"id": "color", "value": {"fixedColor": "#9B59B6", "mode": "fixed"}}]}
         ]
       },
       "options": {
@@ -534,122 +608,57 @@
         "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
         "tooltip": {"mode": "single", "sort": "none"}
       },
-      "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "label_replace(label_replace(label_replace(sum by (model) (increase(claude_code_token_usage_tokens_total{job=\"otel-collector\"}[$__range])), \"short\", \"Opus-$1\", \"model\", \"claude-opus-([0-9]+-[0-9]+)-.*\"), \"short\", \"Sonnet-$1\", \"model\", \"claude-sonnet-([0-9]+-[0-9]+)-.*\"), \"short\", \"Haiku-$1\", \"model\", \"claude-haiku-([0-9]+-[0-9]+)-.*\")", "legendFormat": "{{short}}", "refId": "A"}]
+      "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (model) (increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range]))", "legendFormat": "{{model}}", "refId": "A"}]
     },
     {
-      "id": 29,
-      "title": "Cost by Model",
-      "type": "piechart",
-      "gridPos": {"h": 8, "w": 4, "x": 20, "y": 42},
+      "id": 16,
+      "title": "Cumulative by Model",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 19, "x": 0, "y": 46},
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "fieldConfig": {
-        "defaults": {"color": {"mode": "palette-classic"}, "mappings": [], "unit": "currencyUSD", "decimals": 2},
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "custom": {"axisCenteredZero": false, "axisColorMode": "text", "drawStyle": "line", "fillOpacity": 80, "lineInterpolation": "linear", "lineWidth": 1, "showPoints": "never", "spanNulls": false, "stacking": {"group": "A", "mode": "normal"}, "thresholdsStyle": {"mode": "off"}},
+          "mappings": [],
+          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]},
+          "unit": "locale",
+          "decimals": 0
+        },
         "overrides": [
-          {"matcher": {"id": "byRegexp", "options": ".*Haiku.*"}, "properties": [{"id": "color", "value": {"fixedColor": "#3498DB", "mode": "fixed"}}]},
-          {"matcher": {"id": "byRegexp", "options": ".*Sonnet.*"}, "properties": [{"id": "color", "value": {"fixedColor": "#E67E22", "mode": "fixed"}}]},
-          {"matcher": {"id": "byRegexp", "options": ".*Opus.*"}, "properties": [{"id": "color", "value": {"fixedColor": "#9B59B6", "mode": "fixed"}}]}
+          {"matcher": {"id": "byRegexp", "options": ".*haiku.*"}, "properties": [{"id": "color", "value": {"fixedColor": "#3498DB", "mode": "fixed"}}]},
+          {"matcher": {"id": "byRegexp", "options": ".*sonnet.*"}, "properties": [{"id": "color", "value": {"fixedColor": "#E67E22", "mode": "fixed"}}]},
+          {"matcher": {"id": "byRegexp", "options": ".*opus.*"}, "properties": [{"id": "color", "value": {"fixedColor": "#9B59B6", "mode": "fixed"}}]}
         ]
       },
       "options": {
-        "legend": {"displayMode": "table", "placement": "bottom", "showLegend": true, "values": ["value", "percent"]},
-        "pieType": "donut",
-        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
-        "tooltip": {"mode": "single", "sort": "none"}
+        "legend": {"calcs": ["lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true},
+        "tooltip": {"mode": "multi", "sort": "desc"}
       },
-      "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "label_replace(label_replace(label_replace(sum by (model) (increase(claude_code_cost_usage_USD_total{job=\"otel-collector\"}[$__range])), \"short\", \"Opus-$1\", \"model\", \"claude-opus-([0-9]+-[0-9]+)-.*\"), \"short\", \"Sonnet-$1\", \"model\", \"claude-sonnet-([0-9]+-[0-9]+)-.*\"), \"short\", \"Haiku-$1\", \"model\", \"claude-haiku-([0-9]+-[0-9]+)-.*\")", "legendFormat": "{{short}}", "refId": "A"}]
+      "transformations": [{"id": "calculateField", "options": {"mode": "cumulativeTotal", "replaceFields": true}}],
+      "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (model) (rate(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[5m]))", "legendFormat": "{{model}}", "refId": "A"}]
     },
     {
       "id": 103,
       "title": "Session Analysis",
       "type": "row",
-      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 50},
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 54},
       "collapsed": false
-    },
-    {
-      "id": 30,
-      "title": "Total Sessions",
-      "type": "stat",
-      "gridPos": {"h": 4, "w": 5, "x": 0, "y": 51},
-      "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "fieldConfig": {
-        "defaults": {
-          "color": {"mode": "fixed", "fixedColor": "#3274D9"},
-          "unit": "none",
-          "decimals": 0,
-          "mappings": [],
-          "thresholds": {"mode": "absolute", "steps": [{"color": "#3274D9", "value": null}]}
-        },
-        "overrides": []
-      },
-      "options": {"colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
-      "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "count(count by (session_id) (increase(claude_code_token_usage_tokens_total{job=\"otel-collector\"}[$__range]) > 0))", "refId": "A"}]
-    },
-    {
-      "id": 32,
-      "title": "Total Tokens",
-      "type": "stat",
-      "gridPos": {"h": 4, "w": 5, "x": 5, "y": 51},
-      "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "fieldConfig": {
-        "defaults": {
-          "color": {"mode": "fixed", "fixedColor": "#73BF69"},
-          "unit": "short",
-          "decimals": 0,
-          "mappings": [],
-          "thresholds": {"mode": "absolute", "steps": [{"color": "#73BF69", "value": null}]}
-        },
-        "overrides": []
-      },
-      "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
-      "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum(increase(claude_code_token_usage_tokens_total{job=\"otel-collector\"}[$__range]))", "refId": "A"}]
-    },
-    {
-      "id": 33,
-      "title": "Avg Cost/Session",
-      "type": "stat",
-      "gridPos": {"h": 4, "w": 5, "x": 10, "y": 51},
-      "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "fieldConfig": {
-        "defaults": {
-          "color": {"mode": "fixed", "fixedColor": "#FF9830"},
-          "unit": "currencyUSD",
-          "decimals": 2,
-          "mappings": [],
-          "thresholds": {"mode": "absolute", "steps": [{"color": "#FF9830", "value": null}]}
-        },
-        "overrides": []
-      },
-      "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
-      "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum(increase(claude_code_cost_usage_USD_total{job=\"otel-collector\"}[$__range])) / count(count by (session_id) (increase(claude_code_token_usage_tokens_total{job=\"otel-collector\"}[$__range]) > 0))", "refId": "A"}]
-    },
-    {
-      "id": 34,
-      "title": "Avg Tokens/Session",
-      "type": "stat",
-      "gridPos": {"h": 4, "w": 5, "x": 15, "y": 51},
-      "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "fieldConfig": {
-        "defaults": {
-          "color": {"mode": "fixed", "fixedColor": "#B877D9"},
-          "unit": "short",
-          "decimals": 0,
-          "mappings": [],
-          "thresholds": {"mode": "absolute", "steps": [{"color": "#B877D9", "value": null}]}
-        },
-        "overrides": []
-      },
-      "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
-      "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum(increase(claude_code_token_usage_tokens_total{job=\"otel-collector\"}[$__range])) / count(count by (session_id) (increase(claude_code_token_usage_tokens_total{job=\"otel-collector\"}[$__range]) > 0))", "refId": "A"}]
     },
     {
       "id": 9,
       "title": "Token Usage by Session",
       "type": "timeseries",
-      "gridPos": {"h": 8, "w": 20, "x": 0, "y": 55},
-      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 19, "x": 0, "y": 55},
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": {"mode": "palette-classic"},
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
             "axisCenteredZero": false,
             "axisColorMode": "text",
@@ -659,33 +668,67 @@
             "drawStyle": "line",
             "fillOpacity": 80,
             "gradientMode": "none",
-            "hideFrom": {"legend": false, "tooltip": false, "viz": false},
-            "lineInterpolation": "smooth",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
             "lineWidth": 1,
             "pointSize": 5,
-            "scaleDistribution": {"type": "linear"},
+            "scaleDistribution": {
+              "type": "linear"
+            },
             "showPoints": "never",
             "spanNulls": false,
-            "stacking": {"group": "A", "mode": "normal"},
-            "thresholdsStyle": {"mode": "off"}
+            "stacking": {
+              "group": "A",
+              "mode": "normal"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
           },
           "mappings": [],
-          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]},
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null}
+            ]
+          },
           "unit": "short"
         },
         "overrides": []
       },
       "options": {
-        "legend": {"calcs": ["lastNotNull", "mean"], "displayMode": "table", "placement": "bottom", "showLegend": true},
-        "tooltip": {"mode": "multi", "sort": "desc"}
+        "legend": {
+          "calcs": ["sum"],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
       },
-      "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "topk(10, sum by (session_id) (rate(claude_code_token_usage_tokens_total{job=\"otel-collector\"}[5m])))", "legendFormat": "{{session_id}}", "refId": "A"}]
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "topk(10, sum by (session_id) (rate(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[5m])))",
+          "legendFormat": "{{session_id}}",
+          "refId": "A"
+        }
+      ]
     },
     {
       "id": 17,
-      "title": "Tokens by Session",
+      "title": "Top Sessions Distribution",
       "type": "piechart",
-      "gridPos": {"h": 8, "w": 4, "x": 20, "y": 51},
+      "gridPos": {"h": 16, "w": 5, "x": 19, "y": 55},
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "fieldConfig": {
         "defaults": {"color": {"mode": "palette-classic"}, "mappings": [], "unit": "locale", "decimals": 0},
@@ -697,17 +740,23 @@
         "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
         "tooltip": {"mode": "single", "sort": "none"}
       },
-      "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "label_replace(topk(5, sum by (session_id) (increase(claude_code_token_usage_tokens_total{job=\"otel-collector\"}[$__range]))), \"short_id\", \"$1\", \"session_id\", \"^(.{8}).*\")", "legendFormat": "{{short_id}}", "refId": "A"}]
+      "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "topk(10, sum by (session_id) (increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range])))", "legendFormat": "{{session_id}}", "refId": "A"}]
     },
     {
       "id": 10,
       "title": "Active Sessions Over Time",
       "type": "timeseries",
-      "gridPos": {"h": 8, "w": 20, "x": 0, "y": 63},
-      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 19, "x": 0, "y": 63},
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": {"fixedColor": "#3274D9", "mode": "fixed"},
+          "color": {
+            "fixedColor": "#3274D9",
+            "mode": "fixed"
+          },
           "custom": {
             "axisCenteredZero": false,
             "axisColorMode": "text",
@@ -717,46 +766,62 @@
             "drawStyle": "line",
             "fillOpacity": 30,
             "gradientMode": "none",
-            "hideFrom": {"legend": false, "tooltip": false, "viz": false},
-            "lineInterpolation": "smooth",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
             "lineWidth": 2,
             "pointSize": 5,
-            "scaleDistribution": {"type": "linear"},
+            "scaleDistribution": {
+              "type": "linear"
+            },
             "showPoints": "never",
             "spanNulls": false,
-            "stacking": {"group": "A", "mode": "none"},
-            "thresholdsStyle": {"mode": "off"}
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
           },
           "decimals": 0,
           "mappings": [],
-          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]},
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null}
+            ]
+          },
           "unit": "short"
         },
         "overrides": []
       },
       "options": {
-        "legend": {"calcs": ["max", "mean"], "displayMode": "table", "placement": "bottom", "showLegend": true},
-        "tooltip": {"mode": "single", "sort": "none"}
+        "legend": {
+          "calcs": ["max", "mean"],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
       },
-      "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "count(count by (session_id) (rate(claude_code_token_usage_tokens_total{job=\"otel-collector\"}[5m]) > 0))", "legendFormat": "Active Sessions", "refId": "A"}]
-    },
-    {
-      "id": 31,
-      "title": "Cost by Session",
-      "type": "piechart",
-      "gridPos": {"h": 8, "w": 4, "x": 20, "y": 59},
-      "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "fieldConfig": {
-        "defaults": {"color": {"mode": "palette-classic"}, "mappings": [], "unit": "currencyUSD", "decimals": 2},
-        "overrides": [{"matcher": {"id": "byName", "options": "percent"}, "properties": [{"id": "decimals", "value": 0}]}]
-      },
-      "options": {
-        "legend": {"displayMode": "table", "placement": "bottom", "showLegend": true, "values": ["value", "percent"]},
-        "pieType": "donut",
-        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
-        "tooltip": {"mode": "single", "sort": "none"}
-      },
-      "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "label_replace(topk(5, sum by (session_id) (increase(claude_code_cost_usage_USD_total{job=\"otel-collector\"}[$__range]))), \"short_id\", \"$1\", \"session_id\", \"^(.{8}).*\")", "legendFormat": "{{short_id}}", "refId": "A"}]
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "count(count by (session_id) (rate(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[5m]) > 0))",
+          "legendFormat": "Active Sessions",
+          "refId": "A"
+        }
+      ]
     },
     {
       "id": 104,
@@ -769,7 +834,7 @@
       "id": 11,
       "title": "Cache Efficiency Over Time",
       "type": "timeseries",
-      "gridPos": {"h": 8, "w": 20, "x": 0, "y": 72},
+      "gridPos": {"h": 8, "w": 19, "x": 0, "y": 72},
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -843,38 +908,18 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "100 * sum(rate(claude_code_token_usage_tokens_total{job=\"otel-collector\",type=\"cacheRead\"}[5m])) / (sum(rate(claude_code_token_usage_tokens_total{job=\"otel-collector\",type=\"cacheRead\"}[5m])) + sum(rate(claude_code_token_usage_tokens_total{job=\"otel-collector\",type=\"input\"}[5m])))",
+          "expr": "100 * sum(rate(claude_code_token_usage_tokens_total{job=\"otel-collector\",type=\"cacheRead\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[5m])) / (sum(rate(claude_code_token_usage_tokens_total{job=\"otel-collector\",type=\"cacheRead\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[5m])) + sum(rate(claude_code_token_usage_tokens_total{job=\"otel-collector\",type=\"input\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[5m])))",
           "legendFormat": "Cache Efficiency",
           "refId": "A"
         }
       ]
     },
     {
-      "id": 3,
-      "title": "Cache Efficiency",
-      "type": "gauge",
-      "gridPos": {"h": 4, "w": 4, "x": 20, "y": 72},
-      "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "fieldConfig": {
-        "defaults": {
-          "color": {"mode": "thresholds"},
-          "unit": "percent",
-          "min": 0,
-          "max": 100,
-          "mappings": [],
-          "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "yellow", "value": 50}, {"color": "green", "value": 80}]}
-        },
-        "overrides": []
-      },
-      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "orientation": "auto", "showThresholdLabels": false, "showThresholdMarkers": true},
-      "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "100 * sum(increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",type=\"cacheRead\"}[$__range])) / (sum(increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",type=\"cacheRead\"}[$__range])) + sum(increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",type=\"input\"}[$__range])))", "refId": "A"}]
-    },
-    {
       "id": 12,
-      "title": "Cache Savings",
+      "title": "Cache Savings Estimate",
       "description": "Estimated savings if cache reads were charged as input tokens",
       "type": "stat",
-      "gridPos": {"h": 4, "w": 4, "x": 20, "y": 76},
+      "gridPos": {"h": 8, "w": 5, "x": 19, "y": 72},
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -914,23 +959,85 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "(sum(increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",type=\"cacheRead\",model=~\".*opus.*\"}[$__range])) * 13.50 + sum(increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",type=\"cacheRead\",model=~\".*sonnet.*\"}[$__range])) * 2.70 + sum(increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",type=\"cacheRead\",model=~\".*haiku.*\"}[$__range])) * 0.72) / 1000000",
+          "expr": "sum(increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",type=\"cacheRead\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range])) * 0.000003",
           "refId": "A"
         }
       ]
     },
     {
+      "id": 107,
+      "title": "Project Token Breakdown",
+      "type": "row",
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 80},
+      "collapsed": false
+    },
+    {
+      "id": 30,
+      "title": "Tokens by Project",
+      "type": "barchart",
+      "gridPos": {"h": 7, "w": 12, "x": 0, "y": 81},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {"mode": "palette-classic"},
+          "custom": {"fillOpacity": 80, "barRadius": 0.1, "thresholdsStyle": {"mode": "off"}}
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "showValue": "always",
+        "barWidth": 0.8,
+        "stacking": "none",
+        "legend": {"displayMode": "hidden", "showLegend": false},
+        "tooltip": {"mode": "single"}
+      },
+      "targets": [{
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
+        "expr": "sort_desc(topk(10, sum by (project) (increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",hostname=~\"$hostname\"}[$__range]))))",
+        "legendFormat": "{{project}}",
+        "instant": true,
+        "refId": "A"
+      }]
+    },
+    {
+      "id": 31,
+      "title": "Token Rate by Project",
+      "type": "timeseries",
+      "gridPos": {"h": 7, "w": 12, "x": 12, "y": 81},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {"mode": "palette-classic"},
+          "custom": {"drawStyle": "line", "fillOpacity": 20, "lineWidth": 2, "showPoints": "never", "spanNulls": false, "thresholdsStyle": {"mode": "off"}}
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {"calcs": ["sum"], "displayMode": "table", "placement": "bottom"},
+        "tooltip": {"mode": "multi", "sort": "desc"}
+      },
+      "targets": [{
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
+        "expr": "sum by (project) (rate(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",hostname=~\"$hostname\"}[5m]))",
+        "legendFormat": "{{project}}",
+        "refId": "A"
+      }]
+    },
+    {
       "id": 105,
       "title": "Per-Request Analysis",
       "type": "row",
-      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 84},
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 88},
       "collapsed": false
     },
     {
       "id": 13,
       "title": "Recent API Requests",
       "type": "logs",
-      "gridPos": {"h": 10, "w": 16, "x": 0, "y": 85},
+      "gridPos": {"h": 10, "w": 24, "x": 0, "y": 89},
       "datasource": {
         "type": "loki",
         "uid": "loki"
@@ -951,93 +1058,76 @@
             "type": "loki",
             "uid": "loki"
           },
-          "expr": "{service_name=~\"claude-code.*\"} | event_name = \"api_request\" | line_format \"{{.model}} | in:{{.input_tokens}} out:{{.output_tokens}} cache:{{.cache_read_tokens}} | {{.duration_ms}}ms | ${{.cost_usd}}\"",
+          "expr": "{service_name=~\"claude-code.*\"} | event_name = \"api_request\" | project=~\"$project\" | branch=~\"$branch\" | hostname=~\"$hostname\" | line_format \"[{{.project}}] {{.model}} | in:{{.input_tokens}} out:{{.output_tokens}} cache:{{.cache_read_tokens}} | {{.duration_ms}}ms | ${{.cost_usd}}\"",
           "refId": "A"
         }
       ]
-    },
-    {
-      "id": 40,
-      "title": "Total Requests",
-      "type": "stat",
-      "gridPos": {"h": 5, "w": 4, "x": 16, "y": 85},
-      "datasource": {"type": "loki", "uid": "loki"},
-      "fieldConfig": {
-        "defaults": {
-          "color": {"mode": "fixed", "fixedColor": "#3274D9"},
-          "unit": "locale",
-          "decimals": 0,
-          "mappings": [],
-          "thresholds": {"mode": "absolute", "steps": [{"color": "#3274D9", "value": null}]}
-        },
-        "overrides": []
-      },
-      "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["sum"], "fields": "", "values": false}, "textMode": "auto"},
-      "targets": [{"datasource": {"type": "loki", "uid": "loki"}, "expr": "sum(count_over_time({service_name=~\"claude-code.*\"} | event_name = `api_request` [$__range]))", "refId": "A"}]
-    },
-    {
-      "id": 41,
-      "title": "Avg Latency",
-      "type": "stat",
-      "gridPos": {"h": 5, "w": 4, "x": 20, "y": 85},
-      "datasource": {"type": "loki", "uid": "loki"},
-      "fieldConfig": {
-        "defaults": {
-          "color": {"mode": "thresholds"},
-          "unit": "ms",
-          "decimals": 0,
-          "mappings": [],
-          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 5000}, {"color": "red", "value": 15000}]}
-        },
-        "overrides": []
-      },
-      "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["mean"], "fields": "", "values": false}, "textMode": "auto"},
-      "targets": [{"datasource": {"type": "loki", "uid": "loki"}, "expr": "avg(avg_over_time({service_name=~\"claude-code.*\"} | event_name = `api_request` | unwrap duration_ms | __error__=`` [$__range]))", "refId": "A"}]
-    },
-    {
-      "id": 42,
-      "title": "Avg Tokens/Request",
-      "type": "stat",
-      "gridPos": {"h": 5, "w": 4, "x": 16, "y": 90},
-      "datasource": {"type": "loki", "uid": "loki"},
-      "fieldConfig": {
-        "defaults": {
-          "color": {"mode": "fixed", "fixedColor": "#73BF69"},
-          "unit": "short",
-          "decimals": 0,
-          "mappings": [],
-          "thresholds": {"mode": "absolute", "steps": [{"color": "#73BF69", "value": null}]}
-        },
-        "overrides": []
-      },
-      "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["mean"], "fields": "", "values": false}, "textMode": "auto"},
-      "targets": [{"datasource": {"type": "loki", "uid": "loki"}, "expr": "avg(avg_over_time({service_name=~\"claude-code.*\"} | event_name = `api_request` | unwrap output_tokens | __error__=`` [$__range]))", "refId": "A"}]
-    },
-    {
-      "id": 43,
-      "title": "Avg Cost/Request",
-      "type": "stat",
-      "gridPos": {"h": 5, "w": 4, "x": 20, "y": 90},
-      "datasource": {"type": "loki", "uid": "loki"},
-      "fieldConfig": {
-        "defaults": {
-          "color": {"mode": "thresholds"},
-          "unit": "currencyUSD",
-          "decimals": 4,
-          "mappings": [],
-          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 0.05}, {"color": "red", "value": 0.15}]}
-        },
-        "overrides": []
-      },
-      "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["mean"], "fields": "", "values": false}, "textMode": "auto"},
-      "targets": [{"datasource": {"type": "loki", "uid": "loki"}, "expr": "avg(avg_over_time({service_name=~\"claude-code.*\"} | event_name = `api_request` | unwrap cost_usd | __error__=`` [$__range]))", "refId": "A"}]
     }
   ],
   "refresh": "30s",
   "schemaVersion": 39,
   "style": "dark",
   "tags": ["claude-code", "tokens", "analysis"],
-  "templating": {"list": []},
+  "templating": {
+    "list": [
+      {
+        "allValue": ".*",
+        "current": {"selected": true, "text": "All", "value": "$__all"},
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
+        "definition": "label_values(claude_code_cost_usage_USD_total, project)",
+        "includeAll": true,
+        "multi": true,
+        "name": "project",
+        "query": {"qryType": 1, "query": "label_values(claude_code_cost_usage_USD_total, project)", "refId": "PrometheusVariableQueryEditor-VariableQuery"},
+        "refresh": 2,
+        "regex": "",
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allValue": ".*",
+        "current": {"selected": true, "text": "All", "value": "$__all"},
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
+        "definition": "label_values(claude_code_cost_usage_USD_total{project=~\"$project\"}, branch)",
+        "includeAll": true,
+        "multi": true,
+        "name": "branch",
+        "query": {"qryType": 1, "query": "label_values(claude_code_cost_usage_USD_total{project=~\"$project\"}, branch)", "refId": "PrometheusVariableQueryEditor-VariableQuery"},
+        "refresh": 2,
+        "regex": "",
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allValue": ".*",
+        "current": {"selected": true, "text": "All", "value": "$__all"},
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
+        "definition": "label_values(claude_code_cost_usage_USD_total, hostname)",
+        "includeAll": true,
+        "multi": true,
+        "name": "hostname",
+        "query": {"qryType": 1, "query": "label_values(claude_code_cost_usage_USD_total, hostname)", "refId": "PrometheusVariableQueryEditor-VariableQuery"},
+        "refresh": 2,
+        "regex": "",
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allValue": ".*",
+        "current": {"selected": true, "text": "All", "value": "$__all"},
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
+        "definition": "label_values(claude_code_cost_usage_USD_total{project=~\"$project\"}, directory)",
+        "includeAll": true,
+        "multi": true,
+        "name": "directory",
+        "query": {"qryType": 1, "query": "label_values(claude_code_cost_usage_USD_total{project=~\"$project\"}, directory)", "refId": "PrometheusVariableQueryEditor-VariableQuery"},
+        "refresh": 2,
+        "regex": "",
+        "sort": 1,
+        "type": "query"
+      }
+    ]
+  },
   "time": {"from": "now-1h", "to": "now"},
   "timepicker": {
     "refresh_intervals": ["10s", "30s", "1m", "5m"],

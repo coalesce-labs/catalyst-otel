@@ -4,15 +4,10 @@ datasources:
   - name: prometheus
     type: prometheus
     access: proxy
-    url: http://prometheus:9090
+    url: http://otel-prometheus:9090
     isDefault: true
 
   - name: loki
     type: loki
     access: proxy
-    url: http://loki:3100
-    
-  - name: alertmanager
-    type: alertmanager
-    access: proxy
-    url: http://alertmanager:9093
+    url: http://otel-loki:3100

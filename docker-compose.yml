@@ -13,38 +13,38 @@ services:
       - "4317:4317"      # OTLP gRPC in
       - "4318:4318"      # OTLP HTTP  in
       - "8889:8889"      # Prometheus scrape out
-    restart: always
+    restart: unless-stopped
     networks:
       - otel-network
 
-  prometheus:
+  otel-prometheus:
     image: prom/prometheus:latest
-    container_name: prometheus
+    container_name: otel-prometheus
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - prometheus-data:/prometheus
+      - otel-prometheus-data:/prometheus
     ports:
-      - "9099:9090"
-    restart: always
+      - "9098:9090"
+    restart: unless-stopped
     depends_on: [otel-collector]
     networks:
       - otel-network
 
-  loki:
+  otel-loki:
     image: grafana/loki:latest
-    container_name: loki
+    container_name: otel-loki
     ports:
       - "3100:3100"
     command: -config.file=/etc/loki/local-config.yaml
     volumes:
-      - loki-data:/loki
-    restart: always
+      - otel-loki-data:/loki
+    restart: unless-stopped
     networks:
       - otel-network
 
-  grafana:
+  otel-grafana:
     image: grafana/grafana-oss:latest
-    container_name: grafana
+    container_name: otel-grafana
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin
       - GF_USERS_ALLOW_SIGN_UP=false
@@ -58,12 +58,12 @@ services:
       - ./dashboards/developer-productivity.json:/var/lib/grafana/dashboards/developer-productivity.json:ro
       - ./dashboards/token-usage.json:/var/lib/grafana/dashboards/token-usage.json:ro
     ports:
-      - "3000:3000"
-    restart: always
-    depends_on: [prometheus, loki]
+      - "13001:3000"
+    restart: unless-stopped
+    depends_on: [otel-prometheus, otel-loki]
     networks:
       - otel-network
 
 volumes:
-  prometheus-data:
-  loki-data:
+  otel-prometheus-data:
+  otel-loki-data:

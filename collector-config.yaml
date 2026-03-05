@@ -38,7 +38,7 @@ exporters:
     verbosity: normal
 
   otlphttp:
-    endpoint: http://loki:3100/otlp
+    endpoint: http://otel-loki:3100/otlp
 
 service:
   pipelines:

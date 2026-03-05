@@ -37,7 +37,7 @@
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "targets": [{
         "datasource": {"type": "prometheus", "uid": "prometheus"},
-        "expr": "sum(increase(claude_code_cost_usage_USD_total{job=\"otel-collector\"}[$__range]))",
+        "expr": "sum(increase(claude_code_cost_usage_USD_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range]))",
         "legendFormat": "Cost",
         "refId": "A"
       }],
@@ -75,7 +75,7 @@
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "targets": [{
         "datasource": {"type": "prometheus", "uid": "prometheus"},
-        "expr": "sum(increase(claude_code_token_usage_tokens_total{job=\"otel-collector\"}[$__range]))",
+        "expr": "sum(increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range]))",
         "legendFormat": "Tokens",
         "refId": "A"
       }],
@@ -111,7 +111,7 @@
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "targets": [{
         "datasource": {"type": "prometheus", "uid": "prometheus"},
-        "expr": "sum(increase(claude_code_lines_of_code_count_total{job=\"otel-collector\"}[$__range]))",
+        "expr": "sum(increase(claude_code_lines_of_code_count_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range]))",
         "legendFormat": "Lines",
         "refId": "A"
       }],
@@ -147,7 +147,7 @@
       "datasource": {"type": "loki", "uid": "loki"},
       "targets": [{
         "datasource": {"type": "loki", "uid": "loki"},
-        "expr": "sum(count_over_time({service_name=~\"claude-code.*\"} | tool_name != \"\" [$__range]))",
+        "expr": "sum(count_over_time({service_name=~\"claude-code.*\"} | tool_name != \"\" | project=~\"$project\" | branch=~\"$branch\" | hostname=~\"$hostname\" [$__range]))",
         "legendFormat": "Tool Calls",
         "instant": true,
         "refId": "A"
@@ -185,7 +185,7 @@
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "targets": [{
         "datasource": {"type": "prometheus", "uid": "prometheus"},
-        "expr": "100 * sum(increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",type=\"cacheRead\"}[$__range])) / (sum(increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",type=\"cacheRead\"}[$__range])) + sum(increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",type=\"input\"}[$__range])))",
+        "expr": "100 * sum(increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",type=\"cacheRead\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range])) / (sum(increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",type=\"cacheRead\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range])) + sum(increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",type=\"input\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range])))",
         "legendFormat": "Cache %",
         "refId": "A"
       }],
@@ -228,13 +228,13 @@
       "targets": [
         {
           "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "expr": "sum(rate(claude_code_cost_usage_USD_total{job=\"otel-collector\"}[5m])) * 3600",
+          "expr": "sum(rate(claude_code_cost_usage_USD_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[5m])) * 3600",
           "legendFormat": "Cost ($/hr)",
           "refId": "A"
         },
         {
           "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "expr": "sum(rate(claude_code_token_usage_tokens_total{job=\"otel-collector\"}[5m])) / 1000",
+          "expr": "sum(rate(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[5m])) / 1000",
           "legendFormat": "Tokens (K/sec)",
           "refId": "B"
         }
@@ -294,7 +294,7 @@
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "targets": [{
         "datasource": {"type": "prometheus", "uid": "prometheus"},
-        "expr": "sum by (model) (increase(claude_code_cost_usage_USD_total{job=\"otel-collector\"}[$__range]))",
+        "expr": "sum by (model) (increase(claude_code_cost_usage_USD_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range]))",
         "legendFormat": "{{model}}",
         "refId": "A"
       }],
@@ -340,7 +340,7 @@
       "datasource": {"type": "loki", "uid": "loki"},
       "targets": [{
         "datasource": {"type": "loki", "uid": "loki"},
-        "expr": "sort_desc(topk(10, sum by (tool_name) (count_over_time({service_name=~\"claude-code.*\"} | tool_name != \"\" [$__range]))))",
+        "expr": "sort_desc(topk(10, sum by (tool_name) (count_over_time({service_name=~\"claude-code.*\"} | tool_name != \"\" | project=~\"$project\" | branch=~\"$branch\" | hostname=~\"$hostname\" [$__range]))))",
         "legendFormat": "{{tool_name}}",
         "instant": true,
         "refId": "A"
@@ -403,13 +403,13 @@
       "targets": [
         {
           "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "expr": "sum(rate(claude_code_lines_of_code_count_total{job=\"otel-collector\",type=\"added\"}[5m])) * 60",
+          "expr": "sum(rate(claude_code_lines_of_code_count_total{job=\"otel-collector\",type=\"added\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[5m])) * 60",
           "legendFormat": "Lines Added",
           "refId": "A"
         },
         {
           "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "expr": "-sum(rate(claude_code_lines_of_code_count_total{job=\"otel-collector\",type=\"removed\"}[5m])) * 60",
+          "expr": "-sum(rate(claude_code_lines_of_code_count_total{job=\"otel-collector\",type=\"removed\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[5m])) * 60",
           "legendFormat": "Lines Removed",
           "refId": "B"
         }
@@ -461,7 +461,7 @@
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "targets": [{
         "datasource": {"type": "prometheus", "uid": "prometheus"},
-        "expr": "sum by (model) (rate(claude_code_cost_usage_USD_total{job=\"otel-collector\"}[5m])) * 3600",
+        "expr": "sum by (model) (rate(claude_code_cost_usage_USD_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[5m])) * 3600",
         "legendFormat": "{{model}}",
         "refId": "A"
       }],
@@ -496,7 +496,7 @@
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "targets": [{
         "datasource": {"type": "prometheus", "uid": "prometheus"},
-        "expr": "sum by (type) (increase(claude_code_token_usage_tokens_total{job=\"otel-collector\"}[$__range]))",
+        "expr": "sum by (type) (increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range]))",
         "legendFormat": "{{type}}",
         "refId": "A"
       }],
@@ -530,7 +530,7 @@
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "targets": [{
         "datasource": {"type": "prometheus", "uid": "prometheus"},
-        "expr": "sum(increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",type=\"cacheRead\"}[$__range])) * 0.000003",
+        "expr": "sum(increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",type=\"cacheRead\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range])) * 0.000003",
         "legendFormat": "Savings",
         "refId": "A"
       }],
@@ -570,7 +570,7 @@
       "datasource": {"type": "loki", "uid": "loki"},
       "targets": [{
         "datasource": {"type": "loki", "uid": "loki"},
-        "expr": "{service_name=~\"claude-code.*\"} | event_name = \"tool_result\" | line_format \"{{.tool_name}} {{if eq .success \\\"true\\\"}}OK{{else}}FAIL{{end}} {{.duration_ms}}ms\"",
+        "expr": "{service_name=~\"claude-code.*\"} | event_name = \"tool_result\" | project=~\"$project\" | branch=~\"$branch\" | hostname=~\"$hostname\" | line_format \"[{{.project}}] {{.tool_name}} {{if eq .success \\\"true\\\"}}OK{{else}}FAIL{{end}} {{.duration_ms}}ms\"",
         "refId": "A"
       }],
       "options": {
@@ -592,7 +592,7 @@
       "datasource": {"type": "loki", "uid": "loki"},
       "targets": [{
         "datasource": {"type": "loki", "uid": "loki"},
-        "expr": "{service_name=~\"claude-code.*\"} | event_name = \"api_error\" | line_format \"{{.model}} HTTP {{.status_code}} {{.error}}\"",
+        "expr": "{service_name=~\"claude-code.*\"} | event_name = \"api_error\" | project=~\"$project\" | branch=~\"$branch\" | hostname=~\"$hostname\" | line_format \"[{{.project}}] {{.model}} HTTP {{.status_code}} {{.error}}\"",
         "refId": "A"
       }],
       "options": {
@@ -605,6 +605,72 @@
         "sortOrder": "Descending",
         "dedupStrategy": "none"
       }
+    },
+    {
+      "title": "Project Intelligence",
+      "type": "row",
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 40},
+      "collapsed": false
+    },
+    {
+      "id": 30,
+      "title": "Spend by Project",
+      "type": "barchart",
+      "gridPos": {"h": 7, "w": 12, "x": 0, "y": 41},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "color": {"mode": "palette-classic"},
+          "custom": {"fillOpacity": 80, "barRadius": 0.1, "thresholdsStyle": {"mode": "off"}}
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "showValue": "always",
+        "barWidth": 0.8,
+        "stacking": "none",
+        "legend": {"displayMode": "hidden", "showLegend": false},
+        "tooltip": {"mode": "single"}
+      },
+      "targets": [{
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
+        "expr": "sort_desc(topk(10, sum by (project) (increase(claude_code_cost_usage_USD_total{job=\"otel-collector\",project=~\"$project\",hostname=~\"$hostname\"}[$__range]))))",
+        "legendFormat": "{{project}}",
+        "instant": true,
+        "refId": "A"
+      }]
+    },
+    {
+      "id": 31,
+      "title": "Tool Usage by Project",
+      "type": "barchart",
+      "gridPos": {"h": 7, "w": 12, "x": 12, "y": 41},
+      "datasource": {"type": "loki", "uid": "loki"},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {"mode": "palette-classic"},
+          "custom": {"fillOpacity": 80, "barRadius": 0.1, "thresholdsStyle": {"mode": "off"}}
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "showValue": "always",
+        "barWidth": 0.8,
+        "stacking": "none",
+        "legend": {"displayMode": "hidden", "showLegend": false},
+        "tooltip": {"mode": "single"}
+      },
+      "targets": [{
+        "datasource": {"type": "loki", "uid": "loki"},
+        "expr": "sort_desc(topk(10, sum by (project) (count_over_time({service_name=~\"claude-code.*\"} | tool_name != \"\" | project=~\"$project\" | hostname=~\"$hostname\" [$__range]))))",
+        "legendFormat": "{{project}}",
+        "instant": true,
+        "refId": "A"
+      }]
     }
   ],
   "refresh": "30s",
@@ -612,7 +678,64 @@
   "style": "dark",
   "tags": ["claude-code", "productivity", "developer"],
   "templating": {
-    "list": []
+    "list": [
+      {
+        "allValue": ".*",
+        "current": {"selected": true, "text": "All", "value": "$__all"},
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
+        "definition": "label_values(claude_code_cost_usage_USD_total, project)",
+        "includeAll": true,
+        "multi": true,
+        "name": "project",
+        "query": {"qryType": 1, "query": "label_values(claude_code_cost_usage_USD_total, project)", "refId": "PrometheusVariableQueryEditor-VariableQuery"},
+        "refresh": 2,
+        "regex": "",
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allValue": ".*",
+        "current": {"selected": true, "text": "All", "value": "$__all"},
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
+        "definition": "label_values(claude_code_cost_usage_USD_total{project=~\"$project\"}, branch)",
+        "includeAll": true,
+        "multi": true,
+        "name": "branch",
+        "query": {"qryType": 1, "query": "label_values(claude_code_cost_usage_USD_total{project=~\"$project\"}, branch)", "refId": "PrometheusVariableQueryEditor-VariableQuery"},
+        "refresh": 2,
+        "regex": "",
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allValue": ".*",
+        "current": {"selected": true, "text": "All", "value": "$__all"},
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
+        "definition": "label_values(claude_code_cost_usage_USD_total, hostname)",
+        "includeAll": true,
+        "multi": true,
+        "name": "hostname",
+        "query": {"qryType": 1, "query": "label_values(claude_code_cost_usage_USD_total, hostname)", "refId": "PrometheusVariableQueryEditor-VariableQuery"},
+        "refresh": 2,
+        "regex": "",
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allValue": ".*",
+        "current": {"selected": true, "text": "All", "value": "$__all"},
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
+        "definition": "label_values(claude_code_cost_usage_USD_total{project=~\"$project\"}, directory)",
+        "includeAll": true,
+        "multi": true,
+        "name": "directory",
+        "query": {"qryType": 1, "query": "label_values(claude_code_cost_usage_USD_total{project=~\"$project\"}, directory)", "refId": "PrometheusVariableQueryEditor-VariableQuery"},
+        "refresh": 2,
+        "regex": "",
+        "sort": 1,
+        "type": "query"
+      }
+    ]
   },
   "time": {
     "from": "now-1h",
