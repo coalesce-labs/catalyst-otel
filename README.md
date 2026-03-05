@@ -258,6 +258,130 @@ make validate-config     # Validate all configs
 make setup-claude       # Show Claude Code setup instructions
 ```
 
+## Shell Helper Functions
+
+Add these to your `~/.zshrc` or `~/.bashrc` for quick access to the observability stack. Set the environment variables to match your deployment (localhost or remote).
+
+### Environment Variables
+
+```bash
+# Required: Your Grafana URL (no trailing slash)
+export OTEL_GRAFANA_URL="http://localhost:3000"
+
+# Required: Collector host (for health checks)
+export OTEL_HOST="localhost"
+```
+
+### Helper Functions
+
+```bash
+# Quick check if telemetry is working
+check_claude_telemetry() {
+    echo "Checking Claude Code Telemetry Configuration..."
+    echo ""
+    echo "Telemetry Enabled: ${CLAUDE_CODE_ENABLE_TELEMETRY:-NOT SET}"
+    echo "Prompt Logging:    ${OTEL_LOG_USER_PROMPTS:-NOT SET}"
+    echo "Collector:         ${OTEL_EXPORTER_OTLP_ENDPOINT:-NOT SET}"
+    echo "Grafana:           ${OTEL_GRAFANA_URL:-NOT SET}"
+    echo ""
+
+    if curl -s --connect-timeout 3 "http://${OTEL_HOST:-localhost}:4318" >/dev/null 2>&1; then
+        echo "Collector is reachable at ${OTEL_HOST:-localhost}:4317"
+    else
+        echo "Cannot reach collector at ${OTEL_HOST:-localhost}:4317"
+    fi
+}
+
+# View recent Claude Code logs in Loki via Grafana Explore
+#
+# IMPORTANT: This queries Loki (not Prometheus). Logs use the stream label
+# service_name (not job). All event attributes (tool_name, event_name, etc.)
+# are Loki structured metadata and must be accessed via pipeline filters,
+# not stream selectors. See CLAUDE.md for LogQL query patterns.
+claude_logs() {
+    local minutes=${1:-30}
+    echo "Opening Grafana Explore with Loki (last ${minutes} minutes)..."
+    # Grafana Explore URL with Loki datasource and correct LogQL query
+    # Decoded panes JSON: {"logs":{"datasource":"loki","queries":[{"refId":"A","expr":"{service_name=~\"claude-code.*\"}","queryType":"range"}],"range":{"from":"now-<minutes>m","to":"now"}}}
+    open "${OTEL_GRAFANA_URL}/explore?schemaVersion=1&panes=%7B%22logs%22%3A%7B%22datasource%22%3A%22loki%22%2C%22queries%22%3A%5B%7B%22refId%22%3A%22A%22%2C%22expr%22%3A%22%7Bservice_name%3D~%5C%22claude-code.%2A%5C%22%7D%22%2C%22queryType%22%3A%22range%22%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22now-${minutes}m%22%2C%22to%22%3A%22now%22%7D%7D%7D"
+}
+
+# Open the Claude Code dashboard
+claude_dash() {
+    echo "Opening Claude Code dashboard..."
+    open "${OTEL_GRAFANA_URL}/d/claude-code?refresh=30s"
+}
+
+# Open Prometheus metrics explorer
+claude_metrics() {
+    echo "Opening Grafana Explore with Prometheus..."
+    open "${OTEL_GRAFANA_URL}/explore?schemaVersion=1&panes=%7B%22metrics%22%3A%7B%22datasource%22%3A%22prometheus%22%2C%22queries%22%3A%5B%7B%22refId%22%3A%22A%22%2C%22expr%22%3A%22%7B__name__%3D~%5C%22claude_code.%2A%5C%22%7D%22%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22now-1h%22%2C%22to%22%3A%22now%22%7D%7D%7D"
+}
+```
+
+### Aliases
+
+```bash
+alias claude-check='check_claude_telemetry'
+alias claude-logs='claude_logs'
+alias claude-dash='claude_dash'
+alias claude-metrics='claude_metrics'
+```
+
+### Resource Attributes in Loki
+
+`OTEL_RESOURCE_ATTRIBUTES` are **resource-level** metadata in OTLP. Only `service.name` is reliably promoted to a Loki stream label by default. Custom resource attributes (like `launcher.name`, `user`) do **not** automatically appear as structured metadata in Loki's default config.
+
+To make custom resource attributes queryable, the OTel Collector uses a `transform/logs` processor (see `collector-config.yaml`) that copies them to log record attributes, which Loki stores as structured metadata.
+
+**Stream labels** (usable in `{}` selectors):
+
+| Attribute | LogQL Key | Source |
+|---|---|---|
+| `service.name` | `service_name` | Auto-promoted by Loki |
+
+**Structured metadata** (via transform processor, use `\|` pipeline filters):
+
+| Resource Attribute | LogQL Key | Usage |
+|---|---|---|
+| `launcher.name` | `launcher_name` | `\| launcher_name="conductor"` |
+| `service.namespace` | `service_namespace` | `\| service_namespace="conductor"` |
+| `user` | `user` | `\| user="ryan"` |
+| `environment` | `resource_environment` | `\| resource_environment="dev"` |
+
+**Example queries:**
+
+```logql
+# All logs from a specific launcher
+{service_name=~"claude-code.*"} | launcher_name="conductor"
+
+# Filter by user and event type
+{service_name=~"claude-code.*"} | user="ryan" | event_name="tool_result"
+
+# Aggregate tool usage by launcher
+sum by (launcher_name, tool_name) (
+  count_over_time({service_name=~"claude-code.*"} | launcher_name != "" [$__range])
+)
+```
+
+**Adding more resource attributes**: To expose additional `OTEL_RESOURCE_ATTRIBUTES` in Loki, add a `set()` statement to the `transform/logs` processor in `collector-config.yaml`:
+
+```yaml
+- set(attributes["my_attr"], resource.attributes["my.attr"])
+```
+
+> **Tip**: In Grafana Explore, expand a log entry to see all structured metadata fields. This is the easiest way to discover which attributes are available.
+
+### Common Pitfalls
+
+| Mistake | Why it fails | Fix |
+|---------|-------------|-----|
+| Query Loki with `{job="claude-code"}` | `job` is a Prometheus label, not a Loki stream label | Use `{service_name=~"claude-code.*"}` |
+| Use `{tool_name="Bash"}` in Loki stream selector | Event attributes are structured metadata, not stream labels | Use pipeline filter: `\| tool_name = "Bash"` |
+| Use `{launcher_name="conductor"}` in stream selector | `launcher.name` is not in the default promoted list | Use pipeline filter: `\| launcher_name = "conductor"` |
+| Open Explore with default datasource | Grafana defaults to Prometheus; logs are in Loki | Specify `"datasource":"loki"` in the Explore URL |
+| Use dots in LogQL keys | Loki converts dots to underscores | `launcher.name` → `launcher_name` |
+
 ## 🎯 Use Cases
 
 ### For Engineering Teams

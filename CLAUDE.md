@@ -69,9 +69,9 @@ Claude Code (with telemetry enabled)
 
 1. **OpenTelemetry Collector** (collector-config.yaml)
    - Receivers: OTLP gRPC (:4317) and HTTP (:4318)
-   - Processors: Resource processor (adds environment=production tag)
+   - Processors: Resource processor (adds environment=production tag), Transform processor (copies resource attributes to log record attributes for Loki)
    - Exporters: Prometheus (:8889), Debug, OTLP HTTP to Loki
-   - Pipelines: Separate routing for metrics and logs
+   - Pipelines: Separate routing for metrics and logs (logs pipeline includes transform/logs processor)
 
 2. **Prometheus** (prometheus.yml)
    - Scrapes metrics from OTel Collector endpoint (:8889) every 15 seconds

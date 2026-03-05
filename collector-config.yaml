@@ -14,6 +14,20 @@ processors:
         value: "production"
         action: insert
 
+  # Copy resource attributes to log record attributes so they appear
+  # as Loki structured metadata. Resource attributes from
+  # OTEL_RESOURCE_ATTRIBUTES are not automatically promoted by Loki's
+  # default config — only log record attributes become structured metadata.
+  transform/logs:
+    error_mode: ignore
+    log_statements:
+      - context: log
+        statements:
+          - set(attributes["launcher_name"], resource.attributes["launcher.name"])
+          - set(attributes["service_namespace"], resource.attributes["service.namespace"])
+          - set(attributes["user"], resource.attributes["user"])
+          - set(attributes["resource_environment"], resource.attributes["environment"])
+
 exporters:
   prometheus:
     endpoint: "0.0.0.0:8889"
@@ -33,7 +47,7 @@ service:
       processors: [resource]
       exporters: [prometheus, debug]
     
-    logs:    
+    logs:
       receivers: [otlp]
-      processors: [resource]
-      exporters: [debug, otlphttp] 
+      processors: [resource, transform/logs]
+      exporters: [debug, otlphttp]
