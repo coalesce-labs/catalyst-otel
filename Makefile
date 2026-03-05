@@ -1,5 +1,5 @@
 # Claude Code Observability Stack
-.PHONY: help up down logs restart clean validate-config
+.PHONY: help up down logs restart clean validate-config pull deploy
 
 help: ## Show this help message
 	@echo "Claude Code Observability Stack"
@@ -8,7 +8,11 @@ help: ## Show this help message
 	@echo "Available commands:"
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
-up: ## Start the observability stack
+pull: ## Pull latest config from main branch
+	@echo "📥 Pulling latest from main..."
+	@git pull origin main --ff-only 2>/dev/null && echo "✅ Updated to latest" || echo "⚠️  Pull skipped (no changes or not on main). Continuing with current version."
+
+up: pull ## Start the observability stack (pulls latest first)
 	@echo "🚀 Starting Claude Code observability stack..."
 	docker compose up -d
 	@echo "✅ Stack started!"
@@ -16,16 +20,20 @@ up: ## Start the observability stack
 	@echo "🔍 Prometheus: http://localhost:9099"
 	@echo "📄 Loki: http://localhost:3100"
 
-
 down: ## Stop the observability stack
 	@echo "🛑 Stopping Claude Code observability stack..."
 	docker compose down
 	@echo "✅ Stack stopped!"
 
-restart: ## Restart the observability stack
+restart: pull ## Pull latest and recreate containers with updated configs
 	@echo "🔄 Restarting Claude Code observability stack..."
-	docker compose restart
+	docker compose up -d
 	@echo "✅ Stack restarted!"
+
+deploy: pull ## Pull latest and force-recreate all containers
+	@echo "🚀 Deploying latest Claude Code observability stack..."
+	docker compose up -d --force-recreate
+	@echo "✅ Deploy complete!"
 
 logs: ## Show logs from all services
 	docker compose logs -f
