@@ -364,6 +364,68 @@ sum by (launcher_name, tool_name) (
 )
 ```
 
+**Session context attributes** (dynamic, set by wrapper function):
+
+| Resource Attribute | LogQL Key | Usage |
+|---|---|---|
+| `working.directory` | `working_directory` | `\| working_directory="my-project"` |
+| `git.branch` | `git_branch` | `\| git_branch="feat/login"` |
+| `linear.key` | `linear_key` | `\| linear_key="ENG-123"` |
+| `github.pr` | `github_pr` | `\| github_pr="42"` |
+
+**Example queries:**
+
+```logql
+# All logs from a specific git branch
+{service_name=~"claude-code.*"} | git_branch="feat/login"
+
+# Filter by Linear ticket
+{service_name=~"claude-code.*"} | linear_key="ENG-123"
+
+# Aggregate tool usage by working directory
+sum by (working_directory, tool_name) (
+  count_over_time({service_name=~"claude-code.*"} | working_directory != "" [$__range])
+)
+```
+
+### Dynamic Session Context Wrapper
+
+To automatically capture working directory, git branch, Linear ticket, and GitHub PR as resource attributes, add this wrapper function to your `~/.zshrc`:
+
+```bash
+claude() {
+    # Start with your static attributes
+    local attrs="environment=dev,user=$(whoami),hostname=$(hostname -s)"
+
+    # Working directory
+    attrs="${attrs},working.directory=$(basename "$PWD")"
+
+    # Git branch + derived context
+    local branch=$(git branch --show-current 2>/dev/null)
+    if [[ -n "$branch" ]]; then
+        attrs="${attrs},git.branch=${branch}"
+
+        # Extract Linear ticket key from branch name (e.g., ENG-123)
+        local linear_key=$(echo "$branch" | grep -oE '[A-Z]+-[0-9]+' | head -1)
+        [[ -n "$linear_key" ]] && attrs="${attrs},linear.key=${linear_key}"
+
+        # Get GitHub PR number for current branch
+        local pr_num=$(gh pr view --json number -q .number 2>/dev/null)
+        [[ -n "$pr_num" ]] && attrs="${attrs},github.pr=${pr_num}"
+    fi
+
+    OTEL_RESOURCE_ATTRIBUTES="$attrs" command claude "$@"
+}
+```
+
+This wrapper:
+- Runs before every `claude` invocation, so attributes reflect the current context
+- Extracts Linear ticket keys from branch names (e.g., `feat/ENG-123-login` → `ENG-123`)
+- Looks up the GitHub PR number via `gh` CLI (requires [GitHub CLI](https://cli.github.com/))
+- Falls back gracefully — missing values are simply omitted (the transform processor uses `error_mode: ignore`)
+
+> **Note**: If you use Conductor or another launcher that sets `OTEL_RESOURCE_ATTRIBUTES`, avoid also setting it in `~/.claude/settings.json` — the settings.json value will override the process environment, losing any dynamically-set attributes.
+
 **Adding more resource attributes**: To expose additional `OTEL_RESOURCE_ATTRIBUTES` in Loki, add a `set()` statement to the `transform/logs` processor in `collector-config.yaml`:
 
 ```yaml
