@@ -122,7 +122,7 @@
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "targets": [{"expr": "sum by (model) (increase(claude_code_cost_usage_USD_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range]))", "legendFormat": "{{model}}", "refId": "A"}],
       "fieldConfig": {"defaults": {"unit": "currencyUSD", "color": {"mode": "palette-classic"}, "mappings": []}, "overrides": [{"matcher": {"id": "byRegexp", "options": ".*opus.*"}, "properties": [{"id": "color", "value": {"fixedColor": "#9B59B6", "mode": "fixed"}}]}, {"matcher": {"id": "byRegexp", "options": ".*sonnet.*"}, "properties": [{"id": "color", "value": {"fixedColor": "#E67E22", "mode": "fixed"}}]}, {"matcher": {"id": "byRegexp", "options": ".*haiku.*"}, "properties": [{"id": "color", "value": {"fixedColor": "#3498DB", "mode": "fixed"}}]}]},
-      "options": {"legend": {"displayMode": "table", "placement": "right", "values": ["value", "percent"], "showLegend": true}, "pieType": "donut", "tooltip": {"mode": "single"}, "reduceOptions": {"calcs": ["lastNotNull"], "values": false, "fields": ""}}
+      "options": {"legend": {"displayMode": "table", "placement": "bottom", "values": ["value", "percent"], "showLegend": true}, "pieType": "donut", "tooltip": {"mode": "single"}, "reduceOptions": {"calcs": ["lastNotNull"], "values": false, "fields": ""}}
     },
     {
       "id": 13, "title": "Model Mix (Tokens)", "type": "piechart",
@@ -130,7 +130,7 @@
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "targets": [{"expr": "sum by (model) (increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range]))", "legendFormat": "{{model}}", "refId": "A"}],
       "fieldConfig": {"defaults": {"unit": "short", "color": {"mode": "palette-classic"}, "mappings": []}, "overrides": [{"matcher": {"id": "byRegexp", "options": ".*opus.*"}, "properties": [{"id": "color", "value": {"fixedColor": "#9B59B6", "mode": "fixed"}}]}, {"matcher": {"id": "byRegexp", "options": ".*sonnet.*"}, "properties": [{"id": "color", "value": {"fixedColor": "#E67E22", "mode": "fixed"}}]}, {"matcher": {"id": "byRegexp", "options": ".*haiku.*"}, "properties": [{"id": "color", "value": {"fixedColor": "#3498DB", "mode": "fixed"}}]}]},
-      "options": {"legend": {"displayMode": "table", "placement": "right", "values": ["value", "percent"], "showLegend": true}, "pieType": "donut", "tooltip": {"mode": "single"}, "reduceOptions": {"calcs": ["lastNotNull"], "values": false, "fields": ""}}
+      "options": {"legend": {"displayMode": "table", "placement": "bottom", "values": ["value", "percent"], "showLegend": true}, "pieType": "donut", "tooltip": {"mode": "single"}, "reduceOptions": {"calcs": ["lastNotNull"], "values": false, "fields": ""}}
     },
     {
       "id": 14, "title": "Token Type Breakdown", "type": "piechart",
@@ -138,7 +138,7 @@
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "targets": [{"expr": "sum by (type) (increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range]))", "legendFormat": "{{type}}", "refId": "A"}],
       "fieldConfig": {"defaults": {"unit": "locale", "decimals": 0, "color": {"mode": "palette-classic"}, "mappings": []}, "overrides": [{"matcher": {"id": "byName", "options": "input"}, "properties": [{"id": "color", "value": {"fixedColor": "#FF9830", "mode": "fixed"}}]}, {"matcher": {"id": "byName", "options": "output"}, "properties": [{"id": "color", "value": {"fixedColor": "#73BF69", "mode": "fixed"}}]}, {"matcher": {"id": "byName", "options": "cacheRead"}, "properties": [{"id": "color", "value": {"fixedColor": "#3274D9", "mode": "fixed"}}]}, {"matcher": {"id": "byName", "options": "cacheCreation"}, "properties": [{"id": "color", "value": {"fixedColor": "#B877D9", "mode": "fixed"}}]}]},
-      "options": {"legend": {"displayMode": "table", "placement": "right", "values": ["value", "percent"], "showLegend": true}, "pieType": "donut", "tooltip": {"mode": "single"}, "reduceOptions": {"calcs": ["lastNotNull"], "values": false, "fields": ""}}
+      "options": {"legend": {"displayMode": "table", "placement": "bottom", "values": ["value", "percent"], "showLegend": true}, "pieType": "donut", "tooltip": {"mode": "single"}, "reduceOptions": {"calcs": ["lastNotNull"], "values": false, "fields": ""}}
     },
     {
       "id": 15, "title": "Cache Savings ($)", "type": "stat",
