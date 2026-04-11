@@ -106,7 +106,7 @@ demo-metrics: ## Generate demo metrics for testing
 
 dashboard-validate: ## Validate dashboard JSON files
 	@echo "📊 Validating dashboard files..."
-	@for f in claude-code-dashboard.json dashboards/*.json; do \
+	@for f in dashboards/*.json; do \
 		if [ -f "$$f" ]; then \
 			jq . "$$f" > /dev/null && echo "✅ $$f is valid" || echo "❌ $$f is invalid"; \
 		fi \

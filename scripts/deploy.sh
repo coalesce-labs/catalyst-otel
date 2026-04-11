@@ -31,7 +31,7 @@ echo "==> Pushing dashboards to Grafana API..."
 
 # Push each dashboard JSON via the Grafana API
 # This bypasses the file provisioner cache issue
-ssh "$SERVER" "cd $REMOTE_DIR && for f in claude-code-dashboard.json dashboards/*.json; do
+ssh "$SERVER" "cd $REMOTE_DIR && for f in dashboards/*.json; do
   [ -f \"\$f\" ] || continue
   name=\$(basename \"\$f\")
   echo \"    Pushing \$name...\"

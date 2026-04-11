@@ -54,9 +54,7 @@ services:
     volumes:
       - ./grafana-datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro
       - ./grafana-dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml:ro
-      - ./claude-code-dashboard.json:/var/lib/grafana/dashboards/claude-code-dashboard.json:ro
-      - ./dashboards/developer-productivity.json:/var/lib/grafana/dashboards/developer-productivity.json:ro
-      - ./dashboards/token-usage.json:/var/lib/grafana/dashboards/token-usage.json:ro
+      - ./dashboards/unified-dashboard.json:/var/lib/grafana/dashboards/unified-dashboard.json:ro
     ports:
       - "13001:3000"
     restart: unless-stopped

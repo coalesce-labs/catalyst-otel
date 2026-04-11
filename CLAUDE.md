@@ -83,7 +83,7 @@ Claude Code (with telemetry enabled)
    - Stores event data for tool execution, API requests, and errors
    - Queried by Grafana using LogQL
 
-4. **Grafana** (claude-code-dashboard.json)
+4. **Grafana** (dashboards/unified-dashboard.json)
    - Pre-configured with Prometheus and Loki data sources
    - Dashboard auto-loaded from JSON file
    - 30-second refresh rate, default 1-hour time range
@@ -97,7 +97,7 @@ Claude Code (with telemetry enabled)
 | `prometheus.yml` | Prometheus scrape configuration targeting OTel Collector |
 | `grafana-datasources.yml` | Auto-provisions Prometheus, Loki, and Alertmanager data sources |
 | `grafana-dashboards.yml` | Auto-loads dashboard from JSON file |
-| `claude-code-dashboard.json` | Main Grafana dashboard (17 panels across 6 sections) |
+| `dashboards/unified-dashboard.json` | Unified Grafana dashboard (33 panels across 10 sections) |
 | `Makefile` | All management commands for the stack |
 | `CLAUDE_OBSERVABILITY.md` | Official Claude Code telemetry documentation reference |
 
@@ -135,30 +135,36 @@ Claude Code (with telemetry enabled)
 | `app.version` | Claude Code version | `OTEL_METRICS_INCLUDE_VERSION` |
 | `organization.id` | Organization UUID | Always included when authenticated |
 | `user.account_uuid` | Account UUID | `OTEL_METRICS_INCLUDE_ACCOUNT_UUID` |
+| `catalyst.role` | Catalyst worker/orchestrator role | Set via shell wrapper when `CATALYST_ORCHESTRATOR_ID` exists |
+| `catalyst.orchestrator` | Catalyst orchestrator session ID | Set via shell wrapper when `CATALYST_ORCHESTRATOR_ID` exists |
 
 ## Dashboard Development
 
 ### Current Dashboard Structure
 
-The dashboard (claude-code-dashboard.json) has 6 sections with 17 panels:
+Single unified dashboard (`dashboards/unified-dashboard.json`, UID: `claude-code-unified`) with 10 sections, 33 panels:
 
-1. **Overview** (y=0) - 4 stat panels
-   - Active Sessions, Cost, Token Usage, Lines of Code (all 1h windows)
+1. **Hero Stats** (y=0) — 6 stat/gauge panels: Estimated Cost, Token Burn, Sessions, Lines Changed, Cache Hit Rate, Tool Calls
+2. **Activity Timeline** (y=5) — 5 full-width (w:24) timeseries: Cost Rate by Model, Token Rate by Type, Tool Usage Rate, Code Velocity, Active Sessions
+3. **Model & Cache Intelligence** (y=41) — 4 pie/stat + 2 timeseries: Model Mix (Cost/Tokens), Token Type Breakdown, Cache Savings, Cache Efficiency Over Time, API Request Duration
+4. **By Linear Ticket** (y=56) — 3 bar charts: Cost/Tokens/Tool Calls by `linear_key`
+5. **By Project** (y=65) — 3 bar charts: Cost/Tokens/Tool Calls by `project`
+6. **Top Tools** (y=74) — horizontal bar chart + Tool Success Rate timeseries
+7. **Sessions** (y=83) — Token Burn by Session timeseries + Top Sessions bar chart (legend: `{{project}}/{{git_branch}} ({{linear_key}})`)
+8. **Catalyst Orchestration** (y=92, collapsed) — Cost by Role + Worker Activity (only shows data when Catalyst is running)
+9. **Cumulative Totals** (y=93) — Cumulative Cost + Tokens using `increase()` + Grafana `cumulativeTotal` transform
+10. **Event Logs** (y=101) — Tool Execution Events + API Errors
 
-2. **Cost & Usage Analysis** (y=5) - 3 timeseries panels
-   - Cost by Model, Token Usage Rate by Type, API Requests by Model
+### Template Variables
 
-3. **Tool Usage & Performance** (y=22) - 3 timeseries panels
-   - Tool Usage Rate, Cumulative Tool Usage, Tool Success Rate
+| Variable | Query | Cascades From |
+|----------|-------|---------------|
+| `project` | `label_values(claude_code_cost_usage_USD_total, project)` | — |
+| `branch` | `label_values(...{project=~"$project"}, branch)` | project |
+| `linear_key` | `label_values(...{project=~"$project"}, linear_key)` | project |
+| `hostname` | `label_values(..., hostname)` | — |
 
-4. **Performance & Errors** (y=39) - 2 timeseries panels
-   - API Request Duration by Model, API Error Rate
-
-5. **User Activity & Productivity** (y=48) - 2 timeseries panels
-   - Code Changes Rate, Development Activity (Commits/PRs)
-
-6. **Event Logs** (y=57) - 2 logs panels
-   - Tool Execution Events, API Error Events
+All variables: `includeAll: true`, `allValue: ".*"`, `multi: true`.
 
 ### Query Patterns
 
@@ -259,7 +265,7 @@ When OTel Collector exports to Loki via OTLP, OTel log record attributes become 
 | Collector pipeline | collector-config.yaml | Yes (`make restart`) | `make validate-config` |
 | Prometheus scrape | prometheus.yml | Yes (`make restart`) | `make validate-config` |
 | Data sources | grafana-datasources.yml | Yes (`make restart`) | Check Grafana UI |
-| Dashboard | claude-code-dashboard.json | No (auto-reload) | Refresh Grafana UI |
+| Dashboard | dashboards/unified-dashboard.json | No (auto-reload) | Refresh Grafana UI |
 | Docker services | docker-compose.yml | Yes (`make restart`) | `make validate-config` |
 
 ### Extending the Collector

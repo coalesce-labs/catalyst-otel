@@ -394,24 +394,28 @@ To automatically capture working directory, git branch, Linear ticket, and GitHu
 
 ```bash
 claude() {
-    # Start with your static attributes
     local attrs="environment=dev,user=$(whoami),hostname=$(hostname -s)"
-
-    # Working directory
     attrs="${attrs},working.directory=$(basename "$PWD")"
 
-    # Git branch + derived context
+    # Git branch (full name)
     local branch=$(git branch --show-current 2>/dev/null)
-    if [[ -n "$branch" ]]; then
-        attrs="${attrs},git.branch=${branch}"
+    [[ -n "$branch" ]] && attrs="${attrs},git.branch=${branch}"
 
-        # Extract Linear ticket key from branch name (e.g., ENG-123)
-        local linear_key=$(echo "$branch" | grep -oE '[A-Z]+-[0-9]+' | head -1)
-        [[ -n "$linear_key" ]] && attrs="${attrs},linear.key=${linear_key}"
+    # Linear ticket: from branch name first, then Catalyst workflow-context fallback
+    local linear_key=""
+    [[ -n "$branch" ]] && linear_key=$(echo "$branch" | grep -oE '[A-Z]+-[0-9]+' | head -1)
+    if [[ -z "$linear_key" && -f ".catalyst/.workflow-context.json" ]]; then
+        linear_key=$(jq -r '.currentTicket // empty' .catalyst/.workflow-context.json 2>/dev/null)
+    fi
+    [[ -n "$linear_key" ]] && attrs="${attrs},linear.key=${linear_key}"
 
-        # Get GitHub PR number for current branch
-        local pr_num=$(gh pr view --json number -q .number 2>/dev/null)
-        [[ -n "$pr_num" ]] && attrs="${attrs},github.pr=${pr_num}"
+    # GitHub PR
+    local pr_num=$(gh pr view --json number -q .number 2>/dev/null)
+    [[ -n "$pr_num" ]] && attrs="${attrs},github.pr=${pr_num}"
+
+    # Catalyst orchestrator/worker context (resilient — no-ops when not running Catalyst)
+    if [[ -n "$CATALYST_ORCHESTRATOR_ID" ]]; then
+        attrs="${attrs},catalyst.role=worker,catalyst.orchestrator=${CATALYST_ORCHESTRATOR_ID}"
     fi
 
     OTEL_RESOURCE_ATTRIBUTES="$attrs" command claude "$@"
@@ -420,8 +424,9 @@ claude() {
 
 This wrapper:
 - Runs before every `claude` invocation, so attributes reflect the current context
-- Extracts Linear ticket keys from branch names (e.g., `feat/ENG-123-login` → `ENG-123`)
+- Extracts Linear ticket keys from branch names (e.g., `feat/ENG-123-login` → `ENG-123`), with fallback to Catalyst's `.workflow-context.json`
 - Looks up the GitHub PR number via `gh` CLI (requires [GitHub CLI](https://cli.github.com/))
+- Detects Catalyst orchestrator/worker context when `CATALYST_ORCHESTRATOR_ID` is set
 - Falls back gracefully — missing values are simply omitted (the transform processor uses `error_mode: ignore`)
 
 > **Note**: If you use Conductor or another launcher that sets `OTEL_RESOURCE_ATTRIBUTES`, avoid also setting it in `~/.claude/settings.json` — the settings.json value will override the process environment, losing any dynamically-set attributes.

@@ -33,6 +33,9 @@ processors:
           - set(attributes["git_branch"], resource.attributes["git.branch"])
           - set(attributes["linear_key"], resource.attributes["linear.key"])
           - set(attributes["github_pr"], resource.attributes["github.pr"])
+          # Catalyst orchestrator/worker context (resilient — ignored when not set)
+          - set(attributes["catalyst_role"], resource.attributes["catalyst.role"])
+          - set(attributes["catalyst_orchestrator"], resource.attributes["catalyst.orchestrator"])
 
 exporters:
   prometheus:
