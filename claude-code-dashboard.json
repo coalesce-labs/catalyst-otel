@@ -1066,9 +1066,9 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 23
+        "w": 24,
+        "x": 0,
+        "y": 31
       },
       "id": 8,
       "options": {
@@ -1088,7 +1088,7 @@
             "type": "loki",
             "uid": "loki"
           },
-          "expr": "100 * (sum by (tool_name) (count_over_time({service_name=~\"claude-code.*\"} | launcher_name=~\"$launcher_name\" |= \"claude_code.tool_result\" | json | success=\"true\" [15m]))) / (sum by (tool_name) (count_over_time({service_name=~\"claude-code.*\"} | launcher_name=~\"$launcher_name\" |= \"claude_code.tool_result\" [15m])))",
+          "expr": "100 * (sum by (tool_name) (count_over_time({service_name=~\"claude-code.*\"} | launcher_name=~\"$launcher_name\" |= \"claude_code.tool_result\" | success = \"true\" [15m]))) / (sum by (tool_name) (count_over_time({service_name=~\"claude-code.*\"} | launcher_name=~\"$launcher_name\" |= \"claude_code.tool_result\" [15m])))",
           "interval": "",
           "legendFormat": "{{tool_name}}",
           "refId": "A"
@@ -1272,7 +1272,7 @@
             "type": "loki",
             "uid": "loki"
           },
-          "expr": "sum by (status_code) (rate({service_name=~\"claude-code.*\"} | launcher_name=~\"$launcher_name\" |= \"claude_code.api_error\" | json | __error__ = \"\" [$__interval]))",
+          "expr": "sum by (status_code) (rate({service_name=~\"claude-code.*\"} | launcher_name=~\"$launcher_name\" |= \"claude_code.api_error\" [$__interval]))",
           "interval": "",
           "legendFormat": "HTTP {{status_code}}",
           "refId": "A"

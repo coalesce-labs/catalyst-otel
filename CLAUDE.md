@@ -122,7 +122,7 @@ Claude Code (with telemetry enabled)
 | Event Name | Description | Key Attributes |
 |------------|-------------|----------------|
 | `claude_code.user_prompt` | User prompt submission | prompt_length, prompt (if enabled) |
-| `claude_code.tool_result` | Tool execution result | name, success, duration_ms, error |
+| `claude_code.tool_result` | Tool execution result | tool_name, success, duration_ms, error |
 | `claude_code.api_request` | API request | model, cost_usd, duration_ms, input_tokens, output_tokens, cache_read_tokens |
 | `claude_code.api_error` | API error | model, error, status_code, duration_ms, attempt |
 | `claude_code.tool_decision` | Tool permission decision | tool_name, decision, source |
@@ -178,33 +178,39 @@ sum by (model) (changes(claude_code_cost_usage_USD_total[5m]))
 **LogQL for Events**:
 
 ```logql
-# Filter by event type using structured metadata (NOT label selectors)
-# ❌ Wrong: {service_name=~"claude-code.*", tool_name!=""}
-# ✅ Correct: use pipeline filters for structured metadata
+# Filter by event type using substring match on log body
+# The log body contains the full event name (e.g., "claude_code.tool_result")
+{service_name=~"claude-code.*"} |= "claude_code.tool_result"
+
+# Filter by label via pipeline filter
+# OTel attributes become Loki labels — event_name values do NOT have the claude_code. prefix
 {service_name=~"claude-code.*"} | event_name = "tool_result"
 
-# Filter by structured metadata field
-{service_name=~"claude-code.*"} | tool_name != ""
+# Filter by label value
+{service_name=~"claude-code.*"} |= "claude_code.tool_result" | success = "true"
 
-# Aggregate by structured metadata field
-sum by (tool_name) (count_over_time({service_name=~"claude-code.*"} | tool_name != "" [$__range]))
+# Aggregate by label
+sum by (tool_name) (count_over_time({service_name=~"claude-code.*"} |= "claude_code.tool_result" [$__range]))
 
 # Sort metric results descending (for bar charts)
-sort_desc(topk(10, sum by (tool_name) (count_over_time({service_name=~"claude-code.*"} | tool_name != "" [$__range]))))
+sort_desc(topk(10, sum by (tool_name) (count_over_time({service_name=~"claude-code.*"} |= "claude_code.tool_result" [$__range]))))
 
-# Format log lines using structured metadata
-{service_name=~"claude-code.*"} | event_name = "tool_result" | line_format "{{.tool_name}} {{.duration_ms}}ms"
+# Format log lines using label fields
+{service_name=~"claude-code.*"} |= "claude_code.tool_result" | line_format "{{.tool_name}} {{.duration_ms}}ms"
 ```
 
-**Important: Loki Structured Metadata vs Labels**
+**Important: Loki Labels and Log Body**
 
-When OTel Collector exports to Loki via OTLP, event attributes become **structured metadata** (Loki 3.0+), NOT indexed labels:
-- Only `service_name` is indexed as a queryable label
-- Structured metadata fields (`tool_name`, `event_name`, `success`, etc.) can be used in:
-  - Pipeline filters: `| tool_name != ""`
-  - Aggregations: `sum by (tool_name)`
-  - Line formatting: `| line_format "{{.tool_name}}"`
-- They CANNOT be used in stream selectors: `{tool_name="Bash"}` won't work
+When OTel Collector exports to Loki via OTLP, OTel log record attributes become **Loki stream labels**:
+- `service_name`, `event_name`, `tool_name`, `success`, `status_code`, `model`, `duration_ms`, etc. are all stream labels
+- The `event_name` label contains the short name (e.g., `tool_result`, `api_request`, `api_error`) — NOT the `claude_code.` prefixed name
+- The log body contains the full prefixed event name (e.g., `claude_code.tool_result`)
+- Labels can be used in pipeline filters: `| success = "true"`, `| tool_name != ""`
+- Labels can be used in aggregations: `sum by (tool_name)`, `sum by (status_code)`
+- Labels can be used in line formatting: `| line_format "{{.tool_name}}"`
+- High-cardinality labels (like `tool_name`) should be filtered via pipeline filters, not stream selectors
+- Prefer `|= "claude_code.tool_result"` (substring match on body) over `| event_name = "tool_result"` for consistency with existing panels
+- Do NOT use `| json` to parse log lines — the log body is a plain string, not JSON
 
 ### Panel Configuration Patterns
 
