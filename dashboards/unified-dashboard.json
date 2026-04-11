@@ -171,7 +171,7 @@
       "id": 18, "title": "Cost by Ticket", "type": "barchart",
       "gridPos": {"h": 8, "w": 8, "x": 0, "y": 57},
       "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "targets": [{"expr": "sort_desc(topk(10, sum by (linear_key) (increase(claude_code_cost_usage_USD_total{job=\"otel-collector\",linear_key=~\"$linear_key\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range]))))", "legendFormat": "{{linear_key}}", "instant": true, "refId": "A"}],
+      "targets": [{"expr": "sort_desc(topk(10, sum by (linear_key) (increase(claude_code_cost_usage_USD_total{job=\"otel-collector\",linear_key=~\".+\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range]))))", "legendFormat": "{{linear_key}}", "instant": true, "refId": "A"}],
       "fieldConfig": {"defaults": {"unit": "currencyUSD", "color": {"mode": "palette-classic"}, "custom": {"fillOpacity": 80, "barRadius": 0.1, "thresholdsStyle": {"mode": "off"}}, "mappings": []}, "overrides": []},
       "options": {"orientation": "horizontal", "showValue": "always", "barWidth": 0.8, "stacking": "none", "legend": {"displayMode": "hidden", "showLegend": false}, "tooltip": {"mode": "single"}}
     },
@@ -179,7 +179,7 @@
       "id": 19, "title": "Tokens by Ticket", "type": "barchart",
       "gridPos": {"h": 8, "w": 8, "x": 8, "y": 57},
       "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "targets": [{"expr": "sort_desc(topk(10, sum by (linear_key) (increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",linear_key=~\"$linear_key\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range]))))", "legendFormat": "{{linear_key}}", "instant": true, "refId": "A"}],
+      "targets": [{"expr": "sort_desc(topk(10, sum by (linear_key) (increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",linear_key=~\".+\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range]))))", "legendFormat": "{{linear_key}}", "instant": true, "refId": "A"}],
       "fieldConfig": {"defaults": {"unit": "short", "color": {"mode": "palette-classic"}, "custom": {"fillOpacity": 80, "barRadius": 0.1, "thresholdsStyle": {"mode": "off"}}, "mappings": []}, "overrides": []},
       "options": {"orientation": "horizontal", "showValue": "always", "barWidth": 0.8, "stacking": "none", "legend": {"displayMode": "hidden", "showLegend": false}, "tooltip": {"mode": "single"}}
     },
@@ -187,7 +187,7 @@
       "id": 20, "title": "Tool Calls by Ticket", "type": "barchart",
       "gridPos": {"h": 8, "w": 8, "x": 16, "y": 57},
       "datasource": {"type": "loki", "uid": "loki"},
-      "targets": [{"expr": "sort_desc(topk(10, sum by (linear_key) (count_over_time({service_name=~\"claude-code.*\"} |= \"claude_code.tool_result\" | linear_key=~\"$linear_key\" | project=~\"$project\" | branch=~\"$branch\" | hostname=~\"$hostname\" [$__range]))))", "legendFormat": "{{linear_key}}", "instant": true, "refId": "A"}],
+      "targets": [{"expr": "sort_desc(topk(10, sum by (linear_key) (count_over_time({service_name=~\"claude-code.*\"} |= \"claude_code.tool_result\" | linear_key=~\".+\" | project=~\"$project\" | branch=~\"$branch\" | hostname=~\"$hostname\" [$__range]))))", "legendFormat": "{{linear_key}}", "instant": true, "refId": "A"}],
       "fieldConfig": {"defaults": {"unit": "short", "color": {"mode": "palette-classic"}, "custom": {"fillOpacity": 80, "barRadius": 0.1, "thresholdsStyle": {"mode": "off"}}, "mappings": []}, "overrides": []},
       "options": {"orientation": "horizontal", "showValue": "always", "barWidth": 0.8, "stacking": "none", "legend": {"displayMode": "hidden", "showLegend": false}, "tooltip": {"mode": "single"}}
     },
