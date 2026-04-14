@@ -36,6 +36,7 @@ processors:
           # Catalyst orchestrator/worker context (resilient — ignored when not set)
           - set(attributes["catalyst_role"], resource.attributes["catalyst.role"])
           - set(attributes["catalyst_orchestrator"], resource.attributes["catalyst.orchestrator"])
+          - set(attributes["catalyst_orchestration"], resource.attributes["catalyst.orchestration"])
 
 exporters:
   prometheus:
