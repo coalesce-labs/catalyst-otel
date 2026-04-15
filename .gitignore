@@ -45,6 +45,5 @@ loki_data/
 tmp/
 temp/
 
-# Claude Code
-.claude/
+# Thoughts Repo
 thoughts/

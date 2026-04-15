@@ -135,6 +135,11 @@ Claude Code (with telemetry enabled)
 | `app.version` | Claude Code version | `OTEL_METRICS_INCLUDE_VERSION` |
 | `organization.id` | Organization UUID | Always included when authenticated |
 | `user.account_uuid` | Account UUID | `OTEL_METRICS_INCLUDE_ACCOUNT_UUID` |
+| `project` | Project name | Set via direnv `use_otel_context` |
+| `hostname` | Machine short name | Set via direnv `use_otel_context` |
+| `branch` | Git branch | Set via direnv `use_otel_context` |
+| `linear.key` | Linear ticket ID (e.g. ADV-167) | Set via direnv `use_otel_context` |
+| `catalyst.orchestration` | Catalyst orchestration group name | Set via direnv `use_otel_context` |
 | `catalyst.role` | Catalyst worker/orchestrator role | Set via shell wrapper when `CATALYST_ORCHESTRATOR_ID` exists |
 | `catalyst.orchestrator` | Catalyst orchestrator session ID | Set via shell wrapper when `CATALYST_ORCHESTRATOR_ID` exists |
 
@@ -150,7 +155,7 @@ Single unified dashboard (`dashboards/unified-dashboard.json`, UID: `claude-code
 4. **By Linear Ticket** (y=56) — 3 bar charts: Cost/Tokens/Tool Calls by `linear_key`
 5. **By Project** (y=65) — 3 bar charts: Cost/Tokens/Tool Calls by `project`
 6. **Top Tools** (y=74) — horizontal bar chart + Tool Success Rate timeseries
-7. **Sessions** (y=83) — Token Burn by Session timeseries + Top Sessions bar chart (legend: `{{project}}/{{git_branch}} ({{linear_key}})`)
+7. **Sessions** (y=83) — Token Burn by Session timeseries + Top Sessions bar chart (legend: `{{project}}/{{branch}} ({{linear_key}})`)
 8. **Catalyst Orchestration** (y=92, collapsed) — Cost by Role + Worker Activity (only shows data when Catalyst is running)
 9. **Cumulative Totals** (y=93) — Cumulative Cost + Tokens using `increase()` + Grafana `cumulativeTotal` transform
 10. **Event Logs** (y=101) — Tool Execution Events + API Errors
