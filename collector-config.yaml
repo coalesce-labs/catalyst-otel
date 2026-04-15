@@ -23,20 +23,23 @@ processors:
     log_statements:
       - context: log
         statements:
+          # direnv resource attributes (set via use_otel_context in ~/.config/direnv/lib/otel.sh)
+          - set(attributes["project"], resource.attributes["project"])
+          - set(attributes["hostname"], resource.attributes["hostname"])
+          - set(attributes["branch"], resource.attributes["branch"])
+          - set(attributes["linear_key"], resource.attributes["linear.key"])
+          - set(attributes["catalyst_orchestration"], resource.attributes["catalyst.orchestration"])
           # Identity & environment
           - set(attributes["launcher_name"], resource.attributes["launcher.name"])
           - set(attributes["service_namespace"], resource.attributes["service.namespace"])
           - set(attributes["user"], resource.attributes["user"])
           - set(attributes["resource_environment"], resource.attributes["environment"])
-          # Session context (set dynamically by wrapper function)
+          # Session context
           - set(attributes["working_directory"], resource.attributes["working.directory"])
-          - set(attributes["git_branch"], resource.attributes["git.branch"])
-          - set(attributes["linear_key"], resource.attributes["linear.key"])
           - set(attributes["github_pr"], resource.attributes["github.pr"])
-          # Catalyst orchestrator/worker context (resilient — ignored when not set)
+          # Catalyst orchestrator/worker context
           - set(attributes["catalyst_role"], resource.attributes["catalyst.role"])
           - set(attributes["catalyst_orchestrator"], resource.attributes["catalyst.orchestrator"])
-          - set(attributes["catalyst_orchestration"], resource.attributes["catalyst.orchestration"])
 
 exporters:
   prometheus:
