@@ -369,7 +369,7 @@ sum by (launcher_name, tool_name) (
 | Resource Attribute | LogQL Key | Usage |
 |---|---|---|
 | `working.directory` | `working_directory` | `\| working_directory="my-project"` |
-| `git.branch` | `git_branch` | `\| git_branch="feat/login"` |
+| `branch` | `branch` | `\| branch="feat/login"` |
 | `linear.key` | `linear_key` | `\| linear_key="ENG-123"` |
 | `github.pr` | `github_pr` | `\| github_pr="42"` |
 
@@ -377,7 +377,7 @@ sum by (launcher_name, tool_name) (
 
 ```logql
 # All logs from a specific git branch
-{service_name=~"claude-code.*"} | git_branch="feat/login"
+{service_name=~"claude-code.*"} | branch="feat/login"
 
 # Filter by Linear ticket
 {service_name=~"claude-code.*"} | linear_key="ENG-123"
@@ -399,7 +399,7 @@ claude() {
 
     # Git branch (full name)
     local branch=$(git branch --show-current 2>/dev/null)
-    [[ -n "$branch" ]] && attrs="${attrs},git.branch=${branch}"
+    [[ -n "$branch" ]] && attrs="${attrs},branch=${branch}"
 
     # Linear ticket: from branch name first, then Catalyst workflow-context fallback
     local linear_key=""
