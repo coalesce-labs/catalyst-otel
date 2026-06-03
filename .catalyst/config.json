@@ -9,10 +9,14 @@
       "stateMap": {
         "backlog": "Backlog",
         "todo": "Todo",
-        "research": "In Progress",
-        "planning": "In Progress",
-        "inProgress": "In Progress",
-        "inReview": "In Review",
+        "triage": "Triage",
+        "research": "Research",
+        "planning": "Plan",
+        "inProgress": "Implement",
+        "verifying": "Validate",
+        "reviewing": "Validate",
+        "remediating": "Remediate",
+        "inReview": "PR",
         "done": "Done",
         "canceled": "Canceled"
       }
@@ -21,6 +25,9 @@
       "profile": "coalesce-labs",
       "directory": "catalyst-otel",
       "user": null
+    },
+    "orchestration": {
+      "dispatchMode": "phase-agents"
     }
   }
 }
