@@ -1,6 +1,6 @@
 # Claude Code Observability Stack
 
-[![GitHub](https://img.shields.io/badge/GitHub-ColeMurray%2Fclaude--code--otel-blue?logo=github)](https://github.com/ColeMurray/claude-code-otel)
+[![GitHub](https://img.shields.io/badge/GitHub-coalesce--labs%2Fcatalyst--otel-blue?logo=github)](https://github.com/coalesce-labs/catalyst-otel)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Docker](https://img.shields.io/badge/Docker-Ready-blue?logo=docker)](docker-compose.yml)
 

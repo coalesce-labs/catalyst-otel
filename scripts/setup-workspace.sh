@@ -1,11 +1,11 @@
 #!/bin/bash
-# setup-workspace.sh — Initialize a Conductor worktree for claude-code-otel
+# setup-workspace.sh — Initialize a Conductor worktree for catalyst-otel
 # Creates Claude Code project memory symlink so all worktrees share
-# persistent config from ~/.config/claude-code-otel/
+# persistent config from ~/.config/catalyst-otel/
 
 set -euo pipefail
 
-CONFIG_DIR="$HOME/.config/claude-code-otel"
+CONFIG_DIR="$HOME/.config/catalyst-otel"
 WORKSPACE_PATH="$(pwd)"
 
 # Derive Claude Code's project memory path (replaces / with -)

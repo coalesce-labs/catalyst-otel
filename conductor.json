@@ -2,7 +2,7 @@
   "scripts": {
     "setup": "bash scripts/setup-workspace.sh",
     "run": "make up",
-    "archive": "cd /Users/ryan/code-repos/github/ryanrozich/claude-code-otel && git pull"
+    "archive": "cd /Users/ryan/code-repos/github/coalesce-labs/catalyst-otel && git pull"
   },
   "runScriptMode": "nonconcurrent"
 }

@@ -47,3 +47,6 @@ temp/
 
 # Thoughts Repo
 thoughts/
+# Catalyst runtime artifacts (config.json IS tracked)
+.catalyst/.session-id
+.catalyst/.workflow-context.json

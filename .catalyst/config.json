@@ -1,0 +1,26 @@
+{
+  "catalyst": {
+    "projectKey": "catalyst-otel",
+    "project": {
+      "ticketPrefix": "OTL"
+    },
+    "linear": {
+      "teamKey": "OTL",
+      "stateMap": {
+        "backlog": "Backlog",
+        "todo": "Todo",
+        "research": "In Progress",
+        "planning": "In Progress",
+        "inProgress": "In Progress",
+        "inReview": "In Review",
+        "done": "Done",
+        "canceled": "Canceled"
+      }
+    },
+    "thoughts": {
+      "profile": "coalesce-labs",
+      "directory": "catalyst-otel",
+      "user": null
+    }
+  }
+}

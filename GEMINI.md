@@ -1,10 +1,10 @@
 # GEMINI.md
 
-This file provides context and guidance for Gemini agents working with the `claude-code-otel` repository.
+This file provides context and guidance for Gemini agents working with the `catalyst-otel` repository.
 
 ## Project Overview
 
-`claude-code-otel` is a comprehensive observability solution for monitoring Claude Code usage, performance, and costs. It implements an OpenTelemetry-based monitoring stack:
+`catalyst-otel` is a comprehensive observability solution for monitoring Claude Code usage, performance, and costs. It implements an OpenTelemetry-based monitoring stack:
 
 1.  **Claude Code** (Source): Generates telemetry data.
 2.  **OpenTelemetry Collector**: Ingests, processes, and exports data.
