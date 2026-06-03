@@ -1,13 +1,24 @@
 apiVersion: 1
 
+# Delete the auto-generated datasources first so they can be recreated with
+# pinned uids. Grafana cannot change the uid of an existing provisioned
+# datasource in place (errors "data source not found" and fails to start).
+deleteDatasources:
+  - name: prometheus
+    orgId: 1
+  - name: loki
+    orgId: 1
+
 datasources:
   - name: prometheus
+    uid: prometheus
     type: prometheus
     access: proxy
     url: http://otel-prometheus:9090
     isDefault: true
 
   - name: loki
+    uid: loki
     type: loki
     access: proxy
     url: http://otel-loki:3100

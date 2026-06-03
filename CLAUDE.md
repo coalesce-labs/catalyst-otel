@@ -165,7 +165,7 @@ Single unified dashboard (`dashboards/unified-dashboard.json`, UID: `claude-code
 | Variable | Query | Cascades From |
 |----------|-------|---------------|
 | `project` | `label_values(claude_code_cost_usage_USD_total, project)` | — |
-| `branch` | `label_values(...{project=~"$project"}, git_branch)` | project |
+| `branch` | `label_values(...{project=~"$project"}, branch)` | project |
 | `linear_key` | `label_values(...{project=~"$project"}, linear_key)` | project |
 | `hostname` | `label_values(..., hostname)` | — |
 
