@@ -1,0 +1,28 @@
+{
+  "resourceLogs": [
+    {
+      "resource": {
+        "attributes": [
+          { "key": "service.name", "value": { "stringValue": "claude-code" } }
+        ]
+      },
+      "scopeLogs": [
+        {
+          "logRecords": [
+            {
+              "timeUnixNano": "1717459200000000000",
+              "body": { "stringValue": "claude_code.session.context" },
+              "attributes": [
+                { "key": "event.name", "value": { "stringValue": "session.context" } },
+                { "key": "claude.ratelimit.five_hour_pct", "value": { "doubleValue": 42.5 } },
+                { "key": "claude.ratelimit.seven_day_pct", "value": { "doubleValue": 18.3 } },
+                { "key": "claude.context.used_pct", "value": { "doubleValue": 31.2 } },
+                { "key": "claude.turn", "value": { "intValue": "7" } }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
