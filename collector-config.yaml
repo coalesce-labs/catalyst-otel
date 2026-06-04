@@ -40,6 +40,14 @@ processors:
           # Catalyst orchestrator/worker context
           - set(attributes["catalyst_role"], resource.attributes["catalyst.role"])
           - set(attributes["catalyst_orchestrator"], resource.attributes["catalyst.orchestrator"])
+          # CTL-760 session.context per-event attributes (OTL-2).
+          # These are LOG RECORD attributes (numeric), not resource attributes — source is
+          # attributes[...], not resource.attributes[...]. Rename dot-form -> underscore-form so
+          # LogQL pipeline filters and `unwrap` use the standard naming convention.
+          - set(attributes["claude_ratelimit_five_hour_pct"], attributes["claude.ratelimit.five_hour_pct"])
+          - set(attributes["claude_ratelimit_seven_day_pct"], attributes["claude.ratelimit.seven_day_pct"])
+          - set(attributes["claude_context_used_pct"], attributes["claude.context.used_pct"])
+          - set(attributes["claude_turn"], attributes["claude.turn"])
 
 exporters:
   prometheus:
