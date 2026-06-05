@@ -48,6 +48,9 @@ processors:
           - set(attributes["claude_ratelimit_seven_day_pct"], attributes["claude.ratelimit.seven_day_pct"])
           - set(attributes["claude_context_used_pct"], attributes["claude.context.used_pct"])
           - set(attributes["claude_turn"], attributes["claude.turn"])
+          # Catalyst execution-model phase and context labels (OTL-3)
+          - set(attributes["task_type"], resource.attributes["task.type"])
+          - set(attributes["catalyst_exec_context"], resource.attributes["catalyst.exec_context"])
 
 exporters:
   prometheus:
