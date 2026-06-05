@@ -3328,12 +3328,12 @@
       },
       "targets": [
         {
-          "expr": "max_over_time({service_name=~\"claude-code.*\"} |= \"claude_code.session.context\" | project=~\"$project\" | branch=~\"$branch\" | hostname=~\"$hostname\" | unwrap claude_ratelimit_five_hour_pct [$__auto])",
+          "expr": "max_over_time({service_name=\"catalyst.session\"} |= \"session.context\" | unwrap claude_ratelimit_five_hour_pct [$__auto])",
           "legendFormat": "5h window % {{linear_key}}",
           "refId": "A"
         },
         {
-          "expr": "max_over_time({service_name=~\"claude-code.*\"} |= \"claude_code.session.context\" | project=~\"$project\" | branch=~\"$branch\" | hostname=~\"$hostname\" | unwrap claude_ratelimit_seven_day_pct [$__auto])",
+          "expr": "max_over_time({service_name=\"catalyst.session\"} |= \"session.context\" | unwrap claude_ratelimit_seven_day_pct [$__auto])",
           "legendFormat": "7d window % {{linear_key}}",
           "refId": "B"
         }
@@ -3407,12 +3407,12 @@
       },
       "targets": [
         {
-          "expr": "max_over_time({service_name=~\"claude-code.*\"} |= \"claude_code.session.context\" | project=~\"$project\" | branch=~\"$branch\" | hostname=~\"$hostname\" | unwrap claude_context_used_pct [$__auto])",
+          "expr": "max_over_time({service_name=\"catalyst.session\"} |= \"session.context\" | unwrap claude_context_used_pct [$__auto])",
           "legendFormat": "Context % {{linear_key}}",
           "refId": "A"
         },
         {
-          "expr": "max_over_time({service_name=~\"claude-code.*\"} |= \"claude_code.session.context\" | project=~\"$project\" | branch=~\"$branch\" | hostname=~\"$hostname\" | unwrap claude_turn [$__auto])",
+          "expr": "max_over_time({service_name=\"catalyst.session\"} |= \"session.context\" | unwrap claude_turn [$__auto])",
           "legendFormat": "Turn {{linear_key}}",
           "refId": "B"
         }
