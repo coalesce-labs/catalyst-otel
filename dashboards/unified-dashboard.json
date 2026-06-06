@@ -3381,12 +3381,12 @@
       },
       "targets": [
         {
-          "expr": "max_over_time({service_name=\"catalyst.session\"} |= \"session.context\" | unwrap claude_ratelimit_five_hour_pct [$__auto])",
+          "expr": "max_over_time({service_name=\"catalyst.session\"} |= \"session.context\" | unwrap claude_ratelimit_five_hour_pct | __error__=\"\" [$__auto])",
           "legendFormat": "5h window % {{linear_key}}",
           "refId": "A"
         },
         {
-          "expr": "max_over_time({service_name=\"catalyst.session\"} |= \"session.context\" | unwrap claude_ratelimit_seven_day_pct [$__auto])",
+          "expr": "max_over_time({service_name=\"catalyst.session\"} |= \"session.context\" | unwrap claude_ratelimit_seven_day_pct | __error__=\"\" [$__auto])",
           "legendFormat": "7d window % {{linear_key}}",
           "refId": "B"
         }
@@ -3460,12 +3460,12 @@
       },
       "targets": [
         {
-          "expr": "max_over_time({service_name=\"catalyst.session\"} |= \"session.context\" | unwrap claude_context_used_pct [$__auto])",
+          "expr": "max_over_time({service_name=\"catalyst.session\"} |= \"session.context\" | unwrap claude_context_used_pct | __error__=\"\" [$__auto])",
           "legendFormat": "Context % {{linear_key}}",
           "refId": "A"
         },
         {
-          "expr": "max_over_time({service_name=\"catalyst.session\"} |= \"session.context\" | unwrap claude_turn [$__auto])",
+          "expr": "max_over_time({service_name=\"catalyst.session\"} |= \"session.context\" | unwrap claude_turn | __error__=\"\" [$__auto])",
           "legendFormat": "Turn {{linear_key}}",
           "refId": "B"
         }
@@ -3571,22 +3571,22 @@
       },
       "targets": [
         {
-          "expr": "max_over_time({service_name=\"catalyst.execution-core\"} |= \"account.ratelimit.sampled\" | unwrap ratelimit_five_hour_pct [$__auto]) by (account_email)",
+          "expr": "max_over_time({service_name=\"catalyst.execution-core\"} |= \"account.ratelimit.sampled\" | unwrap ratelimit_five_hour_pct | __error__=\"\" [$__auto]) by (account_email)",
           "legendFormat": "5h - {{account_email}}",
           "refId": "A"
         },
         {
-          "expr": "max_over_time({service_name=\"catalyst.execution-core\"} |= \"account.ratelimit.sampled\" | unwrap ratelimit_seven_day_pct [$__auto]) by (account_email)",
+          "expr": "max_over_time({service_name=\"catalyst.execution-core\"} |= \"account.ratelimit.sampled\" | unwrap ratelimit_seven_day_pct | __error__=\"\" [$__auto]) by (account_email)",
           "legendFormat": "7d - {{account_email}}",
           "refId": "B"
         },
         {
-          "expr": "max_over_time({service_name=\"catalyst.execution-core\"} |= \"account.ratelimit.sampled\" | unwrap ratelimit_seven_day_opus_pct [$__auto]) by (account_email)",
+          "expr": "max_over_time({service_name=\"catalyst.execution-core\"} |= \"account.ratelimit.sampled\" | unwrap ratelimit_seven_day_opus_pct | __error__=\"\" [$__auto]) by (account_email)",
           "legendFormat": "7d opus - {{account_email}}",
           "refId": "C"
         },
         {
-          "expr": "max_over_time({service_name=\"catalyst.execution-core\"} |= \"account.ratelimit.sampled\" | unwrap ratelimit_seven_day_sonnet_pct [$__auto]) by (account_email)",
+          "expr": "max_over_time({service_name=\"catalyst.execution-core\"} |= \"account.ratelimit.sampled\" | unwrap ratelimit_seven_day_sonnet_pct | __error__=\"\" [$__auto]) by (account_email)",
           "legendFormat": "7d sonnet - {{account_email}}",
           "refId": "D"
         }
