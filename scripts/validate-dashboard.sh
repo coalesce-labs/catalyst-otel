@@ -10,8 +10,9 @@ FAIL=0
 pass() { echo "OK: $*"; }
 fail() { echo "FAIL: $*"; FAIL=1; }
 
-# --- collector: task_type + catalyst_exec_context + catalyst_dispatch_mode must reach Loki ---
-for attr in task_type catalyst_exec_context catalyst_dispatch_mode; do
+# --- collector: task_type + catalyst_exec_context + catalyst_dispatch_mode +
+#     account-level rate-limit attrs (CTL-787) must reach Loki ---
+for attr in task_type catalyst_exec_context catalyst_dispatch_mode account_email ratelimit_five_hour_pct ratelimit_seven_day_pct; do
   if grep -q "attributes\[\"${attr}\"\]" "$COLLECTOR"; then
     pass "${attr} copied in transform/logs ($COLLECTOR)"
   else
@@ -66,6 +67,14 @@ if [ "$COUNT" -gt 0 ]; then
   pass "panel 'Cost by Dispatch Mode' present"
 else
   fail "missing panel 'Cost by Dispatch Mode'"
+fi
+
+# --- dashboard: Account Rate-Limit Usage panel present (CTL-787) ---
+COUNT=$(jq '[.. | objects | select(.title=="Account Rate-Limit Usage (5h/7d) by account")] | length' "$DASH")
+if [ "$COUNT" -gt 0 ]; then
+  pass "panel 'Account Rate-Limit Usage (5h/7d) by account' present"
+else
+  fail "missing panel 'Account Rate-Limit Usage (5h/7d) by account'"
 fi
 
 # --- dashboard: Hierarchical placeholder panel present ---

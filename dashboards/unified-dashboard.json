@@ -3554,6 +3554,95 @@
           "sort": "desc"
         }
       }
+    },
+    {
+      "id": 52,
+      "title": "Account Rate-Limit Usage (5h/7d) by account",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 149
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "targets": [
+        {
+          "expr": "max_over_time({service_name=\"catalyst.execution-core\"} |= \"account.ratelimit.sampled\" | unwrap ratelimit_five_hour_pct [$__auto]) by (account_email)",
+          "legendFormat": "5h - {{account_email}}",
+          "refId": "A"
+        },
+        {
+          "expr": "max_over_time({service_name=\"catalyst.execution-core\"} |= \"account.ratelimit.sampled\" | unwrap ratelimit_seven_day_pct [$__auto]) by (account_email)",
+          "legendFormat": "7d - {{account_email}}",
+          "refId": "B"
+        },
+        {
+          "expr": "max_over_time({service_name=\"catalyst.execution-core\"} |= \"account.ratelimit.sampled\" | unwrap ratelimit_seven_day_opus_pct [$__auto]) by (account_email)",
+          "legendFormat": "7d opus - {{account_email}}",
+          "refId": "C"
+        },
+        {
+          "expr": "max_over_time({service_name=\"catalyst.execution-core\"} |= \"account.ratelimit.sampled\" | unwrap ratelimit_seven_day_sonnet_pct [$__auto]) by (account_email)",
+          "legendFormat": "7d sonnet - {{account_email}}",
+          "refId": "D"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "spanNulls": true,
+            "showPoints": "never",
+            "lineInterpolation": "smooth",
+            "thresholdsStyle": {
+              "mode": "dashed"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 70
+              },
+              {
+                "color": "red",
+                "value": 90
+              }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "max",
+            "lastNotNull"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
     }
   ],
   "refresh": "30s",
