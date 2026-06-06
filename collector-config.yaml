@@ -114,29 +114,33 @@ exporters:
     endpoint: http://otel-loki:3100/otlp
 
   # ---------------------------------------------------------------------------
-  # Fan-out exporters (CTL-812). DISABLED by default — these are NOT referenced
-  # in any pipeline below, so the collector validates and runs today with ZERO
-  # env vars set. To enable, populate the env vars (see docker-compose.yml
-  # otel-collector environment passthrough) AND uncomment the matching lines in
-  # the "enable fan-out" block under service.pipelines.logs.exporters.
+  # Fan-out exporters (CTL-812). DISABLED by default — kept COMMENTED OUT, not
+  # just unreferenced. The OTel Collector validates EVERY declared exporter at
+  # startup (not only the ones in a pipeline), and the otlphttp factory rejects
+  # an empty endpoint — so leaving otlp_http/dash0 declared with
+  # endpoint: ${env:DASH0_OTLP_ENDPOINT} would crash-loop the collector with
+  # "at least one endpoint must be specified" until DASH0_OTLP_ENDPOINT is set.
+  # To enable fan-out: (1) uncomment the destination block(s) below, (2) set the
+  # matching env vars (see docker-compose.yml otel-collector environment
+  # passthrough), and (3) uncomment the "enable fan-out" line under
+  # service.pipelines.logs.exporters. As-is, the collector boots with ZERO env
+  # vars set.
   # ---------------------------------------------------------------------------
 
   # Honeycomb (logs). Endpoint is the standard ingest URL. The dataset header
   # is required for non-tracing signals (logs/metrics); for traces Honeycomb
-  # routes by service.name and the dataset header is ignored. Env-gated: if
-  # HONEYCOMB_DATASET is unset the header expands empty (harmless when the
-  # exporter itself is disabled).
-  otlp_http/honeycomb:
-    endpoint: https://api.honeycomb.io
-    headers:
-      x-honeycomb-team: ${env:HONEYCOMB_API_KEY}
-      x-honeycomb-dataset: ${env:HONEYCOMB_DATASET}
+  # routes by service.name and the dataset header is ignored.
+  # otlp_http/honeycomb:
+  #   endpoint: https://api.honeycomb.io
+  #   headers:
+  #     x-honeycomb-team: ${env:HONEYCOMB_API_KEY}
+  #     x-honeycomb-dataset: ${env:HONEYCOMB_DATASET}
 
   # Dash0 (logs). Endpoint and bearer token both come from env.
-  otlp_http/dash0:
-    endpoint: ${env:DASH0_OTLP_ENDPOINT}
-    headers:
-      Authorization: Bearer ${env:DASH0_AUTH_TOKEN}
+  # otlp_http/dash0:
+  #   endpoint: ${env:DASH0_OTLP_ENDPOINT}
+  #   headers:
+  #     Authorization: Bearer ${env:DASH0_AUTH_TOKEN}
 
 service:
   pipelines:
@@ -148,12 +152,14 @@ service:
     logs:
       receivers: [otlp]
       processors: [resource, transform/logs]
-      # otlp_http = Loki (OTL-8 rename). To turn on the CTL-812 fan-out, replace
-      # the line below with the "enable fan-out" line and set the matching env
-      # vars in docker-compose.yml. Keep otlp_http and debug; add the new ones:
+      # otlp_http = Loki (OTL-8 rename). To turn on the CTL-812 fan-out:
+      # (1) uncomment the matching exporter block above, (2) set the env vars in
+      # docker-compose.yml, and (3) replace the line below with the "enable
+      # fan-out" line. Keep otlp_http and debug; add the new ones:
       #
       #   exporters: [debug, otlp_http, otlp_http/honeycomb, otlp_http/dash0]
       #
-      # (Enable only the destinations you have keys for — e.g. drop
-      # otlp_http/dash0 if DASH0_* is unset.)
+      # (Enable only the destinations you have keys for — e.g. omit
+      # otlp_http/dash0 if DASH0_* is unset, and leave its exporter block
+      # commented so the empty endpoint can't fail validation.)
       exporters: [debug, otlp_http]

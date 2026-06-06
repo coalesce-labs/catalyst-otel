@@ -9,9 +9,11 @@ services:
     command: ["--config=/etc/otel/collector-config.yaml"]
     # Fan-out exporter secrets (CTL-812). Passed through from the host env with
     # empty defaults so the collector starts cleanly with NO keys set — the
-    # otlp_http/honeycomb and otlp_http/dash0 exporters stay out of the active
-    # pipeline until you uncomment the "enable fan-out" line in
-    # collector-config.yaml. Set real values (e.g. in a local .env) to enable.
+    # otlp_http/honeycomb and otlp_http/dash0 exporters stay COMMENTED OUT in
+    # collector-config.yaml (the collector validates every declared exporter at
+    # startup, and dash0's empty endpoint would crash-loop it) until you
+    # uncomment both the exporter block and the "enable fan-out" line there.
+    # Set real values (e.g. in a local .env) to enable.
     environment:
       HONEYCOMB_API_KEY: ${HONEYCOMB_API_KEY:-}
       HONEYCOMB_DATASET: ${HONEYCOMB_DATASET:-}
