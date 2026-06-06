@@ -70,6 +70,31 @@ processors:
           - set(attributes["ratelimit_seven_day_sonnet_pct"], attributes["ratelimit.seven_day_sonnet_pct"])
           - set(attributes["subscription_type"], attributes["subscription.type"])
           - set(attributes["rate_limit_tier"], attributes["rate_limit.tier"])
+          # Standalone-host + multi-account agent telemetry (CTL-812): the new
+          # catalyst.agent service emits per-host, per-process, and rate-limit
+          # pace LOG-RECORD attributes. Same dot->underscore rename convention
+          # for LogQL labels/unwrap. Source is attributes[...] (numeric/string),
+          # not resource.attributes[...]. No-op (error_mode: ignore) until the
+          # catalyst.agent emit side ships.
+          # -- rate-limit pace (extends the CTL-787 account block) --
+          - set(attributes["ratelimit_five_hour_pace"], attributes["ratelimit.five_hour_pace"])
+          - set(attributes["ratelimit_seven_day_pace"], attributes["ratelimit.seven_day_pace"])
+          # -- host metrics --
+          - set(attributes["host_cpu_pct"], attributes["host.cpu_pct"])
+          - set(attributes["host_cpu_count"], attributes["host.cpu_count"])
+          - set(attributes["host_load1"], attributes["host.load1"])
+          - set(attributes["host_mem_used_mb"], attributes["host.mem_used_mb"])
+          - set(attributes["host_mem_total_mb"], attributes["host.mem_total_mb"])
+          - set(attributes["host_mem_used_pct"], attributes["host.mem_used_pct"])
+          - set(attributes["host_disk_used_gb"], attributes["host.disk_used_gb"])
+          - set(attributes["host_disk_total_gb"], attributes["host.disk_total_gb"])
+          - set(attributes["host_disk_used_pct"], attributes["host.disk_used_pct"])
+          # -- per-process metrics --
+          - set(attributes["process_command"], attributes["process.command"])
+          - set(attributes["process_cpu_pct"], attributes["process.cpu_pct"])
+          - set(attributes["process_rss_mb"], attributes["process.rss_mb"])
+          - set(attributes["process_ticket"], attributes["process.ticket"])
+          - set(attributes["process_phase"], attributes["process.phase"])
 
 exporters:
   prometheus:
@@ -81,8 +106,37 @@ exporters:
   debug:
     verbosity: normal
 
-  otlphttp:
+  # Loki OTLP/HTTP exporter. Renamed otlphttp -> otlp_http (OTL-8): the bare
+  # "otlphttp" alias is deprecated in otelcol-contrib v0.149.0 and logs a
+  # startup deprecation warning ("\"otlphttp\" alias is deprecated; use
+  # \"otlp_http\" instead"). The canonical factory id is otlp_http.
+  otlp_http:
     endpoint: http://otel-loki:3100/otlp
+
+  # ---------------------------------------------------------------------------
+  # Fan-out exporters (CTL-812). DISABLED by default — these are NOT referenced
+  # in any pipeline below, so the collector validates and runs today with ZERO
+  # env vars set. To enable, populate the env vars (see docker-compose.yml
+  # otel-collector environment passthrough) AND uncomment the matching lines in
+  # the "enable fan-out" block under service.pipelines.logs.exporters.
+  # ---------------------------------------------------------------------------
+
+  # Honeycomb (logs). Endpoint is the standard ingest URL. The dataset header
+  # is required for non-tracing signals (logs/metrics); for traces Honeycomb
+  # routes by service.name and the dataset header is ignored. Env-gated: if
+  # HONEYCOMB_DATASET is unset the header expands empty (harmless when the
+  # exporter itself is disabled).
+  otlp_http/honeycomb:
+    endpoint: https://api.honeycomb.io
+    headers:
+      x-honeycomb-team: ${env:HONEYCOMB_API_KEY}
+      x-honeycomb-dataset: ${env:HONEYCOMB_DATASET}
+
+  # Dash0 (logs). Endpoint and bearer token both come from env.
+  otlp_http/dash0:
+    endpoint: ${env:DASH0_OTLP_ENDPOINT}
+    headers:
+      Authorization: Bearer ${env:DASH0_AUTH_TOKEN}
 
 service:
   pipelines:
@@ -94,4 +148,12 @@ service:
     logs:
       receivers: [otlp]
       processors: [resource, transform/logs]
-      exporters: [debug, otlphttp]
+      # otlp_http = Loki (OTL-8 rename). To turn on the CTL-812 fan-out, replace
+      # the line below with the "enable fan-out" line and set the matching env
+      # vars in docker-compose.yml. Keep otlp_http and debug; add the new ones:
+      #
+      #   exporters: [debug, otlp_http, otlp_http/honeycomb, otlp_http/dash0]
+      #
+      # (Enable only the destinations you have keys for — e.g. drop
+      # otlp_http/dash0 if DASH0_* is unset.)
+      exporters: [debug, otlp_http]
