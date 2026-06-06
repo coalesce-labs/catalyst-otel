@@ -19,7 +19,8 @@
         "inReview": "PR",
         "done": "Done",
         "canceled": "Canceled"
-      }
+      },
+      "teamId": "a5fd6d0d-d75e-4645-8dc9-1915dba19df9"
     },
     "thoughts": {
       "profile": "coalesce-labs",

@@ -20,6 +20,18 @@ for attr in task_type catalyst_exec_context catalyst_dispatch_mode account_email
   fi
 done
 
+# --- collector: CTL-812 fan-out agent attrs — account pace + host + process
+#     metrics must reach Loki as underscore labels. These are added by the
+#     collector half of CTL-812 (host.metrics.sampled / host.process.sampled /
+#     account.ratelimit pace fields). EXPECTED to FAIL until that half lands. ---
+for attr in ratelimit_five_hour_pace ratelimit_seven_day_pace host_cpu_pct host_mem_used_pct host_disk_used_pct host_mem_total_mb host_disk_total_gb host_cpu_count process_command process_rss_mb process_cpu_pct process_ticket process_phase; do
+  if grep -q "attributes\[\"${attr}\"\]" "$COLLECTOR"; then
+    pass "${attr} copied in transform/logs ($COLLECTOR)"
+  else
+    fail "${attr} not copied in transform/logs ($COLLECTOR) [EXPECTED until CTL-812 collector half lands]"
+  fi
+done
+
 # --- dashboard: JSON validity ---
 if jq empty "$DASH" 2>/dev/null; then
   pass "dashboard JSON is valid"
@@ -91,6 +103,33 @@ if [ "$ROW_COUNT" -eq 8 ]; then
   pass "Catalyst Orchestration row has 8 panels"
 else
   fail "Catalyst Orchestration row has $ROW_COUNT panels (expected 8)"
+fi
+
+# --- dashboard: CTL-812 fan-out agent panels present (row + scoreboard + host
+#     gauges + capacity stat + process attribution table) ---
+for t in \
+  "Catalyst Agent — Accounts & Host" \
+  "Per-Account Rate-Limit Scoreboard" \
+  "Host CPU % by hostname" \
+  "Host Memory Used % by hostname" \
+  "Host Disk Used % by hostname" \
+  "Host Capacity (mem / disk / CPUs)" \
+  "Top Processes by RSS (command / ticket / phase)"; do
+  COUNT=$(jq --arg t "$t" '[.. | objects | select(.title==$t)] | length' "$DASH")
+  if [ "$COUNT" -gt 0 ]; then
+    pass "panel '$t' present"
+  else
+    fail "missing panel '$t'"
+  fi
+done
+
+# --- dashboard: widened account selector — no bare execution-core selector may
+#     remain in the account rate-limit panel (panel 52, CTL-812 widening) ---
+BARE=$(jq '[.panels[] | select(.id==52) | .targets[].expr | select(test("service_name=\"catalyst.execution-core\""))] | length' "$DASH")
+if [ "$BARE" -eq 0 ]; then
+  pass "panel 52 account selector widened to catalyst.execution-core|catalyst.agent"
+else
+  fail "panel 52 still has $BARE bare catalyst.execution-core selector(s)"
 fi
 
 if [ "$FAIL" -ne 0 ]; then

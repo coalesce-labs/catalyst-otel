@@ -15,7 +15,7 @@
       }
     ]
   },
-  "description": "Unified Claude Code observability — cost, tokens, tools, projects, tickets, and Catalyst orchestration",
+  "description": "Unified Claude Code observability \u2014 cost, tokens, tools, projects, tickets, and Catalyst orchestration",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
@@ -2939,7 +2939,7 @@
           },
           "options": {
             "mode": "markdown",
-            "content": "### Hierarchical Execution (Coming Soon)\n\nExecution-graph, Gantt, and treemap views are **blocked** pending CTL emission of:\n`subagent_id`, `workflow_stage`, `parentSpanId`, `query_source`\n(none currently emitted — see [research 2026-06-04-OTL-3](thoughts/shared/research/2026-06-04-OTL-3-catalyst-execution-telemetry-dashboard.md)).\n\n**Intended queries once attributes are emitted:**\n\n```promql\n# Treemap cost by (linear_key → task_type → subagent_id)\nsum by (linear_key, task_type, subagent_id) (increase(claude_code_cost_usage_USD_total{subagent_id=~\".+\"}[$__range]))\n```\n\n```logql\n# Subagent-vs-main split via query_source\nsum by (query_source) (count_over_time({service_name=~\"claude-code.*\"} | query_source=~\".+\" [$__range]))\n\n# Gantt approximation by workflow_stage (min/max timestamps per stage)\ncount_over_time({service_name=~\"claude-code.*\"} | workflow_stage=~\".+\" [$__range])\n```\n\n_Blocked attributes not emitted: `subagent_id`, `workflow_stage`, `parentSpanId`, `query_source` — open a CTL emission ticket to unblock._"
+            "content": "### Hierarchical Execution (Coming Soon)\n\nExecution-graph, Gantt, and treemap views are **blocked** pending CTL emission of:\n`subagent_id`, `workflow_stage`, `parentSpanId`, `query_source`\n(none currently emitted \u2014 see [research 2026-06-04-OTL-3](thoughts/shared/research/2026-06-04-OTL-3-catalyst-execution-telemetry-dashboard.md)).\n\n**Intended queries once attributes are emitted:**\n\n```promql\n# Treemap cost by (linear_key \u2192 task_type \u2192 subagent_id)\nsum by (linear_key, task_type, subagent_id) (increase(claude_code_cost_usage_USD_total{subagent_id=~\".+\"}[$__range]))\n```\n\n```logql\n# Subagent-vs-main split via query_source\nsum by (query_source) (count_over_time({service_name=~\"claude-code.*\"} | query_source=~\".+\" [$__range]))\n\n# Gantt approximation by workflow_stage (min/max timestamps per stage)\ncount_over_time({service_name=~\"claude-code.*\"} | workflow_stage=~\".+\" [$__range])\n```\n\n_Blocked attributes not emitted: `subagent_id`, `workflow_stage`, `parentSpanId`, `query_source` \u2014 open a CTL emission ticket to unblock._"
           }
         },
         {
@@ -3571,22 +3571,22 @@
       },
       "targets": [
         {
-          "expr": "max_over_time({service_name=\"catalyst.execution-core\"} |= \"account.ratelimit.sampled\" | unwrap ratelimit_five_hour_pct | __error__=\"\" [$__auto]) by (account_email)",
+          "expr": "max_over_time({service_name=~\"catalyst.execution-core|catalyst.agent\"} |= \"account.ratelimit.sampled\" | unwrap ratelimit_five_hour_pct | __error__=\"\" [$__auto]) by (account_email)",
           "legendFormat": "5h - {{account_email}}",
           "refId": "A"
         },
         {
-          "expr": "max_over_time({service_name=\"catalyst.execution-core\"} |= \"account.ratelimit.sampled\" | unwrap ratelimit_seven_day_pct | __error__=\"\" [$__auto]) by (account_email)",
+          "expr": "max_over_time({service_name=~\"catalyst.execution-core|catalyst.agent\"} |= \"account.ratelimit.sampled\" | unwrap ratelimit_seven_day_pct | __error__=\"\" [$__auto]) by (account_email)",
           "legendFormat": "7d - {{account_email}}",
           "refId": "B"
         },
         {
-          "expr": "max_over_time({service_name=\"catalyst.execution-core\"} |= \"account.ratelimit.sampled\" | unwrap ratelimit_seven_day_opus_pct | __error__=\"\" [$__auto]) by (account_email)",
+          "expr": "max_over_time({service_name=~\"catalyst.execution-core|catalyst.agent\"} |= \"account.ratelimit.sampled\" | unwrap ratelimit_seven_day_opus_pct | __error__=\"\" [$__auto]) by (account_email)",
           "legendFormat": "7d opus - {{account_email}}",
           "refId": "C"
         },
         {
-          "expr": "max_over_time({service_name=\"catalyst.execution-core\"} |= \"account.ratelimit.sampled\" | unwrap ratelimit_seven_day_sonnet_pct | __error__=\"\" [$__auto]) by (account_email)",
+          "expr": "max_over_time({service_name=~\"catalyst.execution-core|catalyst.agent\"} |= \"account.ratelimit.sampled\" | unwrap ratelimit_seven_day_sonnet_pct | __error__=\"\" [$__auto]) by (account_email)",
           "legendFormat": "7d sonnet - {{account_email}}",
           "refId": "D"
         }
@@ -3641,6 +3641,848 @@
         "tooltip": {
           "mode": "multi",
           "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 60,
+      "type": "row",
+      "title": "Catalyst Agent \u2014 Accounts & Host",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 157
+      },
+      "panels": []
+    },
+    {
+      "id": 61,
+      "type": "table",
+      "title": "Per-Account Rate-Limit Scoreboard",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 158
+      },
+      "targets": [
+        {
+          "expr": "max_over_time({service_name=~\"catalyst.execution-core|catalyst.agent\"} |= \"account.ratelimit.sampled\" | unwrap ratelimit_five_hour_pct | __error__=\"\" [$__range]) by (account_email)",
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "instant": true
+        },
+        {
+          "expr": "topk(1, count_over_time({service_name=~\"catalyst.execution-core|catalyst.agent\"} |= \"account.ratelimit.sampled\" | ratelimit_five_hour_resets_at!=\"\" [$__range]) by (account_email, ratelimit_five_hour_resets_at)) by (account_email)",
+          "refId": "B",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "instant": true
+        },
+        {
+          "expr": "max_over_time({service_name=~\"catalyst.execution-core|catalyst.agent\"} |= \"account.ratelimit.sampled\" | unwrap ratelimit_seven_day_pct | __error__=\"\" [$__range]) by (account_email)",
+          "refId": "C",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "instant": true
+        },
+        {
+          "expr": "topk(1, count_over_time({service_name=~\"catalyst.execution-core|catalyst.agent\"} |= \"account.ratelimit.sampled\" | ratelimit_seven_day_resets_at!=\"\" [$__range]) by (account_email, ratelimit_seven_day_resets_at)) by (account_email)",
+          "refId": "D",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "instant": true
+        },
+        {
+          "expr": "max_over_time({service_name=~\"catalyst.execution-core|catalyst.agent\"} |= \"account.ratelimit.sampled\" | unwrap ratelimit_five_hour_pace | __error__=\"\" [$__range]) by (account_email)",
+          "refId": "E",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "instant": true
+        },
+        {
+          "expr": "max_over_time({service_name=~\"catalyst.execution-core|catalyst.agent\"} |= \"account.ratelimit.sampled\" | unwrap ratelimit_seven_day_pace | __error__=\"\" [$__range]) by (account_email)",
+          "refId": "F",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "instant": true
+        }
+      ],
+      "transformations": [
+        {
+          "id": "joinByField",
+          "options": {
+            "byField": "account_email",
+            "mode": "outer"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "Time 1": true,
+              "Time 2": true,
+              "Time 3": true,
+              "Time 4": true,
+              "Time 5": true,
+              "Time 6": true,
+              "Value #B": true,
+              "Value #D": true
+            },
+            "renameByName": {
+              "account_email": "Account",
+              "Value #A": "5h %",
+              "ratelimit_five_hour_resets_at": "5h resets-in",
+              "Value #C": "7d %",
+              "ratelimit_seven_day_resets_at": "7d resets-in",
+              "Value #E": "5h pace",
+              "Value #F": "7d pace"
+            },
+            "indexByName": {
+              "account_email": 0,
+              "Value #A": 1,
+              "ratelimit_five_hour_resets_at": 2,
+              "Value #C": 3,
+              "ratelimit_seven_day_resets_at": 4,
+              "Value #E": 5,
+              "Value #F": 6
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "filterable": true
+          },
+          "mappings": []
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "5h %"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "max",
+                "value": 100
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "gauge",
+                  "mode": "gradient"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 70
+                    },
+                    {
+                      "color": "red",
+                      "value": 90
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "7d %"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "max",
+                "value": 100
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "gauge",
+                  "mode": "gradient"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 70
+                    },
+                    {
+                      "color": "red",
+                      "value": 90
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "5h resets-in"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "dateTimeFromNow"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "7d resets-in"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "dateTimeFromNow"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "5h pace"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "red",
+                      "value": 0
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "7d pace"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "red",
+                      "value": 0
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false,
+          "reducer": [
+            "sum"
+          ],
+          "countRows": false,
+          "fields": ""
+        }
+      }
+    },
+    {
+      "id": 62,
+      "type": "gauge",
+      "title": "Host CPU % by hostname",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 0,
+        "y": 167
+      },
+      "targets": [
+        {
+          "expr": "max_over_time({service_name=\"catalyst.agent\"} |= \"host.metrics.sampled\" | unwrap host_cpu_pct | __error__=\"\" [$__range]) by (hostname)",
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "instant": true,
+          "legendFormat": "{{hostname}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 70
+              },
+              {
+                "color": "red",
+                "value": 90
+              }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      }
+    },
+    {
+      "id": 63,
+      "type": "gauge",
+      "title": "Host Memory Used % by hostname",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 6,
+        "y": 167
+      },
+      "targets": [
+        {
+          "expr": "max_over_time({service_name=\"catalyst.agent\"} |= \"host.metrics.sampled\" | unwrap host_mem_used_pct | __error__=\"\" [$__range]) by (hostname)",
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "instant": true,
+          "legendFormat": "{{hostname}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 70
+              },
+              {
+                "color": "red",
+                "value": 90
+              }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      }
+    },
+    {
+      "id": 64,
+      "type": "gauge",
+      "title": "Host Disk Used % by hostname",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 12,
+        "y": 167
+      },
+      "targets": [
+        {
+          "expr": "max_over_time({service_name=\"catalyst.agent\"} |= \"host.metrics.sampled\" | unwrap host_disk_used_pct | __error__=\"\" [$__range]) by (hostname)",
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "instant": true,
+          "legendFormat": "{{hostname}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 70
+              },
+              {
+                "color": "red",
+                "value": 90
+              }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      }
+    },
+    {
+      "id": 65,
+      "type": "stat",
+      "title": "Host Capacity (mem / disk / CPUs)",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 18,
+        "y": 167
+      },
+      "targets": [
+        {
+          "expr": "max_over_time({service_name=\"catalyst.agent\"} |= \"host.metrics.sampled\" | unwrap host_mem_total_mb | __error__=\"\" [$__range]) by (hostname)",
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "instant": true,
+          "legendFormat": "mem - {{hostname}}"
+        },
+        {
+          "expr": "max_over_time({service_name=\"catalyst.agent\"} |= \"host.metrics.sampled\" | unwrap host_disk_total_gb | __error__=\"\" [$__range]) by (hostname)",
+          "refId": "B",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "instant": true,
+          "legendFormat": "disk - {{hostname}}"
+        },
+        {
+          "expr": "max_over_time({service_name=\"catalyst.agent\"} |= \"host.metrics.sampled\" | unwrap host_cpu_count | __error__=\"\" [$__range]) by (hostname)",
+          "refId": "C",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "instant": true,
+          "legendFormat": "CPUs - {{hostname}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "A"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "decmbytes"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "B"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "decgbytes"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "C"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "value_and_name",
+        "colorMode": "none",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 66,
+      "type": "table",
+      "title": "Top Processes by RSS (command / ticket / phase)",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 175
+      },
+      "targets": [
+        {
+          "expr": "topk(20, max_over_time({service_name=\"catalyst.agent\"} |= \"host.process.sampled\" | label_format proc=\"{{.process_command}} / {{.process_ticket}} / {{.process_phase}}\" | unwrap process_rss_mb | __error__=\"\" [$__range]) by (proc, process_command, process_ticket, process_phase))",
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "instant": true
+        },
+        {
+          "expr": "max_over_time({service_name=\"catalyst.agent\"} |= \"host.process.sampled\" | label_format proc=\"{{.process_command}} / {{.process_ticket}} / {{.process_phase}}\" | unwrap process_cpu_pct | __error__=\"\" [$__range]) by (proc, process_command, process_ticket, process_phase)",
+          "refId": "B",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "instant": true
+        }
+      ],
+      "transformations": [
+        {
+          "id": "joinByField",
+          "options": {
+            "byField": "proc",
+            "mode": "outer"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "Time 1": true,
+              "Time 2": true,
+              "proc": true,
+              "process_command 2": true,
+              "process_ticket 2": true,
+              "process_phase 2": true
+            },
+            "renameByName": {
+              "process_command 1": "Command",
+              "process_command": "Command",
+              "Value #A": "RSS MB",
+              "Value #B": "CPU %",
+              "process_ticket 1": "Ticket",
+              "process_phase 1": "Phase",
+              "process_ticket": "Ticket",
+              "process_phase": "Phase"
+            },
+            "indexByName": {
+              "process_command 1": 0,
+              "Value #A": 1,
+              "Value #B": 2,
+              "process_ticket 1": 3,
+              "process_phase 1": 4
+            }
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": "",
+            "sort": [
+              {
+                "field": "RSS MB",
+                "desc": true
+              }
+            ]
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "filterable": true
+          },
+          "mappings": []
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "RSS MB"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "decmbytes"
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "gauge",
+                  "mode": "gradient"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 1024
+                    },
+                    {
+                      "color": "red",
+                      "value": 4096
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "CPU %"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 50
+                    },
+                    {
+                      "color": "red",
+                      "value": 90
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false,
+          "reducer": [
+            "sum"
+          ],
+          "countRows": false,
+          "fields": ""
         }
       }
     }
@@ -3781,5 +4623,5 @@
   "timezone": "browser",
   "title": "Claude Code",
   "uid": "claude-code-unified",
-  "version": 1
+  "version": 2
 }
