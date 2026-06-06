@@ -56,6 +56,20 @@ processors:
           # phase-agent-dispatch only when CATALYST_DISPATCH_MODE is set, so this
           # set() is a no-op (error_mode: ignore) until the catalyst emit side ships.
           - set(attributes["catalyst_dispatch_mode"], resource.attributes["catalyst.dispatch_mode"])
+          # Account-level rate-limit usage (CTL-787): account.ratelimit.sampled event
+          # (service.name=catalyst.execution-core) carries 5h/7d subscription usage % labeled by
+          # account email. LOG-RECORD attributes (numeric/string) -> source is attributes[...],
+          # not resource.attributes[...]. Rename dot->underscore for LogQL unwrap/labels. No-op
+          # (error_mode: ignore) until the emit side ships.
+          - set(attributes["account_email"], attributes["account.email"])
+          - set(attributes["ratelimit_five_hour_pct"], attributes["ratelimit.five_hour_pct"])
+          - set(attributes["ratelimit_seven_day_pct"], attributes["ratelimit.seven_day_pct"])
+          - set(attributes["ratelimit_five_hour_resets_at"], attributes["ratelimit.five_hour_resets_at"])
+          - set(attributes["ratelimit_seven_day_resets_at"], attributes["ratelimit.seven_day_resets_at"])
+          - set(attributes["ratelimit_seven_day_opus_pct"], attributes["ratelimit.seven_day_opus_pct"])
+          - set(attributes["ratelimit_seven_day_sonnet_pct"], attributes["ratelimit.seven_day_sonnet_pct"])
+          - set(attributes["subscription_type"], attributes["subscription.type"])
+          - set(attributes["rate_limit_tier"], attributes["rate_limit.tier"])
 
 exporters:
   prometheus:
