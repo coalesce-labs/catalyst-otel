@@ -2941,6 +2941,59 @@
             "mode": "markdown",
             "content": "### Hierarchical Execution (Coming Soon)\n\nExecution-graph, Gantt, and treemap views are **blocked** pending CTL emission of:\n`subagent_id`, `workflow_stage`, `parentSpanId`, `query_source`\n(none currently emitted — see [research 2026-06-04-OTL-3](thoughts/shared/research/2026-06-04-OTL-3-catalyst-execution-telemetry-dashboard.md)).\n\n**Intended queries once attributes are emitted:**\n\n```promql\n# Treemap cost by (linear_key → task_type → subagent_id)\nsum by (linear_key, task_type, subagent_id) (increase(claude_code_cost_usage_USD_total{subagent_id=~\".+\"}[$__range]))\n```\n\n```logql\n# Subagent-vs-main split via query_source\nsum by (query_source) (count_over_time({service_name=~\"claude-code.*\"} | query_source=~\".+\" [$__range]))\n\n# Gantt approximation by workflow_stage (min/max timestamps per stage)\ncount_over_time({service_name=~\"claude-code.*\"} | workflow_stage=~\".+\" [$__range])\n```\n\n_Blocked attributes not emitted: `subagent_id`, `workflow_stage`, `parentSpanId`, `query_source` — open a CTL emission ticket to unblock._"
           }
+        },
+        {
+          "id": 43,
+          "title": "Cost by Dispatch Mode",
+          "type": "barchart",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 109
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "expr": "sort_desc(sum by (catalyst_dispatch_mode) (increase(claude_code_cost_usage_USD_total{job=\"otel-collector\",catalyst_dispatch_mode=~\".+\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range])))",
+              "legendFormat": "{{catalyst_dispatch_mode}}",
+              "instant": true,
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "currencyUSD",
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "fillOpacity": 80,
+                "barRadius": 0.1,
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": []
+            },
+            "overrides": []
+          },
+          "options": {
+            "orientation": "horizontal",
+            "showValue": "always",
+            "barWidth": 0.8,
+            "stacking": "none",
+            "legend": {
+              "displayMode": "hidden",
+              "showLegend": false
+            },
+            "tooltip": {
+              "mode": "single"
+            }
+          }
         }
       ]
     },

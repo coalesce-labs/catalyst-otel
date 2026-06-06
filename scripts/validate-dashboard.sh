@@ -10,8 +10,8 @@ FAIL=0
 pass() { echo "OK: $*"; }
 fail() { echo "FAIL: $*"; FAIL=1; }
 
-# --- collector: task_type + catalyst_exec_context must reach Loki ---
-for attr in task_type catalyst_exec_context; do
+# --- collector: task_type + catalyst_exec_context + catalyst_dispatch_mode must reach Loki ---
+for attr in task_type catalyst_exec_context catalyst_dispatch_mode; do
   if grep -q "attributes\[\"${attr}\"\]" "$COLLECTOR"; then
     pass "${attr} copied in transform/logs ($COLLECTOR)"
   else
@@ -60,6 +60,14 @@ else
   fail "missing panel 'Tool Calls by Phase'"
 fi
 
+# --- dashboard: Cost by Dispatch Mode panel present (OTL-7) ---
+COUNT=$(jq '[.. | objects | select(.title=="Cost by Dispatch Mode")] | length' "$DASH")
+if [ "$COUNT" -gt 0 ]; then
+  pass "panel 'Cost by Dispatch Mode' present"
+else
+  fail "missing panel 'Cost by Dispatch Mode'"
+fi
+
 # --- dashboard: Hierarchical placeholder panel present ---
 COUNT=$(jq '[.. | objects | select(.type=="text" and (.title | test("Hierarchical"; "i")))] | length' "$DASH")
 if [ "$COUNT" -gt 0 ]; then
@@ -70,10 +78,10 @@ fi
 
 # --- dashboard: Catalyst Orchestration row contains expected panel count ---
 ROW_COUNT=$(jq '.panels[] | select(.title=="Catalyst Orchestration") | .panels | length' "$DASH")
-if [ "$ROW_COUNT" -eq 7 ]; then
-  pass "Catalyst Orchestration row has 7 panels"
+if [ "$ROW_COUNT" -eq 8 ]; then
+  pass "Catalyst Orchestration row has 8 panels"
 else
-  fail "Catalyst Orchestration row has $ROW_COUNT panels (expected 7)"
+  fail "Catalyst Orchestration row has $ROW_COUNT panels (expected 8)"
 fi
 
 if [ "$FAIL" -ne 0 ]; then

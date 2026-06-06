@@ -51,6 +51,11 @@ processors:
           # Catalyst execution-model phase and context labels (OTL-3)
           - set(attributes["task_type"], resource.attributes["task.type"])
           - set(attributes["catalyst_exec_context"], resource.attributes["catalyst.exec_context"])
+          # Catalyst dispatch-mode label (OTL-7): WHO dispatched the phase —
+          # execution-core (daemon) vs orchestrate (/orchestrate wave). Emitted by
+          # phase-agent-dispatch only when CATALYST_DISPATCH_MODE is set, so this
+          # set() is a no-op (error_mode: ignore) until the catalyst emit side ships.
+          - set(attributes["catalyst_dispatch_mode"], resource.attributes["catalyst.dispatch_mode"])
 
 exporters:
   prometheus:
