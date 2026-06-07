@@ -114,8 +114,10 @@ exporters:
     endpoint: http://otel-loki:3100/otlp
 
   # ---------------------------------------------------------------------------
-  # Fan-out exporters (CTL-812 / OTL-1). DISABLED by default — kept COMMENTED
-  # OUT, not just unreferenced. The OTel Collector validates EVERY declared
+  # Fan-out exporters (CTL-812 / OTL-1). ENABLED 2026-06-07 — env vars live in
+  # /home/rozich/otel-stack/.env (gitignored). To DISABLE a destination,
+  # re-comment its block AND remove it from the pipeline exporters lists
+  # below. The OTel Collector validates EVERY declared
   # exporter at startup (not only the ones in a pipeline), and the otlphttp
   # factory rejects an empty endpoint — so leaving otlp_http/dash0 declared
   # with endpoint: ${env:DASH0_OTLP_ENDPOINT} would crash-loop the collector
@@ -142,17 +144,17 @@ exporters:
   # Honeycomb (logs). Endpoint is the standard ingest URL. The dataset header
   # is required for non-tracing signals (logs/metrics); for traces Honeycomb
   # routes by service.name and the dataset header is ignored.
-  # otlp_http/honeycomb:
-  #   endpoint: https://api.honeycomb.io
-  #   headers:
-  #     x-honeycomb-team: ${env:HONEYCOMB_API_KEY}
-  #     x-honeycomb-dataset: ${env:HONEYCOMB_DATASET}
+  otlp_http/honeycomb:
+    endpoint: https://api.honeycomb.io
+    headers:
+      x-honeycomb-team: ${env:HONEYCOMB_API_KEY}
+      x-honeycomb-dataset: ${env:HONEYCOMB_DATASET}
 
   # Dash0 (logs). Endpoint and bearer token both come from env.
-  # otlp_http/dash0:
-  #   endpoint: ${env:DASH0_OTLP_ENDPOINT}
-  #   headers:
-  #     Authorization: Bearer ${env:DASH0_AUTH_TOKEN}
+  otlp_http/dash0:
+    endpoint: ${env:DASH0_OTLP_ENDPOINT}
+    headers:
+      Authorization: Bearer ${env:DASH0_AUTH_TOKEN}
 
 service:
   # PAYLOAD-PARITY INVARIANT (OTL-1): exactly ONE pipeline per signal type.
@@ -169,7 +171,7 @@ service:
       #   exporters: [prometheus, debug, otlp_http/honeycomb, otlp_http/dash0]
       #
       # (One exporter definition can serve both pipelines.)
-      exporters: [prometheus, debug]
+      exporters: [prometheus, debug, otlp_http/honeycomb, otlp_http/dash0]
     
     logs:
       receivers: [otlp]
@@ -184,4 +186,4 @@ service:
       # (Enable only the destinations you have keys for — e.g. omit
       # otlp_http/dash0 if DASH0_* is unset, and leave its exporter block
       # commented so the empty endpoint can't fail validation.)
-      exporters: [debug, otlp_http]
+      exporters: [debug, otlp_http, otlp_http/honeycomb, otlp_http/dash0]
