@@ -26,6 +26,12 @@ processors:
           # direnv resource attributes (set via use_otel_context in ~/.config/direnv/lib/otel.sh)
           - set(attributes["project"], resource.attributes["project"])
           - set(attributes["hostname"], resource.attributes["hostname"])
+          # Canonical host identity (CTL-812): strip the macOS-appended ".local"
+          # so every emitter (catalyst-agent, Claude Code, otel-forward, future
+          # hosts) lands under ONE hostname label — a ".local" variant briefly
+          # split one machine into two gauge series. Runs for ALL sources here
+          # so no emitter can reintroduce the split.
+          - replace_pattern(attributes["hostname"], "\\.local$", "")
           - set(attributes["branch"], resource.attributes["branch"])
           - set(attributes["linear_key"], resource.attributes["linear.key"])
           - set(attributes["catalyst_orchestration"], resource.attributes["catalyst.orchestration"])
