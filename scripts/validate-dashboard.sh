@@ -149,3 +149,23 @@ if jq -e '[.panels[] | select(.id==61) | .targets[].expr | select(test("last_ove
 else
   fail "scoreboard panel 61 has a query without last_over_time/topk by"
 fi
+
+# --- collector: payload-parity invariant (OTL-1) — exactly ONE pipeline per
+#     signal type. Fan-out destinations append to the EXISTING pipeline's
+#     exporters (after the shared processors); a parallel per-vendor pipeline
+#     (logs/honeycomb, metrics/dash0, ...) would let processor chains drift and
+#     destinations fall out of sync. Comments are stripped before checking. ---
+STRIPPED=$(grep -v '^\s*#' "$COLLECTOR")
+if echo "$STRIPPED" | grep -qE '^\s+(logs|metrics|traces)/[A-Za-z0-9_]+:'; then
+  fail "parallel per-vendor pipeline found in $COLLECTOR (violates OTL-1 payload-parity invariant)"
+else
+  pass "no parallel per-vendor pipelines (payload-parity invariant)"
+fi
+for sig in logs metrics; do
+  COUNT=$(echo "$STRIPPED" | grep -cE "^\s+${sig}:\s*$" || true)
+  if [ "$COUNT" -eq 1 ]; then
+    pass "exactly one ${sig} pipeline"
+  else
+    fail "expected exactly one ${sig} pipeline, found ${COUNT}"
+  fi
+done
