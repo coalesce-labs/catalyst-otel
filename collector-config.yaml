@@ -114,17 +114,29 @@ exporters:
     endpoint: http://otel-loki:3100/otlp
 
   # ---------------------------------------------------------------------------
-  # Fan-out exporters (CTL-812). DISABLED by default — kept COMMENTED OUT, not
-  # just unreferenced. The OTel Collector validates EVERY declared exporter at
-  # startup (not only the ones in a pipeline), and the otlphttp factory rejects
-  # an empty endpoint — so leaving otlp_http/dash0 declared with
-  # endpoint: ${env:DASH0_OTLP_ENDPOINT} would crash-loop the collector with
-  # "at least one endpoint must be specified" until DASH0_OTLP_ENDPOINT is set.
-  # To enable fan-out: (1) uncomment the destination block(s) below, (2) set the
-  # matching env vars (see docker-compose.yml otel-collector environment
-  # passthrough), and (3) uncomment the "enable fan-out" line under
+  # Fan-out exporters (CTL-812 / OTL-1). DISABLED by default — kept COMMENTED
+  # OUT, not just unreferenced. The OTel Collector validates EVERY declared
+  # exporter at startup (not only the ones in a pipeline), and the otlphttp
+  # factory rejects an empty endpoint — so leaving otlp_http/dash0 declared
+  # with endpoint: ${env:DASH0_OTLP_ENDPOINT} would crash-loop the collector
+  # with "at least one endpoint must be specified" until DASH0_OTLP_ENDPOINT
+  # is set. To enable fan-out: (1) uncomment the destination block(s) below,
+  # (2) set the matching env vars (see docker-compose.yml otel-collector
+  # environment passthrough), and (3) uncomment the "enable fan-out" line under
   # service.pipelines.logs.exporters. As-is, the collector boots with ZERO env
   # vars set.
+  #
+  # PAYLOAD-PARITY INVARIANT (OTL-1 — the architectural rule of this file):
+  # this collector runs processing/transforms (resource, transform/logs)
+  # BEFORE storage, so a new destination is added ONLY by appending its
+  # exporter to the exporters list of the EXISTING pipeline — NEVER by
+  # creating a parallel per-vendor pipeline (e.g. logs/honeycomb). A parallel
+  # pipeline lets the processor chains drift apart and the destinations
+  # silently fall out of sync: every destination must receive the IDENTICAL
+  # post-transform payload. Per-exporter FORMAT settings (e.g. prometheus
+  # resource_to_telemetry_conversion) are fine — destination-specific
+  # post-PROCESSING is not. validate-dashboard.sh enforces the
+  # one-pipeline-per-signal rule.
   # ---------------------------------------------------------------------------
 
   # Honeycomb (logs). Endpoint is the standard ingest URL. The dataset header
@@ -143,10 +155,20 @@ exporters:
   #     Authorization: Bearer ${env:DASH0_AUTH_TOKEN}
 
 service:
+  # PAYLOAD-PARITY INVARIANT (OTL-1): exactly ONE pipeline per signal type.
+  # Fan out by appending exporters to the existing pipeline (after the shared
+  # processors) so every destination receives the identical post-transform
+  # payload. Never add a parallel per-vendor pipeline (logs/xxx, metrics/xxx).
   pipelines:
-    metrics: 
+    metrics:
       receivers: [otlp]
       processors: [resource]
+      # To fan metrics out to Honeycomb/Dash0 as well, append the SAME exporter
+      # ids here once their blocks are uncommented, e.g.:
+      #
+      #   exporters: [prometheus, debug, otlp_http/honeycomb, otlp_http/dash0]
+      #
+      # (One exporter definition can serve both pipelines.)
       exporters: [prometheus, debug]
     
     logs:
