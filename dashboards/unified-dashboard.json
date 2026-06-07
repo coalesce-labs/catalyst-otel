@@ -3673,7 +3673,7 @@
       },
       "targets": [
         {
-          "expr": "last_over_time({service_name=~\"catalyst.execution-core|catalyst.agent\"} |= \"account.ratelimit.sampled\" | unwrap ratelimit_five_hour_pct | __error__=\"\" [$__range]) by (account_email)",
+          "expr": "last_over_time({service_name=~\"catalyst.execution-core|catalyst.agent\"} |= \"account.ratelimit.sampled\" | account_email!=\"\" | unwrap ratelimit_five_hour_pct | __error__=\"\" [$__range]) by (account_email)",
           "refId": "A",
           "datasource": {
             "type": "loki",
@@ -3682,7 +3682,7 @@
           "instant": true
         },
         {
-          "expr": "topk by (account_email) (1, sum by (account_email, ratelimit_five_hour_resets_at) (count_over_time({service_name=~\"catalyst.execution-core|catalyst.agent\"} |= \"account.ratelimit.sampled\" | ratelimit_five_hour_resets_at!=\"\" [$__range])))",
+          "expr": "topk by (account_email) (1, sum by (account_email, ratelimit_five_hour_resets_at) (count_over_time({service_name=~\"catalyst.execution-core|catalyst.agent\"} |= \"account.ratelimit.sampled\" | account_email!=\"\" | ratelimit_five_hour_resets_at!=\"\" [$__range])))",
           "refId": "B",
           "datasource": {
             "type": "loki",
@@ -3691,7 +3691,7 @@
           "instant": true
         },
         {
-          "expr": "last_over_time({service_name=~\"catalyst.execution-core|catalyst.agent\"} |= \"account.ratelimit.sampled\" | unwrap ratelimit_seven_day_pct | __error__=\"\" [$__range]) by (account_email)",
+          "expr": "last_over_time({service_name=~\"catalyst.execution-core|catalyst.agent\"} |= \"account.ratelimit.sampled\" | account_email!=\"\" | unwrap ratelimit_seven_day_pct | __error__=\"\" [$__range]) by (account_email)",
           "refId": "C",
           "datasource": {
             "type": "loki",
@@ -3700,7 +3700,7 @@
           "instant": true
         },
         {
-          "expr": "topk by (account_email) (1, sum by (account_email, ratelimit_seven_day_resets_at) (count_over_time({service_name=~\"catalyst.execution-core|catalyst.agent\"} |= \"account.ratelimit.sampled\" | ratelimit_seven_day_resets_at!=\"\" [$__range])))",
+          "expr": "topk by (account_email) (1, sum by (account_email, ratelimit_seven_day_resets_at) (count_over_time({service_name=~\"catalyst.execution-core|catalyst.agent\"} |= \"account.ratelimit.sampled\" | account_email!=\"\" | ratelimit_seven_day_resets_at!=\"\" [$__range])))",
           "refId": "D",
           "datasource": {
             "type": "loki",
@@ -3709,7 +3709,7 @@
           "instant": true
         },
         {
-          "expr": "last_over_time({service_name=~\"catalyst.execution-core|catalyst.agent\"} |= \"account.ratelimit.sampled\" | unwrap ratelimit_five_hour_pace | __error__=\"\" [$__range]) by (account_email)",
+          "expr": "last_over_time({service_name=~\"catalyst.execution-core|catalyst.agent\"} |= \"account.ratelimit.sampled\" | account_email!=\"\" | unwrap ratelimit_five_hour_pace | __error__=\"\" [$__range]) by (account_email)",
           "refId": "E",
           "datasource": {
             "type": "loki",
@@ -3718,7 +3718,7 @@
           "instant": true
         },
         {
-          "expr": "last_over_time({service_name=~\"catalyst.execution-core|catalyst.agent\"} |= \"account.ratelimit.sampled\" | unwrap ratelimit_seven_day_pace | __error__=\"\" [$__range]) by (account_email)",
+          "expr": "last_over_time({service_name=~\"catalyst.execution-core|catalyst.agent\"} |= \"account.ratelimit.sampled\" | account_email!=\"\" | unwrap ratelimit_seven_day_pace | __error__=\"\" [$__range]) by (account_email)",
           "refId": "F",
           "datasource": {
             "type": "loki",
@@ -3999,7 +3999,7 @@
       },
       "targets": [
         {
-          "expr": "last_over_time({service_name=\"catalyst.agent\"} |= \"host.metrics.sampled\" | unwrap host_cpu_pct | __error__=\"\" [$__range]) by (hostname)",
+          "expr": "last_over_time({service_name=\"catalyst.agent\", hostname=~\"$hostname\"} |= \"host.metrics.sampled\" | unwrap host_cpu_pct | __error__=\"\" [$__range]) by (hostname)",
           "refId": "A",
           "datasource": {
             "type": "loki",
@@ -4031,7 +4031,8 @@
               }
             ]
           },
-          "mappings": []
+          "mappings": [],
+          "displayName": "${__field.labels.hostname}"
         },
         "overrides": []
       },
@@ -4064,7 +4065,7 @@
       },
       "targets": [
         {
-          "expr": "last_over_time({service_name=\"catalyst.agent\"} |= \"host.metrics.sampled\" | unwrap host_mem_used_pct | __error__=\"\" [$__range]) by (hostname)",
+          "expr": "last_over_time({service_name=\"catalyst.agent\", hostname=~\"$hostname\"} |= \"host.metrics.sampled\" | unwrap host_mem_used_pct | __error__=\"\" [$__range]) by (hostname)",
           "refId": "A",
           "datasource": {
             "type": "loki",
@@ -4096,7 +4097,8 @@
               }
             ]
           },
-          "mappings": []
+          "mappings": [],
+          "displayName": "${__field.labels.hostname}"
         },
         "overrides": []
       },
@@ -4129,7 +4131,7 @@
       },
       "targets": [
         {
-          "expr": "last_over_time({service_name=\"catalyst.agent\"} |= \"host.metrics.sampled\" | unwrap host_disk_used_pct | __error__=\"\" [$__range]) by (hostname)",
+          "expr": "last_over_time({service_name=\"catalyst.agent\", hostname=~\"$hostname\"} |= \"host.metrics.sampled\" | unwrap host_disk_used_pct | __error__=\"\" [$__range]) by (hostname)",
           "refId": "A",
           "datasource": {
             "type": "loki",
@@ -4161,7 +4163,8 @@
               }
             ]
           },
-          "mappings": []
+          "mappings": [],
+          "displayName": "${__field.labels.hostname}"
         },
         "overrides": []
       },
@@ -4194,7 +4197,7 @@
       },
       "targets": [
         {
-          "expr": "last_over_time({service_name=\"catalyst.agent\"} |= \"host.metrics.sampled\" | unwrap host_mem_total_mb | __error__=\"\" [$__range]) by (hostname)",
+          "expr": "last_over_time({service_name=\"catalyst.agent\", hostname=~\"$hostname\"} |= \"host.metrics.sampled\" | unwrap host_mem_total_mb | __error__=\"\" [$__range]) by (hostname)",
           "refId": "A",
           "datasource": {
             "type": "loki",
@@ -4204,7 +4207,7 @@
           "legendFormat": "mem - {{hostname}}"
         },
         {
-          "expr": "last_over_time({service_name=\"catalyst.agent\"} |= \"host.metrics.sampled\" | unwrap host_disk_total_gb | __error__=\"\" [$__range]) by (hostname)",
+          "expr": "last_over_time({service_name=\"catalyst.agent\", hostname=~\"$hostname\"} |= \"host.metrics.sampled\" | unwrap host_disk_total_gb | __error__=\"\" [$__range]) by (hostname)",
           "refId": "B",
           "datasource": {
             "type": "loki",
@@ -4214,7 +4217,7 @@
           "legendFormat": "disk - {{hostname}}"
         },
         {
-          "expr": "last_over_time({service_name=\"catalyst.agent\"} |= \"host.metrics.sampled\" | unwrap host_cpu_count | __error__=\"\" [$__range]) by (hostname)",
+          "expr": "last_over_time({service_name=\"catalyst.agent\", hostname=~\"$hostname\"} |= \"host.metrics.sampled\" | unwrap host_cpu_count | __error__=\"\" [$__range]) by (hostname)",
           "refId": "C",
           "datasource": {
             "type": "loki",
@@ -4255,7 +4258,7 @@
               },
               {
                 "id": "displayName",
-                "value": "Memory"
+                "value": "Memory \u2014 ${__field.labels.hostname}"
               }
             ]
           },
@@ -4271,7 +4274,7 @@
               },
               {
                 "id": "displayName",
-                "value": "Disk"
+                "value": "Disk \u2014 ${__field.labels.hostname}"
               }
             ]
           },
@@ -4287,7 +4290,7 @@
               },
               {
                 "id": "displayName",
-                "value": "CPU cores"
+                "value": "CPU cores \u2014 ${__field.labels.hostname}"
               }
             ]
           }
@@ -4324,7 +4327,7 @@
       },
       "targets": [
         {
-          "expr": "topk(20, max_over_time({service_name=\"catalyst.agent\"} |= \"host.process.sampled\" | label_format proc=\"{{.process_command}} / {{.process_ticket}} / {{.process_phase}}\" | unwrap process_rss_mb | __error__=\"\" [$__range]) by (proc, process_command, process_ticket, process_phase))",
+          "expr": "topk(20, max_over_time({service_name=\"catalyst.agent\", hostname=~\"$hostname\"} |= \"host.process.sampled\" | label_format proc=\"{{.hostname}} / {{.process_command}} / {{.process_ticket}} / {{.process_phase}}\" | unwrap process_rss_mb | __error__=\"\" [$__range]) by (proc, hostname, process_command, process_ticket, process_phase))",
           "refId": "A",
           "datasource": {
             "type": "loki",
@@ -4333,7 +4336,7 @@
           "instant": true
         },
         {
-          "expr": "max_over_time({service_name=\"catalyst.agent\"} |= \"host.process.sampled\" | label_format proc=\"{{.process_command}} / {{.process_ticket}} / {{.process_phase}}\" | unwrap process_cpu_pct | __error__=\"\" [$__range]) by (proc, process_command, process_ticket, process_phase)",
+          "expr": "max_over_time({service_name=\"catalyst.agent\", hostname=~\"$hostname\"} |= \"host.process.sampled\" | label_format proc=\"{{.hostname}} / {{.process_command}} / {{.process_ticket}} / {{.process_phase}}\" | unwrap process_cpu_pct | __error__=\"\" [$__range]) by (proc, hostname, process_command, process_ticket, process_phase)",
           "refId": "B",
           "datasource": {
             "type": "loki",
@@ -4370,7 +4373,8 @@
               "process_ticket 1": "Ticket",
               "process_phase 1": "Phase",
               "process_ticket": "Ticket",
-              "process_phase": "Phase"
+              "process_phase": "Phase",
+              "hostname": "Host"
             },
             "indexByName": {
               "process_command 1": 0,
