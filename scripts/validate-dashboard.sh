@@ -140,3 +140,12 @@ fi
 
 echo ""
 echo "All checks passed."
+
+# --- scoreboard (panel 61): LogQL must use last_over_time (current value) and
+#     the topk-by wrapper — `count_over_time(...) by (...)` is a LogQL parse
+#     error (grouping not allowed on log-range aggregations) that shipped once ---
+if jq -e '[.panels[] | select(.id==61) | .targets[].expr | select(test("last_over_time|topk by") | not)] | length == 0' "$DASH" > /dev/null; then
+  pass "scoreboard panel 61 queries use last_over_time / topk by"
+else
+  fail "scoreboard panel 61 has a query without last_over_time/topk by"
+fi
