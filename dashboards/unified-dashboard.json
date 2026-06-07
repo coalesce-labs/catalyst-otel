@@ -3673,7 +3673,7 @@
       },
       "targets": [
         {
-          "expr": "max_over_time({service_name=~\"catalyst.execution-core|catalyst.agent\"} |= \"account.ratelimit.sampled\" | unwrap ratelimit_five_hour_pct | __error__=\"\" [$__range]) by (account_email)",
+          "expr": "last_over_time({service_name=~\"catalyst.execution-core|catalyst.agent\"} |= \"account.ratelimit.sampled\" | unwrap ratelimit_five_hour_pct | __error__=\"\" [$__range]) by (account_email)",
           "refId": "A",
           "datasource": {
             "type": "loki",
@@ -3682,7 +3682,7 @@
           "instant": true
         },
         {
-          "expr": "topk(1, count_over_time({service_name=~\"catalyst.execution-core|catalyst.agent\"} |= \"account.ratelimit.sampled\" | ratelimit_five_hour_resets_at!=\"\" [$__range]) by (account_email, ratelimit_five_hour_resets_at)) by (account_email)",
+          "expr": "topk by (account_email) (1, sum by (account_email, ratelimit_five_hour_resets_at) (count_over_time({service_name=~\"catalyst.execution-core|catalyst.agent\"} |= \"account.ratelimit.sampled\" | ratelimit_five_hour_resets_at!=\"\" [$__range])))",
           "refId": "B",
           "datasource": {
             "type": "loki",
@@ -3691,7 +3691,7 @@
           "instant": true
         },
         {
-          "expr": "max_over_time({service_name=~\"catalyst.execution-core|catalyst.agent\"} |= \"account.ratelimit.sampled\" | unwrap ratelimit_seven_day_pct | __error__=\"\" [$__range]) by (account_email)",
+          "expr": "last_over_time({service_name=~\"catalyst.execution-core|catalyst.agent\"} |= \"account.ratelimit.sampled\" | unwrap ratelimit_seven_day_pct | __error__=\"\" [$__range]) by (account_email)",
           "refId": "C",
           "datasource": {
             "type": "loki",
@@ -3700,7 +3700,7 @@
           "instant": true
         },
         {
-          "expr": "topk(1, count_over_time({service_name=~\"catalyst.execution-core|catalyst.agent\"} |= \"account.ratelimit.sampled\" | ratelimit_seven_day_resets_at!=\"\" [$__range]) by (account_email, ratelimit_seven_day_resets_at)) by (account_email)",
+          "expr": "topk by (account_email) (1, sum by (account_email, ratelimit_seven_day_resets_at) (count_over_time({service_name=~\"catalyst.execution-core|catalyst.agent\"} |= \"account.ratelimit.sampled\" | ratelimit_seven_day_resets_at!=\"\" [$__range])))",
           "refId": "D",
           "datasource": {
             "type": "loki",
@@ -3709,7 +3709,7 @@
           "instant": true
         },
         {
-          "expr": "max_over_time({service_name=~\"catalyst.execution-core|catalyst.agent\"} |= \"account.ratelimit.sampled\" | unwrap ratelimit_five_hour_pace | __error__=\"\" [$__range]) by (account_email)",
+          "expr": "last_over_time({service_name=~\"catalyst.execution-core|catalyst.agent\"} |= \"account.ratelimit.sampled\" | unwrap ratelimit_five_hour_pace | __error__=\"\" [$__range]) by (account_email)",
           "refId": "E",
           "datasource": {
             "type": "loki",
@@ -3718,7 +3718,7 @@
           "instant": true
         },
         {
-          "expr": "max_over_time({service_name=~\"catalyst.execution-core|catalyst.agent\"} |= \"account.ratelimit.sampled\" | unwrap ratelimit_seven_day_pace | __error__=\"\" [$__range]) by (account_email)",
+          "expr": "last_over_time({service_name=~\"catalyst.execution-core|catalyst.agent\"} |= \"account.ratelimit.sampled\" | unwrap ratelimit_seven_day_pace | __error__=\"\" [$__range]) by (account_email)",
           "refId": "F",
           "datasource": {
             "type": "loki",
