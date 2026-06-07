@@ -3999,14 +3999,15 @@
       },
       "targets": [
         {
-          "expr": "last_over_time({service_name=\"catalyst.agent\", hostname=~\"$hostname\"} |= \"host.metrics.sampled\" | unwrap host_cpu_pct | __error__=\"\" [$__range]) by (hostname)",
+          "expr": "last_over_time({service_name=\"catalyst.agent\", hostname=~\"$hostname\"} |= \"host.metrics.sampled\" | unwrap host_cpu_pct | __error__=\"\" [$__auto]) by (hostname)",
           "refId": "A",
           "datasource": {
             "type": "loki",
             "uid": "loki"
           },
-          "instant": true,
-          "legendFormat": "{{hostname}}"
+          "instant": false,
+          "legendFormat": "{{hostname}}",
+          "range": true
         }
       ],
       "fieldConfig": {
@@ -4065,14 +4066,15 @@
       },
       "targets": [
         {
-          "expr": "last_over_time({service_name=\"catalyst.agent\", hostname=~\"$hostname\"} |= \"host.metrics.sampled\" | unwrap host_mem_used_pct | __error__=\"\" [$__range]) by (hostname)",
+          "expr": "last_over_time({service_name=\"catalyst.agent\", hostname=~\"$hostname\"} |= \"host.metrics.sampled\" | unwrap host_mem_used_pct | __error__=\"\" [$__auto]) by (hostname)",
           "refId": "A",
           "datasource": {
             "type": "loki",
             "uid": "loki"
           },
-          "instant": true,
-          "legendFormat": "{{hostname}}"
+          "instant": false,
+          "legendFormat": "{{hostname}}",
+          "range": true
         }
       ],
       "fieldConfig": {
@@ -4131,14 +4133,15 @@
       },
       "targets": [
         {
-          "expr": "last_over_time({service_name=\"catalyst.agent\", hostname=~\"$hostname\"} |= \"host.metrics.sampled\" | unwrap host_disk_used_pct | __error__=\"\" [$__range]) by (hostname)",
+          "expr": "last_over_time({service_name=\"catalyst.agent\", hostname=~\"$hostname\"} |= \"host.metrics.sampled\" | unwrap host_disk_used_pct | __error__=\"\" [$__auto]) by (hostname)",
           "refId": "A",
           "datasource": {
             "type": "loki",
             "uid": "loki"
           },
-          "instant": true,
-          "legendFormat": "{{hostname}}"
+          "instant": false,
+          "legendFormat": "{{hostname}}",
+          "range": true
         }
       ],
       "fieldConfig": {
@@ -4197,34 +4200,37 @@
       },
       "targets": [
         {
-          "expr": "last_over_time({service_name=\"catalyst.agent\", hostname=~\"$hostname\"} |= \"host.metrics.sampled\" | unwrap host_mem_total_mb | __error__=\"\" [$__range]) by (hostname)",
+          "expr": "last_over_time({service_name=\"catalyst.agent\", hostname=~\"$hostname\"} |= \"host.metrics.sampled\" | unwrap host_mem_total_mb | __error__=\"\" [$__auto]) by (hostname)",
           "refId": "A",
           "datasource": {
             "type": "loki",
             "uid": "loki"
           },
-          "instant": true,
-          "legendFormat": "mem - {{hostname}}"
+          "instant": false,
+          "legendFormat": "mem - {{hostname}}",
+          "range": true
         },
         {
-          "expr": "last_over_time({service_name=\"catalyst.agent\", hostname=~\"$hostname\"} |= \"host.metrics.sampled\" | unwrap host_disk_total_gb | __error__=\"\" [$__range]) by (hostname)",
+          "expr": "last_over_time({service_name=\"catalyst.agent\", hostname=~\"$hostname\"} |= \"host.metrics.sampled\" | unwrap host_disk_total_gb | __error__=\"\" [$__auto]) by (hostname)",
           "refId": "B",
           "datasource": {
             "type": "loki",
             "uid": "loki"
           },
-          "instant": true,
-          "legendFormat": "disk - {{hostname}}"
+          "instant": false,
+          "legendFormat": "disk - {{hostname}}",
+          "range": true
         },
         {
-          "expr": "last_over_time({service_name=\"catalyst.agent\", hostname=~\"$hostname\"} |= \"host.metrics.sampled\" | unwrap host_cpu_count | __error__=\"\" [$__range]) by (hostname)",
+          "expr": "last_over_time({service_name=\"catalyst.agent\", hostname=~\"$hostname\"} |= \"host.metrics.sampled\" | unwrap host_cpu_count | __error__=\"\" [$__auto]) by (hostname)",
           "refId": "C",
           "datasource": {
             "type": "loki",
             "uid": "loki"
           },
-          "instant": true,
-          "legendFormat": "CPUs - {{hostname}}"
+          "instant": false,
+          "legendFormat": "CPUs - {{hostname}}",
+          "range": true
         }
       ],
       "fieldConfig": {
@@ -4363,7 +4369,8 @@
               "proc": true,
               "process_command 2": true,
               "process_ticket 2": true,
-              "process_phase 2": true
+              "process_phase 2": true,
+              "hostname 2": true
             },
             "renameByName": {
               "process_command 1": "Command",
@@ -4374,14 +4381,15 @@
               "process_phase 1": "Phase",
               "process_ticket": "Ticket",
               "process_phase": "Phase",
-              "hostname": "Host"
+              "hostname 1": "Host"
             },
             "indexByName": {
               "process_command 1": 0,
-              "Value #A": 1,
-              "Value #B": 2,
-              "process_ticket 1": 3,
-              "process_phase 1": 4
+              "Value #A": 2,
+              "Value #B": 3,
+              "process_ticket 1": 4,
+              "process_phase 1": 5,
+              "hostname 1": 1
             }
           }
         },
