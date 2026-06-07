@@ -3999,7 +3999,7 @@
       },
       "targets": [
         {
-          "expr": "max_over_time({service_name=\"catalyst.agent\"} |= \"host.metrics.sampled\" | unwrap host_cpu_pct | __error__=\"\" [$__range]) by (hostname)",
+          "expr": "last_over_time({service_name=\"catalyst.agent\"} |= \"host.metrics.sampled\" | unwrap host_cpu_pct | __error__=\"\" [$__range]) by (hostname)",
           "refId": "A",
           "datasource": {
             "type": "loki",
@@ -4064,7 +4064,7 @@
       },
       "targets": [
         {
-          "expr": "max_over_time({service_name=\"catalyst.agent\"} |= \"host.metrics.sampled\" | unwrap host_mem_used_pct | __error__=\"\" [$__range]) by (hostname)",
+          "expr": "last_over_time({service_name=\"catalyst.agent\"} |= \"host.metrics.sampled\" | unwrap host_mem_used_pct | __error__=\"\" [$__range]) by (hostname)",
           "refId": "A",
           "datasource": {
             "type": "loki",
@@ -4129,7 +4129,7 @@
       },
       "targets": [
         {
-          "expr": "max_over_time({service_name=\"catalyst.agent\"} |= \"host.metrics.sampled\" | unwrap host_disk_used_pct | __error__=\"\" [$__range]) by (hostname)",
+          "expr": "last_over_time({service_name=\"catalyst.agent\"} |= \"host.metrics.sampled\" | unwrap host_disk_used_pct | __error__=\"\" [$__range]) by (hostname)",
           "refId": "A",
           "datasource": {
             "type": "loki",
@@ -4194,7 +4194,7 @@
       },
       "targets": [
         {
-          "expr": "max_over_time({service_name=\"catalyst.agent\"} |= \"host.metrics.sampled\" | unwrap host_mem_total_mb | __error__=\"\" [$__range]) by (hostname)",
+          "expr": "last_over_time({service_name=\"catalyst.agent\"} |= \"host.metrics.sampled\" | unwrap host_mem_total_mb | __error__=\"\" [$__range]) by (hostname)",
           "refId": "A",
           "datasource": {
             "type": "loki",
@@ -4204,7 +4204,7 @@
           "legendFormat": "mem - {{hostname}}"
         },
         {
-          "expr": "max_over_time({service_name=\"catalyst.agent\"} |= \"host.metrics.sampled\" | unwrap host_disk_total_gb | __error__=\"\" [$__range]) by (hostname)",
+          "expr": "last_over_time({service_name=\"catalyst.agent\"} |= \"host.metrics.sampled\" | unwrap host_disk_total_gb | __error__=\"\" [$__range]) by (hostname)",
           "refId": "B",
           "datasource": {
             "type": "loki",
@@ -4214,7 +4214,7 @@
           "legendFormat": "disk - {{hostname}}"
         },
         {
-          "expr": "max_over_time({service_name=\"catalyst.agent\"} |= \"host.metrics.sampled\" | unwrap host_cpu_count | __error__=\"\" [$__range]) by (hostname)",
+          "expr": "last_over_time({service_name=\"catalyst.agent\"} |= \"host.metrics.sampled\" | unwrap host_cpu_count | __error__=\"\" [$__range]) by (hostname)",
           "refId": "C",
           "datasource": {
             "type": "loki",
@@ -4252,6 +4252,10 @@
               {
                 "id": "unit",
                 "value": "decmbytes"
+              },
+              {
+                "id": "displayName",
+                "value": "Memory"
               }
             ]
           },
@@ -4264,6 +4268,10 @@
               {
                 "id": "unit",
                 "value": "decgbytes"
+              },
+              {
+                "id": "displayName",
+                "value": "Disk"
               }
             ]
           },
@@ -4276,6 +4284,10 @@
               {
                 "id": "unit",
                 "value": "short"
+              },
+              {
+                "id": "displayName",
+                "value": "CPU cores"
               }
             ]
           }

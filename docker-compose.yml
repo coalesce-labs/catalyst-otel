@@ -72,7 +72,11 @@ services:
     volumes:
       - ./grafana-datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro
       - ./grafana-dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml:ro
-      - ./dashboards/unified-dashboard.json:/var/lib/grafana/dashboards/unified-dashboard.json:ro
+      # Mount the DIRECTORY, not the file: git pull replaces files by rename
+      # (new inode), and a single-file bind mount stays pinned to the old inode
+      # — Grafana then serves stale JSON until the container is recreated
+      # (bit us in CTL-812). A directory mount follows renames.
+      - ./dashboards:/var/lib/grafana/dashboards:ro
     ports:
       - "13001:3000"
     restart: unless-stopped
