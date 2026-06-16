@@ -4556,7 +4556,7 @@
       },
       "targets": [
         {
-          "expr": "system_cpu_utilization_ratio{hostname=~\"$hostname\", job=\"otel-collector\"}",
+          "expr": "system_cpu_utilization_ratio{hostname=~\"$hostname\", job=\"otel-collector\"} * 100",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -4633,7 +4633,7 @@
       },
       "targets": [
         {
-          "expr": "system_memory_utilization_ratio{hostname=~\"$hostname\", job=\"otel-collector\"}",
+          "expr": "system_memory_utilization_ratio{hostname=~\"$hostname\", job=\"otel-collector\"} * 100",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -4710,7 +4710,7 @@
       },
       "targets": [
         {
-          "expr": "system_filesystem_utilization_ratio{hostname=~\"$hostname\", job=\"otel-collector\"}",
+          "expr": "system_filesystem_utilization_ratio{hostname=~\"$hostname\", job=\"otel-collector\"} * 100",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
