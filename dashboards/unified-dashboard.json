@@ -725,6 +725,25 @@
       "description": "Top 10 Linear tickets by token burn per time bucket (width = Grafana $__rate_interval). Excludes sessions with no linear_key attached."
     },
     {
+      "id": 67,
+      "title": "Process by Role (CTL-1228, Forthcoming)",
+      "type": "text",
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 24
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "### Process by Role (CTL-1228, Forthcoming)\n\n**Reserved for execution-core/monitor/broker/agent/claude/trunk CPU+mem + catalyst-vs-host proportion**\n\nPlanned visualization components:\n- Per-process CPU and memory usage (execution-core, monitor, broker, agent, claude, trunk)\n- Resource allocation breakdown by role\n- Catalyst vs. host machine resource split\n- Time series trends for capacity planning\n\n_Status: Not yet implemented \u2014 awaiting instrumentation of process-level metrics via OTel resource.process.* and custom catalyst.process_role attributes._"
+      },
+      "fieldConfig": {
+        "defaults": {}
+      },
+      "pluginVersion": "10.0.0"
+    },
+    {
       "id": 37,
       "title": "Token Burn by Project (Top 10)",
       "type": "timeseries",
@@ -4509,6 +4528,398 @@
           "fields": ""
         }
       }
+    },
+    {
+      "title": "System Metrics",
+      "type": "row",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 184
+      },
+      "collapsed": false
+    },
+    {
+      "id": 70,
+      "type": "timeseries",
+      "title": "CPU",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 4,
+        "x": 0,
+        "y": 185
+      },
+      "targets": [
+        {
+          "expr": "last_over_time({service_name=\"catalyst.agent\", hostname=~\"$hostname\"} |= \"host.metrics.sampled\" | unwrap host_cpu_pct | __error__=\"\" [$__auto]) by (hostname)",
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "instant": false,
+          "legendFormat": "{{hostname}}",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "spanNulls": true,
+            "showPoints": "never",
+            "lineInterpolation": "smooth"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 70
+              },
+              {
+                "color": "red",
+                "value": 90
+              }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 71,
+      "type": "timeseries",
+      "title": "Memory",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 4,
+        "x": 4,
+        "y": 185
+      },
+      "targets": [
+        {
+          "expr": "last_over_time({service_name=\"catalyst.agent\", hostname=~\"$hostname\"} |= \"host.metrics.sampled\" | unwrap host_mem_used_pct | __error__=\"\" [$__auto]) by (hostname)",
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "instant": false,
+          "legendFormat": "{{hostname}}",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "spanNulls": true,
+            "showPoints": "never",
+            "lineInterpolation": "smooth"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 70
+              },
+              {
+                "color": "red",
+                "value": 90
+              }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 72,
+      "type": "timeseries",
+      "title": "Filesystem",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 4,
+        "x": 8,
+        "y": 185
+      },
+      "targets": [
+        {
+          "expr": "last_over_time({service_name=\"catalyst.agent\", hostname=~\"$hostname\"} |= \"host.metrics.sampled\" | unwrap host_disk_used_pct | __error__=\"\" [$__auto]) by (hostname)",
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "instant": false,
+          "legendFormat": "{{hostname}}",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "spanNulls": true,
+            "showPoints": "never",
+            "lineInterpolation": "smooth"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 70
+              },
+              {
+                "color": "red",
+                "value": 90
+              }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 73,
+      "type": "timeseries",
+      "title": "Thermal",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 4,
+        "x": 12,
+        "y": 185
+      },
+      "targets": [
+        {
+          "expr": "last_over_time({service_name=\"catalyst.agent\", hostname=~\"$hostname\"} |= \"host.thermal.sampled\" | unwrap host_thermal_c | __error__=\"\" [$__auto]) by (hostname)",
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "instant": false,
+          "legendFormat": "{{hostname}}",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "celsius",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "spanNulls": true,
+            "showPoints": "never",
+            "lineInterpolation": "smooth"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 70
+              },
+              {
+                "color": "red",
+                "value": 85
+              }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 74,
+      "type": "barchart",
+      "title": "Worktrees",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 4,
+        "x": 16,
+        "y": 185
+      },
+      "targets": [
+        {
+          "expr": "topk(10, sum by (worktree_name) (count_over_time({service_name=\"catalyst.agent\", hostname=~\"$hostname\"} |= \"worktree.session\" | worktree_name!=\"\" [$__range])))",
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "fillOpacity": 80,
+            "barRadius": 0.1,
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "showValue": "always",
+        "barWidth": 0.8,
+        "stacking": "none",
+        "legend": {
+          "displayMode": "hidden",
+          "showLegend": false
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      }
+    },
+    {
+      "id": 75,
+      "type": "text",
+      "title": "Process by Role (placeholder)",
+      "gridPos": {
+        "h": 8,
+        "w": 4,
+        "x": 20,
+        "y": 185
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "### Process by Role (CTL-1228, Forthcoming)\n\n**Reserved for per-process metrics:**\n\n- CPU and memory by execution context\n- Catalyst vs. host resource split\n- Process timeline trends\n\n_Awaiting emitted process_role and execution_context attributes._"
+      },
+      "fieldConfig": {
+        "defaults": {}
+      },
+      "pluginVersion": "10.0.0"
     }
   ],
   "refresh": "30s",
