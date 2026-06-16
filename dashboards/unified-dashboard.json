@@ -4533,10 +4533,10 @@
       "title": "System Metrics",
       "type": "row",
       "gridPos": {
+        "y": 184,
         "h": 1,
         "w": 24,
-        "x": 0,
-        "y": 184
+        "x": 0
       },
       "collapsed": false
     },
@@ -4549,14 +4549,14 @@
         "uid": "prometheus"
       },
       "gridPos": {
+        "y": 185,
         "h": 8,
-        "w": 4,
-        "x": 0,
-        "y": 185
+        "w": 24,
+        "x": 0
       },
       "targets": [
         {
-          "expr": "system_cpu_utilization_ratio{hostname=~\"$hostname\", job=\"otel-collector\"} * 100",
+          "expr": "system_cpu_utilization_ratio{host_name=~\"$hostname\", job=\"otel-collector\"} * 100",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -4626,14 +4626,14 @@
         "uid": "prometheus"
       },
       "gridPos": {
+        "y": 193,
         "h": 8,
-        "w": 4,
-        "x": 4,
-        "y": 185
+        "w": 24,
+        "x": 0
       },
       "targets": [
         {
-          "expr": "system_memory_utilization_ratio{hostname=~\"$hostname\", job=\"otel-collector\"} * 100",
+          "expr": "system_memory_utilization_ratio{host_name=~\"$hostname\", job=\"otel-collector\"} * 100",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -4703,14 +4703,14 @@
         "uid": "prometheus"
       },
       "gridPos": {
+        "y": 201,
         "h": 8,
-        "w": 4,
-        "x": 8,
-        "y": 185
+        "w": 24,
+        "x": 0
       },
       "targets": [
         {
-          "expr": "system_filesystem_utilization_ratio{hostname=~\"$hostname\", job=\"otel-collector\"} * 100",
+          "expr": "system_filesystem_utilization_ratio{host_name=~\"$hostname\", job=\"otel-collector\"} * 100",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -4772,116 +4772,30 @@
       }
     },
     {
-      "id": 73,
-      "type": "timeseries",
-      "title": "Thermal",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 4,
-        "x": 12,
-        "y": 185
-      },
-      "targets": [
-        {
-          "expr": "hw_temperature_celsius{hostname=~\"$hostname\", job=\"otel-collector\"}",
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "instant": false,
-          "legendFormat": "{{hostname}}",
-          "range": true
-        },
-        {
-          "expr": "catalyst_host_thermal_speed_limit_ratio{hostname=~\"$hostname\", job=\"otel-collector\"}",
-          "refId": "B",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "instant": false,
-          "legendFormat": "throttle {{hostname}}",
-          "range": true
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "celsius",
-          "custom": {
-            "drawStyle": "line",
-            "lineWidth": 2,
-            "fillOpacity": 10,
-            "spanNulls": true,
-            "showPoints": "never",
-            "lineInterpolation": "smooth"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "blue",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 70
-              },
-              {
-                "color": "red",
-                "value": 85
-              }
-            ]
-          },
-          "mappings": []
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "calcs": [
-            "mean",
-            "max"
-          ],
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      }
-    },
-    {
       "id": 74,
       "type": "timeseries",
       "title": "Worktrees",
-      "description": "Worktree count per host (logical disk usage shown in APFS clone-inflated units — not physical disk, bun uses clonefile)",
+      "description": "Worktree count per host (logical disk usage shown in APFS clone-inflated units \u2014 not physical disk, bun uses clonefile)",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
       "gridPos": {
+        "y": 209,
         "h": 8,
-        "w": 4,
-        "x": 16,
-        "y": 185
+        "w": 24,
+        "x": 0
       },
       "targets": [
         {
-          "expr": "catalyst_worktree_count{hostname=~\"$hostname\", job=\"otel-collector\"}",
+          "expr": "catalyst_worktree_count{host_name=~\"$hostname\", job=\"otel-collector\"}",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
           },
           "instant": false,
-          "legendFormat": "count {{hostname}}"
+          "legendFormat": "count {{host_name}}"
         }
       ],
       "fieldConfig": {
@@ -5032,13 +4946,13 @@
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(system_cpu_utilization_ratio, hostname)",
+        "definition": "label_values(system_cpu_utilization_ratio, host_name)",
         "includeAll": true,
         "multi": true,
         "name": "hostname",
         "query": {
           "qryType": 1,
-          "query": "label_values(system_cpu_utilization_ratio, hostname)",
+          "query": "label_values(system_cpu_utilization_ratio, host_name)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 2,
