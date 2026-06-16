@@ -4859,8 +4859,9 @@
     },
     {
       "id": 74,
-      "type": "barchart",
+      "type": "timeseries",
       "title": "Worktrees",
+      "description": "Worktree count per host (logical disk usage shown in APFS clone-inflated units — not physical disk, bun uses clonefile)",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -4879,47 +4880,40 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "instant": false
-        },
-        {
-          "expr": "catalyst_worktree_disk_usage_logical_bytes{hostname=~\"$hostname\", job=\"otel-collector\"}",
-          "refId": "B",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
           "instant": false,
-          "legendFormat": "{{hostname}} (logical bytes)"
+          "legendFormat": "count {{hostname}}"
         }
       ],
       "fieldConfig": {
         "defaults": {
           "unit": "short",
+          "custom": {
+            "drawStyle": "bars",
+            "lineWidth": 2,
+            "fillOpacity": 80,
+            "spanNulls": false,
+            "showPoints": "never",
+            "lineInterpolation": "linear"
+          },
           "color": {
             "mode": "palette-classic"
-          },
-          "custom": {
-            "fillOpacity": 80,
-            "barRadius": 0.1,
-            "thresholdsStyle": {
-              "mode": "off"
-            }
           },
           "mappings": []
         },
         "overrides": []
       },
       "options": {
-        "orientation": "horizontal",
-        "showValue": "always",
-        "barWidth": 0.8,
-        "stacking": "none",
         "legend": {
-          "displayMode": "hidden",
-          "showLegend": false
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ],
+          "showLegend": true
         },
         "tooltip": {
-          "mode": "single"
+          "mode": "multi",
+          "sort": "desc"
         }
       }
     },
