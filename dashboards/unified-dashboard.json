@@ -4007,8 +4007,8 @@
       "type": "gauge",
       "title": "Host CPU % by hostname",
       "datasource": {
-        "type": "loki",
-        "uid": "loki"
+        "type": "prometheus",
+        "uid": "prometheus"
       },
       "gridPos": {
         "h": 8,
@@ -4018,14 +4018,14 @@
       },
       "targets": [
         {
-          "expr": "last_over_time({service_name=\"catalyst.agent\", hostname=~\"$hostname\"} |= \"host.metrics.sampled\" | unwrap host_cpu_pct | __error__=\"\" [$__auto]) by (hostname)",
+          "expr": "system_cpu_utilization_ratio{job=\"otel-collector\"} * 100",
           "refId": "A",
           "datasource": {
-            "type": "loki",
-            "uid": "loki"
+            "type": "prometheus",
+            "uid": "prometheus"
           },
           "instant": false,
-          "legendFormat": "{{hostname}}",
+          "legendFormat": "{{host_name}}",
           "range": true
         }
       ],
@@ -4052,7 +4052,7 @@
             ]
           },
           "mappings": [],
-          "displayName": "${__field.labels.hostname}"
+          "displayName": "${__field.labels.host_name}"
         },
         "overrides": []
       },
@@ -4074,8 +4074,8 @@
       "type": "gauge",
       "title": "Host Memory Used % by hostname",
       "datasource": {
-        "type": "loki",
-        "uid": "loki"
+        "type": "prometheus",
+        "uid": "prometheus"
       },
       "gridPos": {
         "h": 8,
@@ -4085,14 +4085,14 @@
       },
       "targets": [
         {
-          "expr": "last_over_time({service_name=\"catalyst.agent\", hostname=~\"$hostname\"} |= \"host.metrics.sampled\" | unwrap host_mem_used_pct | __error__=\"\" [$__auto]) by (hostname)",
+          "expr": "system_memory_utilization_ratio{job=\"otel-collector\"} * 100",
           "refId": "A",
           "datasource": {
-            "type": "loki",
-            "uid": "loki"
+            "type": "prometheus",
+            "uid": "prometheus"
           },
           "instant": false,
-          "legendFormat": "{{hostname}}",
+          "legendFormat": "{{host_name}}",
           "range": true
         }
       ],
@@ -4119,7 +4119,7 @@
             ]
           },
           "mappings": [],
-          "displayName": "${__field.labels.hostname}"
+          "displayName": "${__field.labels.host_name}"
         },
         "overrides": []
       },
@@ -4141,8 +4141,8 @@
       "type": "gauge",
       "title": "Host Disk Used % by hostname",
       "datasource": {
-        "type": "loki",
-        "uid": "loki"
+        "type": "prometheus",
+        "uid": "prometheus"
       },
       "gridPos": {
         "h": 8,
@@ -4152,14 +4152,14 @@
       },
       "targets": [
         {
-          "expr": "last_over_time({service_name=\"catalyst.agent\", hostname=~\"$hostname\"} |= \"host.metrics.sampled\" | unwrap host_disk_used_pct | __error__=\"\" [$__auto]) by (hostname)",
+          "expr": "system_filesystem_utilization_ratio{job=\"otel-collector\"} * 100",
           "refId": "A",
           "datasource": {
-            "type": "loki",
-            "uid": "loki"
+            "type": "prometheus",
+            "uid": "prometheus"
           },
           "instant": false,
-          "legendFormat": "{{hostname}}",
+          "legendFormat": "{{host_name}}",
           "range": true
         }
       ],
@@ -4186,7 +4186,7 @@
             ]
           },
           "mappings": [],
-          "displayName": "${__field.labels.hostname}"
+          "displayName": "${__field.labels.host_name}"
         },
         "overrides": []
       },
