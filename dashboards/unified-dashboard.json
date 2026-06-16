@@ -4545,8 +4545,8 @@
       "type": "timeseries",
       "title": "CPU",
       "datasource": {
-        "type": "loki",
-        "uid": "loki"
+        "type": "prometheus",
+        "uid": "prometheus"
       },
       "gridPos": {
         "h": 8,
@@ -4556,11 +4556,11 @@
       },
       "targets": [
         {
-          "expr": "last_over_time({service_name=\"catalyst.agent\", hostname=~\"$hostname\"} |= \"host.metrics.sampled\" | unwrap host_cpu_pct | __error__=\"\" [$__auto]) by (hostname)",
+          "expr": "system_cpu_utilization_ratio{hostname=~\"$hostname\", job=\"otel-collector\"}",
           "refId": "A",
           "datasource": {
-            "type": "loki",
-            "uid": "loki"
+            "type": "prometheus",
+            "uid": "prometheus"
           },
           "instant": false,
           "legendFormat": "{{hostname}}",
@@ -4622,8 +4622,8 @@
       "type": "timeseries",
       "title": "Memory",
       "datasource": {
-        "type": "loki",
-        "uid": "loki"
+        "type": "prometheus",
+        "uid": "prometheus"
       },
       "gridPos": {
         "h": 8,
@@ -4633,11 +4633,11 @@
       },
       "targets": [
         {
-          "expr": "last_over_time({service_name=\"catalyst.agent\", hostname=~\"$hostname\"} |= \"host.metrics.sampled\" | unwrap host_mem_used_pct | __error__=\"\" [$__auto]) by (hostname)",
+          "expr": "system_memory_utilization_ratio{hostname=~\"$hostname\", job=\"otel-collector\"}",
           "refId": "A",
           "datasource": {
-            "type": "loki",
-            "uid": "loki"
+            "type": "prometheus",
+            "uid": "prometheus"
           },
           "instant": false,
           "legendFormat": "{{hostname}}",
@@ -4699,8 +4699,8 @@
       "type": "timeseries",
       "title": "Filesystem",
       "datasource": {
-        "type": "loki",
-        "uid": "loki"
+        "type": "prometheus",
+        "uid": "prometheus"
       },
       "gridPos": {
         "h": 8,
@@ -4710,11 +4710,11 @@
       },
       "targets": [
         {
-          "expr": "last_over_time({service_name=\"catalyst.agent\", hostname=~\"$hostname\"} |= \"host.metrics.sampled\" | unwrap host_disk_used_pct | __error__=\"\" [$__auto]) by (hostname)",
+          "expr": "system_filesystem_utilization_ratio{hostname=~\"$hostname\", job=\"otel-collector\"}",
           "refId": "A",
           "datasource": {
-            "type": "loki",
-            "uid": "loki"
+            "type": "prometheus",
+            "uid": "prometheus"
           },
           "instant": false,
           "legendFormat": "{{hostname}}",
@@ -4776,8 +4776,8 @@
       "type": "timeseries",
       "title": "Thermal",
       "datasource": {
-        "type": "loki",
-        "uid": "loki"
+        "type": "prometheus",
+        "uid": "prometheus"
       },
       "gridPos": {
         "h": 8,
@@ -4787,14 +4787,25 @@
       },
       "targets": [
         {
-          "expr": "last_over_time({service_name=\"catalyst.agent\", hostname=~\"$hostname\"} |= \"host.thermal.sampled\" | unwrap host_thermal_c | __error__=\"\" [$__auto]) by (hostname)",
+          "expr": "hw_temperature_celsius{hostname=~\"$hostname\", job=\"otel-collector\"}",
           "refId": "A",
           "datasource": {
-            "type": "loki",
-            "uid": "loki"
+            "type": "prometheus",
+            "uid": "prometheus"
           },
           "instant": false,
           "legendFormat": "{{hostname}}",
+          "range": true
+        },
+        {
+          "expr": "catalyst_host_thermal_speed_limit_ratio{hostname=~\"$hostname\", job=\"otel-collector\"}",
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "instant": false,
+          "legendFormat": "throttle {{hostname}}",
           "range": true
         }
       ],
@@ -4851,8 +4862,8 @@
       "type": "barchart",
       "title": "Worktrees",
       "datasource": {
-        "type": "loki",
-        "uid": "loki"
+        "type": "prometheus",
+        "uid": "prometheus"
       },
       "gridPos": {
         "h": 8,
@@ -4862,13 +4873,23 @@
       },
       "targets": [
         {
-          "expr": "topk(10, sum by (worktree_name) (count_over_time({service_name=\"catalyst.agent\", hostname=~\"$hostname\"} |= \"worktree.session\" | worktree_name!=\"\" [$__range])))",
+          "expr": "catalyst_worktree_count{hostname=~\"$hostname\", job=\"otel-collector\"}",
           "refId": "A",
           "datasource": {
-            "type": "loki",
-            "uid": "loki"
+            "type": "prometheus",
+            "uid": "prometheus"
           },
-          "instant": true
+          "instant": false
+        },
+        {
+          "expr": "catalyst_worktree_disk_usage_logical_bytes{hostname=~\"$hostname\", job=\"otel-collector\"}",
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "instant": false,
+          "legendFormat": "{{hostname}} (logical bytes)"
         }
       ],
       "fieldConfig": {
@@ -5017,13 +5038,13 @@
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(claude_code_cost_usage_USD_total, hostname)",
+        "definition": "label_values(system_cpu_utilization_ratio, hostname)",
         "includeAll": true,
         "multi": true,
         "name": "hostname",
         "query": {
           "qryType": 1,
-          "query": "label_values(claude_code_cost_usage_USD_total, hostname)",
+          "query": "label_values(system_cpu_utilization_ratio, hostname)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 2,
