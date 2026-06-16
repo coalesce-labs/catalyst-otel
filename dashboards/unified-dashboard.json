@@ -4563,7 +4563,7 @@
             "uid": "prometheus"
           },
           "instant": false,
-          "legendFormat": "{{hostname}}",
+          "legendFormat": "{{host_name}}",
           "range": true
         }
       ],
@@ -4640,7 +4640,7 @@
             "uid": "prometheus"
           },
           "instant": false,
-          "legendFormat": "{{hostname}}",
+          "legendFormat": "{{host_name}}",
           "range": true
         }
       ],
@@ -4717,7 +4717,7 @@
             "uid": "prometheus"
           },
           "instant": false,
-          "legendFormat": "{{hostname}}",
+          "legendFormat": "{{host_name}}",
           "range": true
         }
       ],
