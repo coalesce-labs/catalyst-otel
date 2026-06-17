@@ -336,8 +336,8 @@
       "collapsed": false
     },
     {
-      "id": 7,
-      "title": "Spend by Model",
+      "id": 76,
+      "title": "Spend by Host",
       "type": "timeseries",
       "gridPos": {
         "h": 7,
@@ -351,8 +351,158 @@
       },
       "targets": [
         {
-          "expr": "sum by (model) (increase(claude_code_cost_usage_USD_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__rate_interval]))",
-          "legendFormat": "{{model}}",
+          "expr": "sum by (display) (label_replace(label_replace(sum by (host_name, hostname) (increase(claude_code_cost_usage_USD_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"}[$__rate_interval])), \"display\", \"$1\", \"hostname\", \"(.+)\"), \"display\", \"$1\", \"host_name\", \"(.+)\"))",
+          "legendFormat": "{{display}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "spanNulls": true,
+            "showPoints": "never",
+            "lineInterpolation": "smooth",
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "sum"
+          ],
+          "showLegend": true,
+          "width": 240,
+          "sortBy": "Total",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "description": "$ spent per time bucket, grouped by canonical host_name (falls back to the machine's hostname when host_name is not set). Shows which hosts are actively spending. Note: only hosts with the OTel context configured emit the canonical host_name (e.g. laptop); others appear under their FQDN."
+    },
+    {
+      "id": 77,
+      "title": "Tokens by Host",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 13
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum by (display) (label_replace(label_replace(sum by (host_name, hostname) (increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"}[$__rate_interval])), \"display\", \"$1\", \"hostname\", \"(.+)\"), \"display\", \"$1\", \"host_name\", \"(.+)\"))",
+          "legendFormat": "{{display}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "spanNulls": true,
+            "showPoints": "never",
+            "lineInterpolation": "smooth",
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "sum"
+          ],
+          "showLegend": true,
+          "width": 240,
+          "sortBy": "Total",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "description": "Tokens consumed per time bucket, grouped by canonical host_name (falls back to hostname when host_name is not set). A liveliness view of per-host activity."
+    },
+    {
+      "id": 7,
+      "title": "Spend by Model",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 20
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum by (model_family) (label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(sum by (model) (increase(claude_code_cost_usage_USD_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__rate_interval])), \"model_family\", \"$1\", \"model\", \"(.+)\"), \"model_family\", \"$1 $2.$3\", \"model\", \"claude-([a-z]+)-([0-9]+)-([0-9]+).*\"), \"model_family\", \"$1 $2\", \"model\", \"claude-([a-z]+)-([0-9]+)(\\\\[[^]]*\\\\])?$\"), \"model_family\", \"Opus $1\", \"model_family\", \"opus (.*)\"), \"model_family\", \"Haiku $1\", \"model_family\", \"haiku (.*)\"), \"model_family\", \"Sonnet $1\", \"model_family\", \"sonnet (.*)\"), \"model_family\", \"Fable $1\", \"model_family\", \"fable (.*)\"))",
+          "legendFormat": "{{model_family}}",
           "refId": "A"
         }
       ],
@@ -393,7 +543,7 @@
           {
             "matcher": {
               "id": "byRegexp",
-              "options": ".*opus.*"
+              "options": "(?i)opus"
             },
             "properties": [
               {
@@ -408,7 +558,7 @@
           {
             "matcher": {
               "id": "byRegexp",
-              "options": ".*sonnet.*"
+              "options": "(?i)sonnet"
             },
             "properties": [
               {
@@ -423,7 +573,7 @@
           {
             "matcher": {
               "id": "byRegexp",
-              "options": ".*haiku.*"
+              "options": "(?i)haiku"
             },
             "properties": [
               {
@@ -440,12 +590,14 @@
       "options": {
         "legend": {
           "displayMode": "table",
-          "placement": "bottom",
+          "placement": "right",
           "calcs": [
-            "sum",
-            "mean"
+            "sum"
           ],
-          "showLegend": true
+          "showLegend": true,
+          "width": 240,
+          "sortBy": "Total",
+          "sortDesc": true
         },
         "tooltip": {
           "mode": "multi",
@@ -462,7 +614,7 @@
         "h": 7,
         "w": 24,
         "x": 0,
-        "y": 13
+        "y": 27
       },
       "datasource": {
         "type": "prometheus",
@@ -574,12 +726,14 @@
       "options": {
         "legend": {
           "displayMode": "table",
-          "placement": "bottom",
+          "placement": "right",
           "calcs": [
-            "sum",
-            "mean"
+            "sum"
           ],
-          "showLegend": true
+          "showLegend": true,
+          "width": 240,
+          "sortBy": "Total",
+          "sortDesc": true
         },
         "tooltip": {
           "mode": "multi",
@@ -596,7 +750,7 @@
         "h": 7,
         "w": 24,
         "x": 0,
-        "y": 20
+        "y": 34
       },
       "datasource": {
         "type": "prometheus",
@@ -708,14 +862,14 @@
       "options": {
         "legend": {
           "displayMode": "table",
-          "placement": "bottom",
+          "placement": "right",
           "calcs": [
-            "sum",
-            "mean"
+            "sum"
           ],
           "showLegend": true,
           "sortBy": "Total",
-          "sortDesc": true
+          "sortDesc": true,
+          "width": 240
         },
         "tooltip": {
           "mode": "multi",
@@ -732,7 +886,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 24
+        "y": 38
       },
       "options": {
         "mode": "markdown",
@@ -751,7 +905,7 @@
         "h": 7,
         "w": 24,
         "x": 0,
-        "y": 27
+        "y": 41
       },
       "datasource": {
         "type": "prometheus",
@@ -863,14 +1017,14 @@
       "options": {
         "legend": {
           "displayMode": "table",
-          "placement": "bottom",
+          "placement": "right",
           "calcs": [
-            "sum",
-            "mean"
+            "sum"
           ],
           "showLegend": true,
           "sortBy": "Total",
-          "sortDesc": true
+          "sortDesc": true,
+          "width": 240
         },
         "tooltip": {
           "mode": "multi",
@@ -887,7 +1041,7 @@
         "h": 7,
         "w": 24,
         "x": 0,
-        "y": 34
+        "y": 48
       },
       "datasource": {
         "type": "loki",
@@ -999,11 +1153,14 @@
       "options": {
         "legend": {
           "displayMode": "table",
-          "placement": "bottom",
+          "placement": "right",
           "calcs": [
             "sum"
           ],
-          "showLegend": true
+          "showLegend": true,
+          "width": 240,
+          "sortBy": "Total",
+          "sortDesc": true
         },
         "tooltip": {
           "mode": "multi",
@@ -1019,7 +1176,7 @@
         "h": 7,
         "w": 24,
         "x": 0,
-        "y": 41
+        "y": 55
       },
       "datasource": {
         "type": "prometheus",
@@ -1107,11 +1264,14 @@
       "options": {
         "legend": {
           "displayMode": "table",
-          "placement": "bottom",
+          "placement": "right",
           "calcs": [
             "sum"
           ],
-          "showLegend": true
+          "showLegend": true,
+          "width": 240,
+          "sortBy": "Total",
+          "sortDesc": true
         },
         "tooltip": {
           "mode": "multi",
@@ -1127,7 +1287,7 @@
         "h": 7,
         "w": 24,
         "x": 0,
-        "y": 48
+        "y": 62
       },
       "datasource": {
         "type": "prometheus",
@@ -1181,9 +1341,10 @@
       },
       "options": {
         "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "width": 240
         },
         "tooltip": {
           "mode": "single",
@@ -1198,7 +1359,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 55
+        "y": 69
       },
       "collapsed": false
     },
@@ -1210,7 +1371,7 @@
         "h": 7,
         "w": 6,
         "x": 0,
-        "y": 56
+        "y": 70
       },
       "datasource": {
         "type": "prometheus",
@@ -1218,8 +1379,8 @@
       },
       "targets": [
         {
-          "expr": "sum by (model) (increase(claude_code_cost_usage_USD_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range]))",
-          "legendFormat": "{{model}}",
+          "expr": "sum by (model_family) (label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(sum by (model) (increase(claude_code_cost_usage_USD_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range])), \"model_family\", \"$1\", \"model\", \"(.+)\"), \"model_family\", \"$1 $2.$3\", \"model\", \"claude-([a-z]+)-([0-9]+)-([0-9]+).*\"), \"model_family\", \"$1 $2\", \"model\", \"claude-([a-z]+)-([0-9]+)(\\\\[[^]]*\\\\])?$\"), \"model_family\", \"Opus $1\", \"model_family\", \"opus (.*)\"), \"model_family\", \"Haiku $1\", \"model_family\", \"haiku (.*)\"), \"model_family\", \"Sonnet $1\", \"model_family\", \"sonnet (.*)\"), \"model_family\", \"Fable $1\", \"model_family\", \"fable (.*)\"))",
+          "legendFormat": "{{model_family}}",
           "refId": "A"
         }
       ],
@@ -1235,7 +1396,7 @@
           {
             "matcher": {
               "id": "byRegexp",
-              "options": ".*opus.*"
+              "options": "(?i)opus"
             },
             "properties": [
               {
@@ -1250,7 +1411,7 @@
           {
             "matcher": {
               "id": "byRegexp",
-              "options": ".*sonnet.*"
+              "options": "(?i)sonnet"
             },
             "properties": [
               {
@@ -1265,7 +1426,7 @@
           {
             "matcher": {
               "id": "byRegexp",
-              "options": ".*haiku.*"
+              "options": "(?i)haiku"
             },
             "properties": [
               {
@@ -1310,7 +1471,7 @@
         "h": 7,
         "w": 6,
         "x": 6,
-        "y": 56
+        "y": 70
       },
       "datasource": {
         "type": "prometheus",
@@ -1318,8 +1479,8 @@
       },
       "targets": [
         {
-          "expr": "sum by (model) (increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range]))",
-          "legendFormat": "{{model}}",
+          "expr": "sum by (model_family) (label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(sum by (model) (increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range])), \"model_family\", \"$1\", \"model\", \"(.+)\"), \"model_family\", \"$1 $2.$3\", \"model\", \"claude-([a-z]+)-([0-9]+)-([0-9]+).*\"), \"model_family\", \"$1 $2\", \"model\", \"claude-([a-z]+)-([0-9]+)(\\\\[[^]]*\\\\])?$\"), \"model_family\", \"Opus $1\", \"model_family\", \"opus (.*)\"), \"model_family\", \"Haiku $1\", \"model_family\", \"haiku (.*)\"), \"model_family\", \"Sonnet $1\", \"model_family\", \"sonnet (.*)\"), \"model_family\", \"Fable $1\", \"model_family\", \"fable (.*)\"))",
+          "legendFormat": "{{model_family}}",
           "refId": "A"
         }
       ],
@@ -1335,7 +1496,7 @@
           {
             "matcher": {
               "id": "byRegexp",
-              "options": ".*opus.*"
+              "options": "(?i)opus"
             },
             "properties": [
               {
@@ -1350,7 +1511,7 @@
           {
             "matcher": {
               "id": "byRegexp",
-              "options": ".*sonnet.*"
+              "options": "(?i)sonnet"
             },
             "properties": [
               {
@@ -1365,7 +1526,7 @@
           {
             "matcher": {
               "id": "byRegexp",
-              "options": ".*haiku.*"
+              "options": "(?i)haiku"
             },
             "properties": [
               {
@@ -1410,7 +1571,7 @@
         "h": 7,
         "w": 6,
         "x": 12,
-        "y": 56
+        "y": 70
       },
       "datasource": {
         "type": "prometheus",
@@ -1527,7 +1688,7 @@
         "h": 7,
         "w": 6,
         "x": 18,
-        "y": 56
+        "y": 70
       },
       "datasource": {
         "type": "prometheus",
@@ -1583,7 +1744,7 @@
         "h": 7,
         "w": 24,
         "x": 0,
-        "y": 63
+        "y": 77
       },
       "datasource": {
         "type": "loki",
@@ -1591,8 +1752,8 @@
       },
       "targets": [
         {
-          "expr": "avg by (model) (avg_over_time({service_name=~\"claude-code.*\"} |= \"claude_code.api_request\" | project=~\"$project\" | branch=~\"$branch\" | hostname=~\"$hostname\" | unwrap duration_ms [$__auto]))",
-          "legendFormat": "{{model}}",
+          "expr": "avg by (model_family) (label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(avg by (model) (avg_over_time({service_name=~\"claude-code.*\"} |= \"claude_code.api_request\" | project=~\"$project\" | branch=~\"$branch\" | hostname=~\"$hostname\" | unwrap duration_ms [$__auto])), \"model_family\", \"$1\", \"model\", \"(.+)\"), \"model_family\", \"$1 $2.$3\", \"model\", \"claude-([a-z]+)-([0-9]+)-([0-9]+).*\"), \"model_family\", \"$1 $2\", \"model\", \"claude-([a-z]+)-([0-9]+)(\\\\[[^]]*\\\\])?$\"), \"model_family\", \"Opus $1\", \"model_family\", \"opus (.*)\"), \"model_family\", \"Haiku $1\", \"model_family\", \"haiku (.*)\"), \"model_family\", \"Sonnet $1\", \"model_family\", \"sonnet (.*)\"), \"model_family\", \"Fable $1\", \"model_family\", \"fable (.*)\"))",
+          "legendFormat": "{{model_family}}",
           "refId": "A"
         }
       ],
@@ -1633,7 +1794,7 @@
           {
             "matcher": {
               "id": "byRegexp",
-              "options": ".*opus.*"
+              "options": "(?i)opus"
             },
             "properties": [
               {
@@ -1648,7 +1809,7 @@
           {
             "matcher": {
               "id": "byRegexp",
-              "options": ".*sonnet.*"
+              "options": "(?i)sonnet"
             },
             "properties": [
               {
@@ -1663,7 +1824,7 @@
           {
             "matcher": {
               "id": "byRegexp",
-              "options": ".*haiku.*"
+              "options": "(?i)haiku"
             },
             "properties": [
               {
@@ -1680,12 +1841,15 @@
       "options": {
         "legend": {
           "displayMode": "table",
-          "placement": "bottom",
+          "placement": "right",
           "calcs": [
             "mean",
             "max"
           ],
-          "showLegend": true
+          "showLegend": true,
+          "width": 240,
+          "sortBy": "Mean",
+          "sortDesc": true
         },
         "tooltip": {
           "mode": "multi",
@@ -1700,7 +1864,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 70
+        "y": 84
       },
       "collapsed": false
     },
@@ -1712,7 +1876,7 @@
         "h": 8,
         "w": 7,
         "x": 0,
-        "y": 71
+        "y": 85
       },
       "datasource": {
         "type": "prometheus",
@@ -1777,7 +1941,7 @@
         "h": 8,
         "w": 7,
         "x": 7,
-        "y": 71
+        "y": 85
       },
       "datasource": {
         "type": "prometheus",
@@ -1842,7 +2006,7 @@
         "h": 8,
         "w": 7,
         "x": 14,
-        "y": 71
+        "y": 85
       },
       "datasource": {
         "type": "loki",
@@ -1896,7 +2060,7 @@
         "h": 8,
         "w": 3,
         "x": 21,
-        "y": 71
+        "y": 85
       },
       "datasource": {
         "type": "prometheus",
@@ -1954,7 +2118,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 79
+        "y": 93
       },
       "collapsed": false
     },
@@ -1966,7 +2130,7 @@
         "h": 8,
         "w": 7,
         "x": 0,
-        "y": 80
+        "y": 94
       },
       "datasource": {
         "type": "prometheus",
@@ -2031,7 +2195,7 @@
         "h": 8,
         "w": 7,
         "x": 7,
-        "y": 80
+        "y": 94
       },
       "datasource": {
         "type": "prometheus",
@@ -2096,7 +2260,7 @@
         "h": 8,
         "w": 7,
         "x": 14,
-        "y": 80
+        "y": 94
       },
       "datasource": {
         "type": "loki",
@@ -2150,7 +2314,7 @@
         "h": 8,
         "w": 3,
         "x": 21,
-        "y": 80
+        "y": 94
       },
       "datasource": {
         "type": "prometheus",
@@ -2208,7 +2372,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 88
+        "y": 102
       },
       "collapsed": false
     },
@@ -2220,7 +2384,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 89
+        "y": 103
       },
       "datasource": {
         "type": "loki",
@@ -2383,7 +2547,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 89
+        "y": 103
       },
       "datasource": {
         "type": "loki",
@@ -2436,11 +2600,14 @@
       "options": {
         "legend": {
           "displayMode": "table",
-          "placement": "bottom",
+          "placement": "right",
           "calcs": [
             "mean"
           ],
-          "showLegend": true
+          "showLegend": true,
+          "width": 240,
+          "sortBy": "Mean",
+          "sortDesc": true
         },
         "tooltip": {
           "mode": "multi",
@@ -2455,7 +2622,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 97
+        "y": 111
       },
       "collapsed": false
     },
@@ -2467,7 +2634,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 98
+        "y": 112
       },
       "datasource": {
         "type": "prometheus",
@@ -2518,12 +2685,14 @@
       "options": {
         "legend": {
           "displayMode": "table",
-          "placement": "bottom",
+          "placement": "right",
           "calcs": [
-            "sum",
-            "mean"
+            "sum"
           ],
-          "showLegend": true
+          "showLegend": true,
+          "width": 240,
+          "sortBy": "Total",
+          "sortDesc": true
         },
         "tooltip": {
           "mode": "multi",
@@ -2539,7 +2708,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 98
+        "y": 112
       },
       "datasource": {
         "type": "prometheus",
@@ -2603,7 +2772,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 106
+        "y": 120
       },
       "collapsed": true,
       "panels": [
@@ -2615,7 +2784,7 @@
             "h": 8,
             "w": 8,
             "x": 0,
-            "y": 93
+            "y": 107
           },
           "datasource": {
             "type": "prometheus",
@@ -2668,7 +2837,7 @@
             "h": 8,
             "w": 16,
             "x": 8,
-            "y": 93
+            "y": 107
           },
           "datasource": {
             "type": "prometheus",
@@ -2719,12 +2888,14 @@
           "options": {
             "legend": {
               "displayMode": "table",
-              "placement": "bottom",
+              "placement": "right",
               "calcs": [
-                "sum",
-                "mean"
+                "sum"
               ],
-              "showLegend": true
+              "showLegend": true,
+              "width": 240,
+              "sortBy": "Total",
+              "sortDesc": true
             },
             "tooltip": {
               "mode": "multi",
@@ -2740,7 +2911,7 @@
             "h": 8,
             "w": 8,
             "x": 0,
-            "y": 101
+            "y": 115
           },
           "datasource": {
             "type": "prometheus",
@@ -2793,7 +2964,7 @@
             "h": 8,
             "w": 8,
             "x": 8,
-            "y": 101
+            "y": 115
           },
           "datasource": {
             "type": "prometheus",
@@ -2846,7 +3017,7 @@
             "h": 8,
             "w": 8,
             "x": 16,
-            "y": 101
+            "y": 115
           },
           "datasource": {
             "type": "prometheus",
@@ -2901,7 +3072,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 109
+            "y": 123
           },
           "datasource": {
             "type": "loki",
@@ -2954,7 +3125,7 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 117
+            "y": 131
           },
           "options": {
             "mode": "markdown",
@@ -2969,7 +3140,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 109
+            "y": 123
           },
           "datasource": {
             "type": "prometheus",
@@ -3023,7 +3194,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 107
+        "y": 121
       },
       "collapsed": false
     },
@@ -3035,7 +3206,7 @@
         "h": 7,
         "w": 24,
         "x": 0,
-        "y": 108
+        "y": 122
       },
       "datasource": {
         "type": "prometheus",
@@ -3043,9 +3214,10 @@
       },
       "targets": [
         {
-          "expr": "sum(increase(claude_code_cost_usage_USD_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__rate_interval]))",
+          "expr": "sum(increase(claude_code_cost_usage_USD_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__interval]))",
           "legendFormat": "Cost",
-          "refId": "A"
+          "refId": "A",
+          "interval": "1m"
         }
       ],
       "fieldConfig": {
@@ -3089,9 +3261,10 @@
       },
       "options": {
         "legend": {
-          "displayMode": "hidden",
-          "placement": "bottom",
-          "showLegend": false
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "width": 240
         },
         "tooltip": {
           "mode": "single",
@@ -3120,7 +3293,7 @@
         "h": 7,
         "w": 24,
         "x": 0,
-        "y": 115
+        "y": 129
       },
       "datasource": {
         "type": "prometheus",
@@ -3128,9 +3301,10 @@
       },
       "targets": [
         {
-          "expr": "sum by (type) (increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__rate_interval]))",
+          "expr": "sum by (type) (increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__interval]))",
           "legendFormat": "{{type}}",
-          "refId": "A"
+          "refId": "A",
+          "interval": "1m"
         }
       ],
       "fieldConfig": {
@@ -3231,9 +3405,10 @@
       },
       "options": {
         "legend": {
-          "displayMode": "hidden",
-          "placement": "bottom",
-          "showLegend": false
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "width": 240
         },
         "tooltip": {
           "mode": "multi",
@@ -3305,7 +3480,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 121
+        "y": 135
       },
       "collapsed": false
     },
@@ -3317,7 +3492,7 @@
         "h": 10,
         "w": 12,
         "x": 0,
-        "y": 122
+        "y": 136
       },
       "datasource": {
         "type": "loki",
@@ -3348,7 +3523,7 @@
         "h": 10,
         "w": 12,
         "x": 12,
-        "y": 122
+        "y": 136
       },
       "datasource": {
         "type": "loki",
@@ -3380,7 +3555,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 132
+        "y": 146
       },
       "panels": []
     },
@@ -3392,7 +3567,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 133
+        "y": 147
       },
       "datasource": {
         "type": "loki",
@@ -3450,12 +3625,15 @@
       "options": {
         "legend": {
           "displayMode": "table",
-          "placement": "bottom",
+          "placement": "right",
           "calcs": [
             "max",
             "lastNotNull"
           ],
-          "showLegend": true
+          "showLegend": true,
+          "width": 240,
+          "sortBy": "Max",
+          "sortDesc": true
         },
         "tooltip": {
           "mode": "multi",
@@ -3471,7 +3649,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 141
+        "y": 155
       },
       "datasource": {
         "type": "loki",
@@ -3561,12 +3739,15 @@
       "options": {
         "legend": {
           "displayMode": "table",
-          "placement": "bottom",
+          "placement": "right",
           "calcs": [
             "max",
             "lastNotNull"
           ],
-          "showLegend": true
+          "showLegend": true,
+          "width": 240,
+          "sortBy": "Max",
+          "sortDesc": true
         },
         "tooltip": {
           "mode": "multi",
@@ -3576,13 +3757,13 @@
     },
     {
       "id": 52,
-      "title": "Account Rate-Limit Usage (5h/7d) by account",
+      "title": "Account Rate Limits \u2014 $account",
       "type": "timeseries",
       "gridPos": {
         "h": 8,
-        "w": 24,
+        "w": 12,
         "x": 0,
-        "y": 149
+        "y": 163
       },
       "datasource": {
         "type": "loki",
@@ -3590,24 +3771,40 @@
       },
       "targets": [
         {
-          "expr": "max_over_time({service_name=~\"catalyst.execution-core|catalyst.agent\"} |= \"account.ratelimit.sampled\" | unwrap ratelimit_five_hour_pct | __error__=\"\" [$__auto]) by (account_email)",
-          "legendFormat": "5h - {{account_email}}",
-          "refId": "A"
+          "refId": "A",
+          "expr": "max_over_time({service_name=~\"catalyst.execution-core|catalyst.agent\"} |= \"account.ratelimit.sampled\" | account_email=~\"$account\" | unwrap ratelimit_five_hour_pct | __error__=\"\" [$__auto]) by (account_email)",
+          "legendFormat": "5h",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          }
         },
         {
-          "expr": "max_over_time({service_name=~\"catalyst.execution-core|catalyst.agent\"} |= \"account.ratelimit.sampled\" | unwrap ratelimit_seven_day_pct | __error__=\"\" [$__auto]) by (account_email)",
-          "legendFormat": "7d - {{account_email}}",
-          "refId": "B"
+          "refId": "B",
+          "expr": "max_over_time({service_name=~\"catalyst.execution-core|catalyst.agent\"} |= \"account.ratelimit.sampled\" | account_email=~\"$account\" | unwrap ratelimit_seven_day_pct | __error__=\"\" [$__auto]) by (account_email)",
+          "legendFormat": "7d",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          }
         },
         {
-          "expr": "max_over_time({service_name=~\"catalyst.execution-core|catalyst.agent\"} |= \"account.ratelimit.sampled\" | unwrap ratelimit_seven_day_opus_pct | __error__=\"\" [$__auto]) by (account_email)",
-          "legendFormat": "7d opus - {{account_email}}",
-          "refId": "C"
+          "refId": "C",
+          "expr": "max_over_time({service_name=~\"catalyst.execution-core|catalyst.agent\"} |= \"account.ratelimit.sampled\" | account_email=~\"$account\" | unwrap ratelimit_seven_day_opus_pct | __error__=\"\" [$__auto]) by (account_email)",
+          "legendFormat": "7d opus",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          }
         },
         {
-          "expr": "max_over_time({service_name=~\"catalyst.execution-core|catalyst.agent\"} |= \"account.ratelimit.sampled\" | unwrap ratelimit_seven_day_sonnet_pct | __error__=\"\" [$__auto]) by (account_email)",
-          "legendFormat": "7d sonnet - {{account_email}}",
-          "refId": "D"
+          "refId": "D",
+          "expr": "max_over_time({service_name=~\"catalyst.execution-core|catalyst.agent\"} |= \"account.ratelimit.sampled\" | account_email=~\"$account\" | unwrap ratelimit_seven_day_sonnet_pct | __error__=\"\" [$__auto]) by (account_email)",
+          "legendFormat": "7d sonnet",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          }
         }
       ],
       "fieldConfig": {
@@ -3643,25 +3840,95 @@
               }
             ]
           },
-          "mappings": []
+          "mappings": [],
+          "color": {
+            "mode": "palette-classic"
+          }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "5h"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#73BF69"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "7d"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#FADE2A"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "7d opus"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#B877D9"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "7d sonnet"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#5794F2"
+                }
+              }
+            ]
+          }
+        ]
       },
       "options": {
         "legend": {
           "displayMode": "table",
-          "placement": "bottom",
+          "placement": "right",
+          "width": 200,
           "calcs": [
-            "max",
             "lastNotNull"
           ],
-          "showLegend": true
+          "showLegend": true,
+          "sortBy": "Last *",
+          "sortDesc": true
         },
         "tooltip": {
           "mode": "multi",
           "sort": "desc"
         }
-      }
+      },
+      "description": "Per-account quota usage (5h / 7d / 7d-opus / 7d-sonnet). Repeats once per selected account so the few quota lines stay correlatable without cross-account overlap.",
+      "repeat": "account",
+      "repeatDirection": "h",
+      "maxPerRow": 2
     },
     {
       "id": 60,
@@ -3672,7 +3939,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 157
+        "y": 171
       },
       "panels": []
     },
@@ -3688,7 +3955,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 158
+        "y": 172
       },
       "targets": [
         {
@@ -4014,11 +4281,11 @@
         "h": 8,
         "w": 6,
         "x": 0,
-        "y": 167
+        "y": 181
       },
       "targets": [
         {
-          "expr": "system_cpu_utilization_ratio{job=\"otel-collector\"} * 100",
+          "expr": "avg by (host_name) (system_cpu_utilization_ratio{job=\"otel-collector\"}) * 100",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -4081,11 +4348,11 @@
         "h": 8,
         "w": 6,
         "x": 6,
-        "y": 167
+        "y": 181
       },
       "targets": [
         {
-          "expr": "system_memory_utilization_ratio{job=\"otel-collector\"} * 100",
+          "expr": "avg by (host_name) (system_memory_utilization_ratio{job=\"otel-collector\"}) * 100",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -4148,11 +4415,11 @@
         "h": 8,
         "w": 6,
         "x": 12,
-        "y": 167
+        "y": 181
       },
       "targets": [
         {
-          "expr": "system_filesystem_utilization_ratio{job=\"otel-collector\"} * 100",
+          "expr": "avg by (host_name) (system_filesystem_utilization_ratio{job=\"otel-collector\"}) * 100",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -4215,7 +4482,7 @@
         "h": 8,
         "w": 6,
         "x": 18,
-        "y": 167
+        "y": 181
       },
       "targets": [
         {
@@ -4348,7 +4615,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 175
+        "y": 189
       },
       "targets": [
         {
@@ -4533,7 +4800,7 @@
       "title": "System Metrics",
       "type": "row",
       "gridPos": {
-        "y": 184,
+        "y": 198,
         "h": 1,
         "w": 24,
         "x": 0
@@ -4549,14 +4816,14 @@
         "uid": "prometheus"
       },
       "gridPos": {
-        "y": 185,
+        "y": 199,
         "h": 8,
         "w": 24,
         "x": 0
       },
       "targets": [
         {
-          "expr": "system_cpu_utilization_ratio{host_name=~\"$hostname\", job=\"otel-collector\"} * 100",
+          "expr": "avg by (host_name) (system_cpu_utilization_ratio{host_name=~\"$hostname\", job=\"otel-collector\"}) * 100",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -4604,12 +4871,15 @@
       "options": {
         "legend": {
           "displayMode": "table",
-          "placement": "bottom",
+          "placement": "right",
           "calcs": [
             "mean",
             "max"
           ],
-          "showLegend": true
+          "showLegend": true,
+          "width": 240,
+          "sortBy": "Mean",
+          "sortDesc": true
         },
         "tooltip": {
           "mode": "multi",
@@ -4626,14 +4896,14 @@
         "uid": "prometheus"
       },
       "gridPos": {
-        "y": 193,
+        "y": 207,
         "h": 8,
         "w": 24,
         "x": 0
       },
       "targets": [
         {
-          "expr": "system_memory_utilization_ratio{host_name=~\"$hostname\", job=\"otel-collector\"} * 100",
+          "expr": "avg by (host_name) (system_memory_utilization_ratio{host_name=~\"$hostname\", job=\"otel-collector\"}) * 100",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -4681,12 +4951,15 @@
       "options": {
         "legend": {
           "displayMode": "table",
-          "placement": "bottom",
+          "placement": "right",
           "calcs": [
             "mean",
             "max"
           ],
-          "showLegend": true
+          "showLegend": true,
+          "width": 240,
+          "sortBy": "Mean",
+          "sortDesc": true
         },
         "tooltip": {
           "mode": "multi",
@@ -4703,14 +4976,14 @@
         "uid": "prometheus"
       },
       "gridPos": {
-        "y": 201,
+        "y": 215,
         "h": 8,
         "w": 24,
         "x": 0
       },
       "targets": [
         {
-          "expr": "system_filesystem_utilization_ratio{host_name=~\"$hostname\", job=\"otel-collector\"} * 100",
+          "expr": "avg by (host_name) (system_filesystem_utilization_ratio{host_name=~\"$hostname\", job=\"otel-collector\"}) * 100",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -4758,12 +5031,15 @@
       "options": {
         "legend": {
           "displayMode": "table",
-          "placement": "bottom",
+          "placement": "right",
           "calcs": [
             "mean",
             "max"
           ],
-          "showLegend": true
+          "showLegend": true,
+          "width": 240,
+          "sortBy": "Mean",
+          "sortDesc": true
         },
         "tooltip": {
           "mode": "multi",
@@ -4781,14 +5057,14 @@
         "uid": "prometheus"
       },
       "gridPos": {
-        "y": 209,
+        "y": 223,
         "h": 8,
         "w": 24,
         "x": 0
       },
       "targets": [
         {
-          "expr": "catalyst_worktree_count{host_name=~\"$hostname\", job=\"otel-collector\"}",
+          "expr": "max by (host_name) (catalyst_worktree_count{host_name=~\"$hostname\", job=\"otel-collector\"})",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -4819,11 +5095,14 @@
       "options": {
         "legend": {
           "displayMode": "table",
-          "placement": "bottom",
+          "placement": "right",
           "calcs": [
             "lastNotNull"
           ],
-          "showLegend": true
+          "showLegend": true,
+          "width": 240,
+          "sortBy": "Last *",
+          "sortDesc": true
         },
         "tooltip": {
           "mode": "multi",
@@ -4839,7 +5118,7 @@
         "h": 8,
         "w": 4,
         "x": 20,
-        "y": 185
+        "y": 199
       },
       "options": {
         "mode": "markdown",
@@ -4849,6 +5128,257 @@
         "defaults": {}
       },
       "pluginVersion": "10.0.0"
+    },
+    {
+      "id": 80,
+      "type": "row",
+      "title": "Fleet Version & Drift",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 231
+      },
+      "panels": []
+    },
+    {
+      "id": 81,
+      "title": "Running Version & Commit by Host",
+      "type": "table",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 10,
+        "x": 0,
+        "y": 232
+      },
+      "targets": [
+        {
+          "expr": "catalyst_build_info",
+          "format": "table",
+          "instant": true,
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "environment": true,
+              "exported_job": true,
+              "host_id": true,
+              "hostname": true,
+              "instance": true,
+              "job": true,
+              "otel_scope_name": true,
+              "service_name": true,
+              "service_namespace": true,
+              "Value": true
+            },
+            "indexByName": {
+              "host_name": 0,
+              "service_version": 1,
+              "vcs_ref_head_revision": 2
+            },
+            "renameByName": {
+              "host_name": "Host",
+              "service_version": "Version",
+              "vcs_ref_head_revision": "Commit"
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "left",
+            "filterable": true,
+            "cellOptions": {
+              "type": "auto"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "sortBy": [
+          {
+            "displayName": "Host",
+            "desc": false
+          }
+        ],
+        "cellHeight": "sm"
+      },
+      "description": "Current catalyst-agent version and HEAD commit running on each host (catalyst_build_info). A host may briefly show two commit rows right after a deploy until the prior series expires."
+    },
+    {
+      "id": 82,
+      "title": "Commits Behind main Over Time",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 14,
+        "x": 10,
+        "y": 232
+      },
+      "targets": [
+        {
+          "expr": "max by (host_name) (catalyst_vcs_commits_behind)",
+          "legendFormat": "{{host_name}}",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "showPoints": "auto",
+            "pointSize": 5,
+            "lineInterpolation": "stepAfter",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 10
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "width": 240,
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "showLegend": true,
+          "sortBy": "Last *",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "description": "Commits each host is behind origin/main over time. 0 = current (green); climbs and turns yellow/red as a host falls behind. Doubles as a 'did this host stop pulling?' signal."
+    },
+    {
+      "id": 83,
+      "title": "Version Running Over Time",
+      "type": "state-timeline",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 240
+      },
+      "targets": [
+        {
+          "expr": "max by (host_name, service_version, vcs_ref_head_revision) (catalyst_build_info)",
+          "legendFormat": "{{host_name}} \u00b7 {{service_version}} \u00b7 {{vcs_ref_head_revision}}",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineWidth": 0,
+            "fillOpacity": 85
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "mergeValues": true,
+        "showValue": "never",
+        "alignValue": "left",
+        "rowHeight": 0.9,
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "description": "Which catalyst-agent version each host ran over time. A new band starts when a host upgrades; commit-level detail is in the table."
     }
   ],
   "refresh": "30s",
@@ -4959,6 +5489,39 @@
         "regex": "",
         "sort": 1,
         "type": "query"
+      },
+      {
+        "name": "account",
+        "type": "custom",
+        "label": "Account",
+        "description": "Accounts to render rate-limit small-multiples for. account_email is Loki structured metadata, so it can't be auto-discovered \u2014 add new accounts here.",
+        "query": "ryan@getadva.ai",
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": true,
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "options": [
+          {
+            "selected": true,
+            "text": "All",
+            "value": "$__all"
+          },
+          {
+            "selected": false,
+            "text": "ryan@getadva.ai",
+            "value": "ryan@getadva.ai"
+          }
+        ],
+        "hide": 0,
+        "skipUrlSync": false
       }
     ]
   },

@@ -105,7 +105,12 @@ processors:
 exporters:
   prometheus:
     endpoint: "0.0.0.0:8889"
-    metric_expiration: 24h
+    # Keep this only modestly longer than the agent emit interval (~5m). A short
+    # window means a stale series shape (e.g. an old commit/version label-set
+    # after a deploy, or an offline host) stops being re-published within
+    # minutes instead of lingering for hours — which is what made the same host
+    # appear as multiple "ghost" series across panels (CTL-1235 follow-up).
+    metric_expiration: 15m
     resource_to_telemetry_conversion:
       enabled: true
 
