@@ -4202,7 +4202,7 @@
       },
       "targets": [
         {
-          "expr": "system_cpu_utilization_ratio{job=\"otel-collector\"} * 100",
+          "expr": "avg by (host_name) (system_cpu_utilization_ratio{job=\"otel-collector\"}) * 100",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -4269,7 +4269,7 @@
       },
       "targets": [
         {
-          "expr": "system_memory_utilization_ratio{job=\"otel-collector\"} * 100",
+          "expr": "avg by (host_name) (system_memory_utilization_ratio{job=\"otel-collector\"}) * 100",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -4336,7 +4336,7 @@
       },
       "targets": [
         {
-          "expr": "system_filesystem_utilization_ratio{job=\"otel-collector\"} * 100",
+          "expr": "avg by (host_name) (system_filesystem_utilization_ratio{job=\"otel-collector\"}) * 100",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -4740,7 +4740,7 @@
       },
       "targets": [
         {
-          "expr": "system_cpu_utilization_ratio{host_name=~\"$hostname\", job=\"otel-collector\"} * 100",
+          "expr": "avg by (host_name) (system_cpu_utilization_ratio{host_name=~\"$hostname\", job=\"otel-collector\"}) * 100",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -4820,7 +4820,7 @@
       },
       "targets": [
         {
-          "expr": "system_memory_utilization_ratio{host_name=~\"$hostname\", job=\"otel-collector\"} * 100",
+          "expr": "avg by (host_name) (system_memory_utilization_ratio{host_name=~\"$hostname\", job=\"otel-collector\"}) * 100",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -4900,7 +4900,7 @@
       },
       "targets": [
         {
-          "expr": "system_filesystem_utilization_ratio{host_name=~\"$hostname\", job=\"otel-collector\"} * 100",
+          "expr": "avg by (host_name) (system_filesystem_utilization_ratio{host_name=~\"$hostname\", job=\"otel-collector\"}) * 100",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -4981,7 +4981,7 @@
       },
       "targets": [
         {
-          "expr": "catalyst_worktree_count{host_name=~\"$hostname\", job=\"otel-collector\"}",
+          "expr": "max by (host_name) (catalyst_worktree_count{host_name=~\"$hostname\", job=\"otel-collector\"})",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
