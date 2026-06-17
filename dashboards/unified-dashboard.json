@@ -399,7 +399,9 @@
             "sum"
           ],
           "showLegend": true,
-          "width": 240
+          "width": 240,
+          "sortBy": "Total",
+          "sortDesc": true
         },
         "tooltip": {
           "mode": "multi",
@@ -472,7 +474,9 @@
             "sum"
           ],
           "showLegend": true,
-          "width": 240
+          "width": 240,
+          "sortBy": "Total",
+          "sortDesc": true
         },
         "tooltip": {
           "mode": "multi",
@@ -497,8 +501,8 @@
       },
       "targets": [
         {
-          "expr": "sum by (model) (increase(claude_code_cost_usage_USD_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__rate_interval]))",
-          "legendFormat": "{{model}}",
+          "expr": "sum by (model_family) (label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(sum by (model) (increase(claude_code_cost_usage_USD_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__rate_interval])), \"model_family\", \"$1\", \"model\", \"(.+)\"), \"model_family\", \"$1 $2.$3\", \"model\", \"claude-([a-z]+)-([0-9]+)-([0-9]+).*\"), \"model_family\", \"$1 $2\", \"model\", \"claude-([a-z]+)-([0-9]+)(\\\\[[^]]*\\\\])?$\"), \"model_family\", \"Opus $1\", \"model_family\", \"opus (.*)\"), \"model_family\", \"Haiku $1\", \"model_family\", \"haiku (.*)\"), \"model_family\", \"Sonnet $1\", \"model_family\", \"sonnet (.*)\"), \"model_family\", \"Fable $1\", \"model_family\", \"fable (.*)\"))",
+          "legendFormat": "{{model_family}}",
           "refId": "A"
         }
       ],
@@ -539,7 +543,7 @@
           {
             "matcher": {
               "id": "byRegexp",
-              "options": ".*opus.*"
+              "options": "(?i)opus"
             },
             "properties": [
               {
@@ -554,7 +558,7 @@
           {
             "matcher": {
               "id": "byRegexp",
-              "options": ".*sonnet.*"
+              "options": "(?i)sonnet"
             },
             "properties": [
               {
@@ -569,7 +573,7 @@
           {
             "matcher": {
               "id": "byRegexp",
-              "options": ".*haiku.*"
+              "options": "(?i)haiku"
             },
             "properties": [
               {
@@ -591,7 +595,9 @@
             "sum"
           ],
           "showLegend": true,
-          "width": 240
+          "width": 240,
+          "sortBy": "Total",
+          "sortDesc": true
         },
         "tooltip": {
           "mode": "multi",
@@ -725,7 +731,9 @@
             "sum"
           ],
           "showLegend": true,
-          "width": 240
+          "width": 240,
+          "sortBy": "Total",
+          "sortDesc": true
         },
         "tooltip": {
           "mode": "multi",
@@ -1150,7 +1158,9 @@
             "sum"
           ],
           "showLegend": true,
-          "width": 240
+          "width": 240,
+          "sortBy": "Total",
+          "sortDesc": true
         },
         "tooltip": {
           "mode": "multi",
@@ -1259,7 +1269,9 @@
             "sum"
           ],
           "showLegend": true,
-          "width": 240
+          "width": 240,
+          "sortBy": "Total",
+          "sortDesc": true
         },
         "tooltip": {
           "mode": "multi",
@@ -1367,8 +1379,8 @@
       },
       "targets": [
         {
-          "expr": "sum by (model) (increase(claude_code_cost_usage_USD_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range]))",
-          "legendFormat": "{{model}}",
+          "expr": "sum by (model_family) (label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(sum by (model) (increase(claude_code_cost_usage_USD_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range])), \"model_family\", \"$1\", \"model\", \"(.+)\"), \"model_family\", \"$1 $2.$3\", \"model\", \"claude-([a-z]+)-([0-9]+)-([0-9]+).*\"), \"model_family\", \"$1 $2\", \"model\", \"claude-([a-z]+)-([0-9]+)(\\\\[[^]]*\\\\])?$\"), \"model_family\", \"Opus $1\", \"model_family\", \"opus (.*)\"), \"model_family\", \"Haiku $1\", \"model_family\", \"haiku (.*)\"), \"model_family\", \"Sonnet $1\", \"model_family\", \"sonnet (.*)\"), \"model_family\", \"Fable $1\", \"model_family\", \"fable (.*)\"))",
+          "legendFormat": "{{model_family}}",
           "refId": "A"
         }
       ],
@@ -1384,7 +1396,7 @@
           {
             "matcher": {
               "id": "byRegexp",
-              "options": ".*opus.*"
+              "options": "(?i)opus"
             },
             "properties": [
               {
@@ -1399,7 +1411,7 @@
           {
             "matcher": {
               "id": "byRegexp",
-              "options": ".*sonnet.*"
+              "options": "(?i)sonnet"
             },
             "properties": [
               {
@@ -1414,7 +1426,7 @@
           {
             "matcher": {
               "id": "byRegexp",
-              "options": ".*haiku.*"
+              "options": "(?i)haiku"
             },
             "properties": [
               {
@@ -1467,8 +1479,8 @@
       },
       "targets": [
         {
-          "expr": "sum by (model) (increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range]))",
-          "legendFormat": "{{model}}",
+          "expr": "sum by (model_family) (label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(sum by (model) (increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range])), \"model_family\", \"$1\", \"model\", \"(.+)\"), \"model_family\", \"$1 $2.$3\", \"model\", \"claude-([a-z]+)-([0-9]+)-([0-9]+).*\"), \"model_family\", \"$1 $2\", \"model\", \"claude-([a-z]+)-([0-9]+)(\\\\[[^]]*\\\\])?$\"), \"model_family\", \"Opus $1\", \"model_family\", \"opus (.*)\"), \"model_family\", \"Haiku $1\", \"model_family\", \"haiku (.*)\"), \"model_family\", \"Sonnet $1\", \"model_family\", \"sonnet (.*)\"), \"model_family\", \"Fable $1\", \"model_family\", \"fable (.*)\"))",
+          "legendFormat": "{{model_family}}",
           "refId": "A"
         }
       ],
@@ -1484,7 +1496,7 @@
           {
             "matcher": {
               "id": "byRegexp",
-              "options": ".*opus.*"
+              "options": "(?i)opus"
             },
             "properties": [
               {
@@ -1499,7 +1511,7 @@
           {
             "matcher": {
               "id": "byRegexp",
-              "options": ".*sonnet.*"
+              "options": "(?i)sonnet"
             },
             "properties": [
               {
@@ -1514,7 +1526,7 @@
           {
             "matcher": {
               "id": "byRegexp",
-              "options": ".*haiku.*"
+              "options": "(?i)haiku"
             },
             "properties": [
               {
@@ -1740,8 +1752,8 @@
       },
       "targets": [
         {
-          "expr": "avg by (model) (avg_over_time({service_name=~\"claude-code.*\"} |= \"claude_code.api_request\" | project=~\"$project\" | branch=~\"$branch\" | hostname=~\"$hostname\" | unwrap duration_ms [$__auto]))",
-          "legendFormat": "{{model}}",
+          "expr": "avg by (model_family) (label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(avg by (model) (avg_over_time({service_name=~\"claude-code.*\"} |= \"claude_code.api_request\" | project=~\"$project\" | branch=~\"$branch\" | hostname=~\"$hostname\" | unwrap duration_ms [$__auto])), \"model_family\", \"$1\", \"model\", \"(.+)\"), \"model_family\", \"$1 $2.$3\", \"model\", \"claude-([a-z]+)-([0-9]+)-([0-9]+).*\"), \"model_family\", \"$1 $2\", \"model\", \"claude-([a-z]+)-([0-9]+)(\\\\[[^]]*\\\\])?$\"), \"model_family\", \"Opus $1\", \"model_family\", \"opus (.*)\"), \"model_family\", \"Haiku $1\", \"model_family\", \"haiku (.*)\"), \"model_family\", \"Sonnet $1\", \"model_family\", \"sonnet (.*)\"), \"model_family\", \"Fable $1\", \"model_family\", \"fable (.*)\"))",
+          "legendFormat": "{{model_family}}",
           "refId": "A"
         }
       ],
@@ -1782,7 +1794,7 @@
           {
             "matcher": {
               "id": "byRegexp",
-              "options": ".*opus.*"
+              "options": "(?i)opus"
             },
             "properties": [
               {
@@ -1797,7 +1809,7 @@
           {
             "matcher": {
               "id": "byRegexp",
-              "options": ".*sonnet.*"
+              "options": "(?i)sonnet"
             },
             "properties": [
               {
@@ -1812,7 +1824,7 @@
           {
             "matcher": {
               "id": "byRegexp",
-              "options": ".*haiku.*"
+              "options": "(?i)haiku"
             },
             "properties": [
               {
@@ -1835,7 +1847,9 @@
             "max"
           ],
           "showLegend": true,
-          "width": 240
+          "width": 240,
+          "sortBy": "Mean",
+          "sortDesc": true
         },
         "tooltip": {
           "mode": "multi",
@@ -2591,7 +2605,9 @@
             "mean"
           ],
           "showLegend": true,
-          "width": 240
+          "width": 240,
+          "sortBy": "Mean",
+          "sortDesc": true
         },
         "tooltip": {
           "mode": "multi",
@@ -2674,7 +2690,9 @@
             "sum"
           ],
           "showLegend": true,
-          "width": 240
+          "width": 240,
+          "sortBy": "Total",
+          "sortDesc": true
         },
         "tooltip": {
           "mode": "multi",
@@ -2875,7 +2893,9 @@
                 "sum"
               ],
               "showLegend": true,
-              "width": 240
+              "width": 240,
+              "sortBy": "Total",
+              "sortDesc": true
             },
             "tooltip": {
               "mode": "multi",
@@ -3609,7 +3629,9 @@
             "lastNotNull"
           ],
           "showLegend": true,
-          "width": 240
+          "width": 240,
+          "sortBy": "Max",
+          "sortDesc": true
         },
         "tooltip": {
           "mode": "multi",
@@ -3721,7 +3743,9 @@
             "lastNotNull"
           ],
           "showLegend": true,
-          "width": 240
+          "width": 240,
+          "sortBy": "Max",
+          "sortDesc": true
         },
         "tooltip": {
           "mode": "multi",
@@ -3811,7 +3835,9 @@
             "lastNotNull"
           ],
           "showLegend": true,
-          "width": 240
+          "width": 240,
+          "sortBy": "Max",
+          "sortDesc": true
         },
         "tooltip": {
           "mode": "multi",
@@ -4766,7 +4792,9 @@
             "max"
           ],
           "showLegend": true,
-          "width": 240
+          "width": 240,
+          "sortBy": "Mean",
+          "sortDesc": true
         },
         "tooltip": {
           "mode": "multi",
@@ -4844,7 +4872,9 @@
             "max"
           ],
           "showLegend": true,
-          "width": 240
+          "width": 240,
+          "sortBy": "Mean",
+          "sortDesc": true
         },
         "tooltip": {
           "mode": "multi",
@@ -4922,7 +4952,9 @@
             "max"
           ],
           "showLegend": true,
-          "width": 240
+          "width": 240,
+          "sortBy": "Mean",
+          "sortDesc": true
         },
         "tooltip": {
           "mode": "multi",
@@ -4983,7 +5015,9 @@
             "lastNotNull"
           ],
           "showLegend": true,
-          "width": 240
+          "width": 240,
+          "sortBy": "Last *",
+          "sortDesc": true
         },
         "tooltip": {
           "mode": "multi",
