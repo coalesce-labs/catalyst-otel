@@ -5045,6 +5045,267 @@
         "defaults": {}
       },
       "pluginVersion": "10.0.0"
+    },
+    {
+      "id": 80,
+      "type": "row",
+      "title": "Fleet Version & Drift",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 231
+      },
+      "panels": []
+    },
+    {
+      "id": 81,
+      "title": "Running Version & Commit by Host",
+      "type": "table",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 10,
+        "x": 0,
+        "y": 232
+      },
+      "targets": [
+        {
+          "expr": "catalyst_build_info",
+          "format": "table",
+          "instant": true,
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "environment": true,
+              "exported_job": true,
+              "host_id": true,
+              "hostname": true,
+              "instance": true,
+              "job": true,
+              "otel_scope_name": true,
+              "service_name": true,
+              "service_namespace": true,
+              "Value": true
+            },
+            "indexByName": {
+              "host_name": 0,
+              "service_version": 1,
+              "vcs_ref_head_revision": 2
+            },
+            "renameByName": {
+              "host_name": "Host",
+              "service_version": "Version",
+              "vcs_ref_head_revision": "Commit"
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "left",
+            "filterable": true,
+            "cellOptions": {
+              "type": "auto"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "sortBy": [
+          {
+            "displayName": "Host",
+            "desc": false
+          }
+        ],
+        "cellHeight": "sm"
+      },
+      "description": "Current catalyst-agent version and HEAD commit running on each host (catalyst_build_info). A host may briefly show two commit rows right after a deploy until the prior series expires."
+    },
+    {
+      "id": 82,
+      "title": "Commits Behind main Over Time",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 14,
+        "x": 10,
+        "y": 232
+      },
+      "targets": [
+        {
+          "expr": "max by (host_name) (catalyst_vcs_commits_behind)",
+          "legendFormat": "{{host_name}}",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "showPoints": "auto",
+            "pointSize": 5,
+            "lineInterpolation": "stepAfter",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 10
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "width": 240,
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "showLegend": true,
+          "sortBy": "Last *",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "description": "Commits each host is behind origin/main over time. 0 = current (green); climbs and turns yellow/red as a host falls behind. Doubles as a 'did this host stop pulling?' signal."
+    },
+    {
+      "id": 83,
+      "title": "Version Running Over Time",
+      "type": "state-timeline",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 240
+      },
+      "targets": [
+        {
+          "expr": "max by (host_name, service_version) (catalyst_build_info)",
+          "legendFormat": "{{host_name}} \u00b7 {{service_version}}",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineWidth": 0,
+            "fillOpacity": 85
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "1": {
+                  "text": "running",
+                  "index": 0
+                }
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "mergeValues": true,
+        "showValue": "never",
+        "alignValue": "left",
+        "rowHeight": 0.9,
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "description": "Which catalyst-agent version each host ran over time. A new band starts when a host upgrades; commit-level detail is in the table."
     }
   ],
   "refresh": "30s",
