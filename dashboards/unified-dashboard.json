@@ -3757,11 +3757,11 @@
     },
     {
       "id": 52,
-      "title": "Account Rate-Limit Usage (5h/7d) by account",
+      "title": "Account Rate Limits \u2014 $account",
       "type": "timeseries",
       "gridPos": {
         "h": 8,
-        "w": 24,
+        "w": 12,
         "x": 0,
         "y": 163
       },
@@ -3771,24 +3771,40 @@
       },
       "targets": [
         {
-          "expr": "max_over_time({service_name=~\"catalyst.execution-core|catalyst.agent\"} |= \"account.ratelimit.sampled\" | unwrap ratelimit_five_hour_pct | __error__=\"\" [$__auto]) by (account_email)",
-          "legendFormat": "5h - {{account_email}}",
-          "refId": "A"
+          "refId": "A",
+          "expr": "max_over_time({service_name=~\"catalyst.execution-core|catalyst.agent\"} |= \"account.ratelimit.sampled\" | account_email=~\"$account\" | unwrap ratelimit_five_hour_pct | __error__=\"\" [$__auto]) by (account_email)",
+          "legendFormat": "5h",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          }
         },
         {
-          "expr": "max_over_time({service_name=~\"catalyst.execution-core|catalyst.agent\"} |= \"account.ratelimit.sampled\" | unwrap ratelimit_seven_day_pct | __error__=\"\" [$__auto]) by (account_email)",
-          "legendFormat": "7d - {{account_email}}",
-          "refId": "B"
+          "refId": "B",
+          "expr": "max_over_time({service_name=~\"catalyst.execution-core|catalyst.agent\"} |= \"account.ratelimit.sampled\" | account_email=~\"$account\" | unwrap ratelimit_seven_day_pct | __error__=\"\" [$__auto]) by (account_email)",
+          "legendFormat": "7d",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          }
         },
         {
-          "expr": "max_over_time({service_name=~\"catalyst.execution-core|catalyst.agent\"} |= \"account.ratelimit.sampled\" | unwrap ratelimit_seven_day_opus_pct | __error__=\"\" [$__auto]) by (account_email)",
-          "legendFormat": "7d opus - {{account_email}}",
-          "refId": "C"
+          "refId": "C",
+          "expr": "max_over_time({service_name=~\"catalyst.execution-core|catalyst.agent\"} |= \"account.ratelimit.sampled\" | account_email=~\"$account\" | unwrap ratelimit_seven_day_opus_pct | __error__=\"\" [$__auto]) by (account_email)",
+          "legendFormat": "7d opus",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          }
         },
         {
-          "expr": "max_over_time({service_name=~\"catalyst.execution-core|catalyst.agent\"} |= \"account.ratelimit.sampled\" | unwrap ratelimit_seven_day_sonnet_pct | __error__=\"\" [$__auto]) by (account_email)",
-          "legendFormat": "7d sonnet - {{account_email}}",
-          "refId": "D"
+          "refId": "D",
+          "expr": "max_over_time({service_name=~\"catalyst.execution-core|catalyst.agent\"} |= \"account.ratelimit.sampled\" | account_email=~\"$account\" | unwrap ratelimit_seven_day_sonnet_pct | __error__=\"\" [$__auto]) by (account_email)",
+          "legendFormat": "7d sonnet",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          }
         }
       ],
       "fieldConfig": {
@@ -3824,20 +3840,83 @@
               }
             ]
           },
-          "mappings": []
+          "mappings": [],
+          "color": {
+            "mode": "palette-classic"
+          }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "5h"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#73BF69"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "7d"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#FADE2A"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "7d opus"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#B877D9"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "7d sonnet"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#5794F2"
+                }
+              }
+            ]
+          }
+        ]
       },
       "options": {
         "legend": {
           "displayMode": "table",
-          "placement": "right",
+          "placement": "bottom",
           "calcs": [
-            "max",
-            "lastNotNull"
+            "lastNotNull",
+            "max"
           ],
           "showLegend": true,
-          "width": 240,
           "sortBy": "Max",
           "sortDesc": true
         },
@@ -3845,7 +3924,11 @@
           "mode": "multi",
           "sort": "desc"
         }
-      }
+      },
+      "description": "Per-account quota usage (5h / 7d / 7d-opus / 7d-sonnet). Repeats once per selected account so the few quota lines stay correlatable without cross-account overlap.",
+      "repeat": "account",
+      "repeatDirection": "h",
+      "maxPerRow": 2
     },
     {
       "id": 60,
@@ -5406,6 +5489,39 @@
         "regex": "",
         "sort": 1,
         "type": "query"
+      },
+      {
+        "name": "account",
+        "type": "custom",
+        "label": "Account",
+        "description": "Accounts to render rate-limit small-multiples for. account_email is Loki structured metadata, so it can't be auto-discovered \u2014 add new accounts here.",
+        "query": "ryan@getadva.ai",
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": true,
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "options": [
+          {
+            "selected": true,
+            "text": "All",
+            "value": "$__all"
+          },
+          {
+            "selected": false,
+            "text": "ryan@getadva.ai",
+            "value": "ryan@getadva.ai"
+          }
+        ],
+        "hide": 0,
+        "skipUrlSync": false
       }
     ]
   },
