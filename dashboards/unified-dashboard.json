@@ -3214,9 +3214,10 @@
       },
       "targets": [
         {
-          "expr": "sum(increase(claude_code_cost_usage_USD_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__rate_interval]))",
+          "expr": "sum(increase(claude_code_cost_usage_USD_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__interval]))",
           "legendFormat": "Cost",
-          "refId": "A"
+          "refId": "A",
+          "interval": "1m"
         }
       ],
       "fieldConfig": {
@@ -3300,9 +3301,10 @@
       },
       "targets": [
         {
-          "expr": "sum by (type) (increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__rate_interval]))",
+          "expr": "sum by (type) (increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__interval]))",
           "legendFormat": "{{type}}",
-          "refId": "A"
+          "refId": "A",
+          "interval": "1m"
         }
       ],
       "fieldConfig": {
