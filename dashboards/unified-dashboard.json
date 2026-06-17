@@ -3911,13 +3911,13 @@
       "options": {
         "legend": {
           "displayMode": "table",
-          "placement": "bottom",
+          "placement": "right",
+          "width": 200,
           "calcs": [
-            "lastNotNull",
-            "max"
+            "lastNotNull"
           ],
           "showLegend": true,
-          "sortBy": "Max",
+          "sortBy": "Last *",
           "sortDesc": true
         },
         "tooltip": {
