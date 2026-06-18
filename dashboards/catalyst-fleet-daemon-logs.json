@@ -482,7 +482,7 @@
             "type": "loki",
             "uid": "loki"
           },
-          "expr": "{service_name=~\"${service:pipe}\"} | log_file_name=~`.+` | catalyst_node_name=~\"${node:pipe}\" | level=~`40|50|60` | line_format `[{{.catalyst_node_name}}] {{.service_name}} L{{.level}} {{.__line__}}`",
+          "expr": "{service_name=~\"${service:pipe}\"} | log_file_name=~`.+` | catalyst_node_name=~\"${node:pipe}\" | level=~`40|50|60` | label_format sev=`{{ if eq .level \"30\" }}INFO{{ else if eq .level \"40\" }}WARN{{ else if eq .level \"50\" }}ERROR{{ else if eq .level \"60\" }}FATAL{{ else }}L{{ .level }}{{ end }}` | line_format `[{{ .catalyst_node_name }}] {{ .service_name }} {{ .sev }} | {{ __line__ }}`",
           "refId": "A",
           "queryType": "range"
         }
@@ -888,7 +888,7 @@
             "type": "loki",
             "uid": "loki"
           },
-          "expr": "{service_name=~\"${service:pipe}\"} | log_file_name=~`.+` | catalyst_node_name=~\"${node:pipe}\" | line_format `[{{.catalyst_node_name}}] {{.service_name}} {{.__line__}}`",
+          "expr": "{service_name=~\"${service:pipe}\"} | log_file_name=~`.+` | catalyst_node_name=~\"${node:pipe}\" | label_format sev=`{{ if eq .level \"30\" }}INFO{{ else if eq .level \"40\" }}WARN{{ else if eq .level \"50\" }}ERROR{{ else if eq .level \"60\" }}FATAL{{ else }}L{{ .level }}{{ end }}` | line_format `[{{ .catalyst_node_name }}] {{ .service_name }} {{ .sev }} | {{ __line__ }}`",
           "refId": "A",
           "queryType": "range"
         }
