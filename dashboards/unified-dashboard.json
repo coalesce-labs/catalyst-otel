@@ -1394,127 +1394,6 @@
           }
         },
         {
-          "id": 17,
-          "title": "API Request Duration",
-          "type": "timeseries",
-          "gridPos": {
-            "h": 7,
-            "w": 24,
-            "x": 0,
-            "y": 55
-          },
-          "datasource": {
-            "type": "loki",
-            "uid": "loki"
-          },
-          "targets": [
-            {
-              "expr": "avg by (model_family) (label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(avg by (model) (avg_over_time({service_name=~\"claude-code.*\"} |= \"claude_code.api_request\" | project=~\"$project\" | branch=~\"$branch\" | hostname=~\"$hostname\" | unwrap duration_ms [$__auto])), \"model_family\", \"$1\", \"model\", \"(.+)\"), \"model_family\", \"$1 $2.$3\", \"model\", \"claude-([a-z]+)-([0-9]+)-([0-9]+).*\"), \"model_family\", \"$1 $2\", \"model\", \"claude-([a-z]+)-([0-9]+)(\\\\[[^]]*\\\\])?$\"), \"model_family\", \"Opus $1\", \"model_family\", \"opus (.*)\"), \"model_family\", \"Haiku $1\", \"model_family\", \"haiku (.*)\"), \"model_family\", \"Sonnet $1\", \"model_family\", \"sonnet (.*)\"), \"model_family\", \"Fable $1\", \"model_family\", \"fable (.*)\"))",
-              "legendFormat": "{{model_family}}",
-              "refId": "A"
-            }
-          ],
-          "fieldConfig": {
-            "defaults": {
-              "unit": "ms",
-              "custom": {
-                "drawStyle": "line",
-                "lineWidth": 2,
-                "fillOpacity": 15,
-                "gradientMode": "opacity",
-                "spanNulls": true,
-                "showPoints": "never",
-                "lineInterpolation": "smooth",
-                "stacking": {
-                  "mode": "none",
-                  "group": "A"
-                },
-                "scaleDistribution": {
-                  "type": "linear"
-                },
-                "thresholdsStyle": {
-                  "mode": "off"
-                }
-              },
-              "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "green",
-                    "value": null
-                  }
-                ]
-              }
-            },
-            "overrides": [
-              {
-                "matcher": {
-                  "id": "byRegexp",
-                  "options": "(?i)opus"
-                },
-                "properties": [
-                  {
-                    "id": "color",
-                    "value": {
-                      "fixedColor": "#9B59B6",
-                      "mode": "fixed"
-                    }
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byRegexp",
-                  "options": "(?i)sonnet"
-                },
-                "properties": [
-                  {
-                    "id": "color",
-                    "value": {
-                      "fixedColor": "#E67E22",
-                      "mode": "fixed"
-                    }
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byRegexp",
-                  "options": "(?i)haiku"
-                },
-                "properties": [
-                  {
-                    "id": "color",
-                    "value": {
-                      "fixedColor": "#3498DB",
-                      "mode": "fixed"
-                    }
-                  }
-                ]
-              }
-            ]
-          },
-          "options": {
-            "legend": {
-              "displayMode": "table",
-              "placement": "right",
-              "calcs": [
-                "mean",
-                "max"
-              ],
-              "showLegend": true,
-              "width": 240,
-              "sortBy": "Mean",
-              "sortDesc": true
-            },
-            "tooltip": {
-              "mode": "multi",
-              "sort": "desc"
-            }
-          }
-        },
-        {
           "id": 36,
           "title": "Token Burn by Ticket (Top 10)",
           "type": "timeseries",
@@ -1522,7 +1401,7 @@
             "h": 7,
             "w": 24,
             "x": 0,
-            "y": 62
+            "y": 55
           },
           "datasource": {
             "type": "prometheus",
@@ -1658,7 +1537,7 @@
             "h": 7,
             "w": 24,
             "x": 0,
-            "y": 69
+            "y": 62
           },
           "datasource": {
             "type": "prometheus",
@@ -1787,6 +1666,978 @@
           "description": "Top 10 projects by token burn per time bucket (width = Grafana $__rate_interval). Excludes sessions with no project attached."
         },
         {
+          "id": 18,
+          "title": "Cost by Ticket (Top 10)",
+          "type": "barchart",
+          "gridPos": {
+            "h": 8,
+            "w": 7,
+            "x": 0,
+            "y": 69
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "expr": "sort_desc(topk(10, sum by (linear_key) (increase(claude_code_cost_usage_USD_total{job=\"otel-collector\",linear_key=~\".+\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range]))))",
+              "legendFormat": "{{linear_key}}",
+              "instant": true,
+              "format": "table",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "currencyUSD",
+              "color": {
+                "mode": "palette-classic-by-name"
+              },
+              "custom": {
+                "fillOpacity": 80,
+                "barRadius": 0.1,
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": []
+            },
+            "overrides": []
+          },
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true
+                }
+              }
+            }
+          ],
+          "options": {
+            "orientation": "horizontal",
+            "xField": "linear_key",
+            "showValue": "always",
+            "barWidth": 0.8,
+            "stacking": "none",
+            "legend": {
+              "displayMode": "hidden",
+              "showLegend": false
+            },
+            "tooltip": {
+              "mode": "single"
+            }
+          }
+        },
+        {
+          "id": 19,
+          "title": "Tokens by Ticket (Top 10)",
+          "type": "barchart",
+          "gridPos": {
+            "h": 8,
+            "w": 7,
+            "x": 7,
+            "y": 69
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "expr": "sort_desc(topk(10, sum by (linear_key) (increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",linear_key=~\".+\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range]))))",
+              "legendFormat": "{{linear_key}}",
+              "instant": true,
+              "format": "table",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": {
+                "mode": "palette-classic-by-name"
+              },
+              "custom": {
+                "fillOpacity": 80,
+                "barRadius": 0.1,
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": []
+            },
+            "overrides": []
+          },
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true
+                }
+              }
+            }
+          ],
+          "options": {
+            "orientation": "horizontal",
+            "xField": "linear_key",
+            "showValue": "always",
+            "barWidth": 0.8,
+            "stacking": "none",
+            "legend": {
+              "displayMode": "hidden",
+              "showLegend": false
+            },
+            "tooltip": {
+              "mode": "single"
+            }
+          }
+        },
+        {
+          "id": 20,
+          "title": "Tool Calls by Ticket (Top 10)",
+          "type": "barchart",
+          "gridPos": {
+            "h": 8,
+            "w": 7,
+            "x": 14,
+            "y": 69
+          },
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "targets": [
+            {
+              "expr": "sort_desc(topk(10, sum by (linear_key) (count_over_time({service_name=~\"claude-code.*\"} |= \"claude_code.tool_result\" | linear_key=~\".+\" | project=~\"$project\" | branch=~\"$branch\" | hostname=~\"$hostname\" [$__range]))))",
+              "legendFormat": "{{linear_key}}",
+              "instant": true,
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": {
+                "mode": "palette-classic-by-name"
+              },
+              "custom": {
+                "fillOpacity": 80,
+                "barRadius": 0.1,
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": []
+            },
+            "overrides": []
+          },
+          "options": {
+            "orientation": "horizontal",
+            "showValue": "always",
+            "barWidth": 0.8,
+            "stacking": "none",
+            "legend": {
+              "displayMode": "hidden",
+              "showLegend": false
+            },
+            "tooltip": {
+              "mode": "single"
+            }
+          }
+        },
+        {
+          "id": 34,
+          "title": "Unique Tickets",
+          "description": "Total distinct linear_key values in the selected time range. Bars above show top 10.",
+          "type": "stat",
+          "gridPos": {
+            "h": 8,
+            "w": 3,
+            "x": 21,
+            "y": 69
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "expr": "count(count by (linear_key) (sum by (linear_key) (increase(claude_code_cost_usage_USD_total{job=\"otel-collector\",linear_key=~\".+\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range])) > 0))",
+              "instant": true,
+              "refId": "A",
+              "legendFormat": "__auto"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "none",
+              "decimals": 0,
+              "color": {
+                "mode": "fixed",
+                "fixedColor": "blue"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "blue",
+                    "value": null
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": {
+              "values": false,
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": ""
+            },
+            "orientation": "auto",
+            "textMode": "value_and_name",
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "center",
+            "showPercentChange": false,
+            "wideLayout": true
+          }
+        },
+        {
+          "id": 21,
+          "title": "Cost by Project (Top 10)",
+          "type": "barchart",
+          "gridPos": {
+            "h": 8,
+            "w": 7,
+            "x": 0,
+            "y": 77
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "expr": "sort_desc(topk(10, sum by (project) (increase(claude_code_cost_usage_USD_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range]))))",
+              "legendFormat": "{{project}}",
+              "instant": true,
+              "format": "table",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "currencyUSD",
+              "color": {
+                "mode": "palette-classic-by-name"
+              },
+              "custom": {
+                "fillOpacity": 80,
+                "barRadius": 0.1,
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": []
+            },
+            "overrides": []
+          },
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true
+                }
+              }
+            }
+          ],
+          "options": {
+            "orientation": "horizontal",
+            "xField": "project",
+            "showValue": "always",
+            "barWidth": 0.8,
+            "stacking": "none",
+            "legend": {
+              "displayMode": "hidden",
+              "showLegend": false
+            },
+            "tooltip": {
+              "mode": "single"
+            }
+          }
+        },
+        {
+          "id": 22,
+          "title": "Tokens by Project (Top 10)",
+          "type": "barchart",
+          "gridPos": {
+            "h": 8,
+            "w": 7,
+            "x": 7,
+            "y": 77
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "expr": "sort_desc(topk(10, sum by (project) (increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range]))))",
+              "legendFormat": "{{project}}",
+              "instant": true,
+              "format": "table",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": {
+                "mode": "palette-classic-by-name"
+              },
+              "custom": {
+                "fillOpacity": 80,
+                "barRadius": 0.1,
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": []
+            },
+            "overrides": []
+          },
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true
+                }
+              }
+            }
+          ],
+          "options": {
+            "orientation": "horizontal",
+            "xField": "project",
+            "showValue": "always",
+            "barWidth": 0.8,
+            "stacking": "none",
+            "legend": {
+              "displayMode": "hidden",
+              "showLegend": false
+            },
+            "tooltip": {
+              "mode": "single"
+            }
+          }
+        },
+        {
+          "id": 23,
+          "title": "Tool Calls by Project (Top 10)",
+          "type": "barchart",
+          "gridPos": {
+            "h": 8,
+            "w": 7,
+            "x": 14,
+            "y": 77
+          },
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "targets": [
+            {
+              "expr": "sort_desc(topk(10, sum by (project) (count_over_time({service_name=~\"claude-code.*\"} |= \"claude_code.tool_result\" | project=~\"$project\" | branch=~\"$branch\" | hostname=~\"$hostname\" [$__range]))))",
+              "legendFormat": "{{project}}",
+              "instant": true,
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": {
+                "mode": "palette-classic-by-name"
+              },
+              "custom": {
+                "fillOpacity": 80,
+                "barRadius": 0.1,
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": []
+            },
+            "overrides": []
+          },
+          "options": {
+            "orientation": "horizontal",
+            "showValue": "always",
+            "barWidth": 0.8,
+            "stacking": "none",
+            "legend": {
+              "displayMode": "hidden",
+              "showLegend": false
+            },
+            "tooltip": {
+              "mode": "single"
+            }
+          }
+        },
+        {
+          "id": 35,
+          "title": "Unique Projects",
+          "description": "Total distinct project values in the selected time range. Bars above show top 10.",
+          "type": "stat",
+          "gridPos": {
+            "h": 8,
+            "w": 3,
+            "x": 21,
+            "y": 77
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "expr": "count(count by (project) (sum by (project) (increase(claude_code_cost_usage_USD_total{job=\"otel-collector\",project=~\".+\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range])) > 0))",
+              "instant": true,
+              "refId": "A",
+              "legendFormat": "__auto"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "none",
+              "decimals": 0,
+              "color": {
+                "mode": "fixed",
+                "fixedColor": "blue"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "blue",
+                    "value": null
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": {
+              "values": false,
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": ""
+            },
+            "orientation": "auto",
+            "textMode": "value_and_name",
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "center",
+            "showPercentChange": false,
+            "wideLayout": true
+          }
+        },
+        {
+          "id": 26,
+          "title": "Token Burn by Session",
+          "type": "timeseries",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 85
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "expr": "topk(10, sum by (session_id, project, branch, linear_key) (rate(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__rate_interval])))",
+              "legendFormat": "{{project}}/{{branch}} ({{linear_key}})",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": {
+                "drawStyle": "line",
+                "lineWidth": 2,
+                "fillOpacity": 15,
+                "gradientMode": "opacity",
+                "spanNulls": true,
+                "showPoints": "never",
+                "lineInterpolation": "smooth",
+                "stacking": {
+                  "mode": "none",
+                  "group": "A"
+                },
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "right",
+              "calcs": [
+                "sum"
+              ],
+              "showLegend": true,
+              "width": 240,
+              "sortBy": "Total",
+              "sortDesc": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "id": 27,
+          "title": "Top Sessions",
+          "type": "barchart",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 85
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "expr": "topk(10, sum by (session_id, project, branch, linear_key) (increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range])))",
+              "legendFormat": "{{project}}/{{branch}} ({{linear_key}})",
+              "instant": true,
+              "refId": "A",
+              "format": "table"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": {
+                "mode": "palette-classic-by-name"
+              },
+              "custom": {
+                "fillOpacity": 80,
+                "barRadius": 0.1,
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": []
+            },
+            "overrides": []
+          },
+          "options": {
+            "orientation": "horizontal",
+            "showValue": "always",
+            "barWidth": 0.8,
+            "stacking": "none",
+            "legend": {
+              "displayMode": "hidden",
+              "showLegend": false
+            },
+            "tooltip": {
+              "mode": "single"
+            },
+            "xField": "session_id"
+          },
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": 28,
+          "title": "Cost by Role",
+          "type": "barchart",
+          "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 0,
+            "y": 93
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "expr": "sum by (catalyst_role) (increase(claude_code_cost_usage_USD_total{job=\"otel-collector\",catalyst_role=~\".+\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range]))",
+              "legendFormat": "{{catalyst_role}}",
+              "instant": true,
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "currencyUSD",
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "fillOpacity": 80,
+                "barRadius": 0.1,
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": []
+            },
+            "overrides": []
+          },
+          "options": {
+            "orientation": "horizontal",
+            "showValue": "always",
+            "barWidth": 0.8,
+            "stacking": "none",
+            "legend": {
+              "displayMode": "hidden",
+              "showLegend": false
+            },
+            "tooltip": {
+              "mode": "single"
+            }
+          }
+        },
+        {
+          "id": 38,
+          "title": "Cost by Phase",
+          "type": "barchart",
+          "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 8,
+            "y": 93
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "expr": "sort_desc(sum by (task_type) (increase(claude_code_cost_usage_USD_total{job=\"otel-collector\",task_type=~\".+\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range])))",
+              "legendFormat": "{{task_type}}",
+              "instant": true,
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "currencyUSD",
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "fillOpacity": 80,
+                "barRadius": 0.1,
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": []
+            },
+            "overrides": []
+          },
+          "options": {
+            "orientation": "horizontal",
+            "showValue": "always",
+            "barWidth": 0.8,
+            "stacking": "none",
+            "legend": {
+              "displayMode": "hidden",
+              "showLegend": false
+            },
+            "tooltip": {
+              "mode": "single"
+            }
+          }
+        },
+        {
+          "id": 39,
+          "title": "Tokens by Phase",
+          "type": "barchart",
+          "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 16,
+            "y": 93
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "expr": "sort_desc(sum by (task_type) (increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",task_type=~\".+\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range])))",
+              "legendFormat": "{{task_type}}",
+              "instant": true,
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "fillOpacity": 80,
+                "barRadius": 0.1,
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": []
+            },
+            "overrides": []
+          },
+          "options": {
+            "orientation": "horizontal",
+            "showValue": "always",
+            "barWidth": 0.8,
+            "stacking": "none",
+            "legend": {
+              "displayMode": "hidden",
+              "showLegend": false
+            },
+            "tooltip": {
+              "mode": "single"
+            }
+          }
+        },
+        {
+          "id": 43,
+          "title": "Cost by Dispatch Mode",
+          "type": "barchart",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 101
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "expr": "sort_desc(sum by (catalyst_dispatch_mode) (increase(claude_code_cost_usage_USD_total{job=\"otel-collector\",catalyst_dispatch_mode=~\".+\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range])))",
+              "legendFormat": "{{catalyst_dispatch_mode}}",
+              "instant": true,
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "currencyUSD",
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "fillOpacity": 80,
+                "barRadius": 0.1,
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": []
+            },
+            "overrides": []
+          },
+          "options": {
+            "orientation": "horizontal",
+            "showValue": "always",
+            "barWidth": 0.8,
+            "stacking": "none",
+            "legend": {
+              "displayMode": "hidden",
+              "showLegend": false
+            },
+            "tooltip": {
+              "mode": "single"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "\u2462 Observability",
+      "collapsed": true,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 48
+      },
+      "id": 202,
+      "panels": [
+        {
+          "id": 17,
+          "title": "API Request Duration",
+          "type": "timeseries",
+          "gridPos": {
+            "h": 7,
+            "w": 24,
+            "x": 0,
+            "y": 49
+          },
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "targets": [
+            {
+              "expr": "avg by (model_family) (label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(avg by (model) (avg_over_time({service_name=~\"claude-code.*\"} |= \"claude_code.api_request\" | project=~\"$project\" | branch=~\"$branch\" | hostname=~\"$hostname\" | unwrap duration_ms [$__auto])), \"model_family\", \"$1\", \"model\", \"(.+)\"), \"model_family\", \"$1 $2.$3\", \"model\", \"claude-([a-z]+)-([0-9]+)-([0-9]+).*\"), \"model_family\", \"$1 $2\", \"model\", \"claude-([a-z]+)-([0-9]+)(\\\\[[^]]*\\\\])?$\"), \"model_family\", \"Opus $1\", \"model_family\", \"opus (.*)\"), \"model_family\", \"Haiku $1\", \"model_family\", \"haiku (.*)\"), \"model_family\", \"Sonnet $1\", \"model_family\", \"sonnet (.*)\"), \"model_family\", \"Fable $1\", \"model_family\", \"fable (.*)\"))",
+              "legendFormat": "{{model_family}}",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ms",
+              "custom": {
+                "drawStyle": "line",
+                "lineWidth": 2,
+                "fillOpacity": 15,
+                "gradientMode": "opacity",
+                "spanNulls": true,
+                "showPoints": "never",
+                "lineInterpolation": "smooth",
+                "stacking": {
+                  "mode": "none",
+                  "group": "A"
+                },
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  }
+                ]
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byRegexp",
+                  "options": "(?i)opus"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "#9B59B6",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byRegexp",
+                  "options": "(?i)sonnet"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "#E67E22",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byRegexp",
+                  "options": "(?i)haiku"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "#3498DB",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "right",
+              "calcs": [
+                "mean",
+                "max"
+              ],
+              "showLegend": true,
+              "width": 240,
+              "sortBy": "Mean",
+              "sortDesc": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
           "id": 9,
           "title": "Tool Usage Rate",
           "type": "timeseries",
@@ -1794,7 +2645,7 @@
             "h": 7,
             "w": 24,
             "x": 0,
-            "y": 76
+            "y": 56
           },
           "datasource": {
             "type": "loki",
@@ -1922,676 +2773,6 @@
           }
         },
         {
-          "id": 10,
-          "title": "Code Velocity",
-          "type": "timeseries",
-          "gridPos": {
-            "h": 7,
-            "w": 24,
-            "x": 0,
-            "y": 83
-          },
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "targets": [
-            {
-              "expr": "sum(rate(claude_code_lines_of_code_count_total{job=\"otel-collector\",type=\"added\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__rate_interval])) * 60",
-              "legendFormat": "Lines Added",
-              "refId": "A"
-            },
-            {
-              "expr": "-sum(rate(claude_code_lines_of_code_count_total{job=\"otel-collector\",type=\"removed\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__rate_interval])) * 60",
-              "legendFormat": "Lines Removed",
-              "refId": "B"
-            }
-          ],
-          "fieldConfig": {
-            "defaults": {
-              "unit": "short",
-              "custom": {
-                "drawStyle": "bars",
-                "fillOpacity": 80,
-                "stacking": {
-                  "mode": "normal",
-                  "group": "A"
-                },
-                "barAlignment": 0,
-                "lineWidth": 1,
-                "showPoints": "never",
-                "spanNulls": false,
-                "gradientMode": "none",
-                "scaleDistribution": {
-                  "type": "linear"
-                },
-                "lineInterpolation": "linear",
-                "thresholdsStyle": {
-                  "mode": "off"
-                }
-              },
-              "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "green",
-                    "value": null
-                  }
-                ]
-              }
-            },
-            "overrides": [
-              {
-                "matcher": {
-                  "id": "byName",
-                  "options": "Lines Added"
-                },
-                "properties": [
-                  {
-                    "id": "color",
-                    "value": {
-                      "fixedColor": "#73BF69",
-                      "mode": "fixed"
-                    }
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byName",
-                  "options": "Lines Removed"
-                },
-                "properties": [
-                  {
-                    "id": "color",
-                    "value": {
-                      "fixedColor": "#F2495C",
-                      "mode": "fixed"
-                    }
-                  }
-                ]
-              }
-            ]
-          },
-          "options": {
-            "legend": {
-              "displayMode": "table",
-              "placement": "right",
-              "calcs": [
-                "sum"
-              ],
-              "showLegend": true,
-              "width": 240,
-              "sortBy": "Total",
-              "sortDesc": true
-            },
-            "tooltip": {
-              "mode": "multi",
-              "sort": "desc"
-            }
-          }
-        },
-        {
-          "id": 11,
-          "title": "Active Sessions",
-          "type": "timeseries",
-          "gridPos": {
-            "h": 7,
-            "w": 24,
-            "x": 0,
-            "y": 90
-          },
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "targets": [
-            {
-              "expr": "count(count by (session_id) (rate(claude_code_cost_usage_USD_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__rate_interval]) > 0))",
-              "legendFormat": "Active Sessions",
-              "refId": "A"
-            }
-          ],
-          "fieldConfig": {
-            "defaults": {
-              "unit": "short",
-              "color": {
-                "fixedColor": "#B877D9",
-                "mode": "fixed"
-              },
-              "custom": {
-                "drawStyle": "line",
-                "lineWidth": 2,
-                "fillOpacity": 15,
-                "gradientMode": "opacity",
-                "spanNulls": true,
-                "showPoints": "never",
-                "lineInterpolation": "smooth",
-                "stacking": {
-                  "mode": "none",
-                  "group": "A"
-                },
-                "scaleDistribution": {
-                  "type": "linear"
-                },
-                "thresholdsStyle": {
-                  "mode": "off"
-                }
-              },
-              "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "#B877D9",
-                    "value": null
-                  }
-                ]
-              }
-            },
-            "overrides": []
-          },
-          "options": {
-            "legend": {
-              "displayMode": "table",
-              "placement": "right",
-              "showLegend": true,
-              "width": 240
-            },
-            "tooltip": {
-              "mode": "single",
-              "sort": "none"
-            }
-          }
-        },
-        {
-          "id": 18,
-          "title": "Cost by Ticket (Top 10)",
-          "type": "barchart",
-          "gridPos": {
-            "h": 8,
-            "w": 7,
-            "x": 0,
-            "y": 97
-          },
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "targets": [
-            {
-              "expr": "sort_desc(topk(10, sum by (linear_key) (increase(claude_code_cost_usage_USD_total{job=\"otel-collector\",linear_key=~\".+\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range]))))",
-              "legendFormat": "{{linear_key}}",
-              "instant": true,
-              "format": "table",
-              "refId": "A"
-            }
-          ],
-          "fieldConfig": {
-            "defaults": {
-              "unit": "currencyUSD",
-              "color": {
-                "mode": "palette-classic-by-name"
-              },
-              "custom": {
-                "fillOpacity": 80,
-                "barRadius": 0.1,
-                "thresholdsStyle": {
-                  "mode": "off"
-                }
-              },
-              "mappings": []
-            },
-            "overrides": []
-          },
-          "transformations": [
-            {
-              "id": "organize",
-              "options": {
-                "excludeByName": {
-                  "Time": true
-                }
-              }
-            }
-          ],
-          "options": {
-            "orientation": "horizontal",
-            "xField": "linear_key",
-            "showValue": "always",
-            "barWidth": 0.8,
-            "stacking": "none",
-            "legend": {
-              "displayMode": "hidden",
-              "showLegend": false
-            },
-            "tooltip": {
-              "mode": "single"
-            }
-          }
-        },
-        {
-          "id": 19,
-          "title": "Tokens by Ticket (Top 10)",
-          "type": "barchart",
-          "gridPos": {
-            "h": 8,
-            "w": 7,
-            "x": 7,
-            "y": 97
-          },
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "targets": [
-            {
-              "expr": "sort_desc(topk(10, sum by (linear_key) (increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",linear_key=~\".+\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range]))))",
-              "legendFormat": "{{linear_key}}",
-              "instant": true,
-              "format": "table",
-              "refId": "A"
-            }
-          ],
-          "fieldConfig": {
-            "defaults": {
-              "unit": "short",
-              "color": {
-                "mode": "palette-classic-by-name"
-              },
-              "custom": {
-                "fillOpacity": 80,
-                "barRadius": 0.1,
-                "thresholdsStyle": {
-                  "mode": "off"
-                }
-              },
-              "mappings": []
-            },
-            "overrides": []
-          },
-          "transformations": [
-            {
-              "id": "organize",
-              "options": {
-                "excludeByName": {
-                  "Time": true
-                }
-              }
-            }
-          ],
-          "options": {
-            "orientation": "horizontal",
-            "xField": "linear_key",
-            "showValue": "always",
-            "barWidth": 0.8,
-            "stacking": "none",
-            "legend": {
-              "displayMode": "hidden",
-              "showLegend": false
-            },
-            "tooltip": {
-              "mode": "single"
-            }
-          }
-        },
-        {
-          "id": 20,
-          "title": "Tool Calls by Ticket (Top 10)",
-          "type": "barchart",
-          "gridPos": {
-            "h": 8,
-            "w": 7,
-            "x": 14,
-            "y": 97
-          },
-          "datasource": {
-            "type": "loki",
-            "uid": "loki"
-          },
-          "targets": [
-            {
-              "expr": "sort_desc(topk(10, sum by (linear_key) (count_over_time({service_name=~\"claude-code.*\"} |= \"claude_code.tool_result\" | linear_key=~\".+\" | project=~\"$project\" | branch=~\"$branch\" | hostname=~\"$hostname\" [$__range]))))",
-              "legendFormat": "{{linear_key}}",
-              "instant": true,
-              "refId": "A"
-            }
-          ],
-          "fieldConfig": {
-            "defaults": {
-              "unit": "short",
-              "color": {
-                "mode": "palette-classic-by-name"
-              },
-              "custom": {
-                "fillOpacity": 80,
-                "barRadius": 0.1,
-                "thresholdsStyle": {
-                  "mode": "off"
-                }
-              },
-              "mappings": []
-            },
-            "overrides": []
-          },
-          "options": {
-            "orientation": "horizontal",
-            "showValue": "always",
-            "barWidth": 0.8,
-            "stacking": "none",
-            "legend": {
-              "displayMode": "hidden",
-              "showLegend": false
-            },
-            "tooltip": {
-              "mode": "single"
-            }
-          }
-        },
-        {
-          "id": 34,
-          "title": "Unique Tickets",
-          "description": "Total distinct linear_key values in the selected time range. Bars above show top 10.",
-          "type": "stat",
-          "gridPos": {
-            "h": 8,
-            "w": 3,
-            "x": 21,
-            "y": 97
-          },
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "targets": [
-            {
-              "expr": "count(count by (linear_key) (sum by (linear_key) (increase(claude_code_cost_usage_USD_total{job=\"otel-collector\",linear_key=~\".+\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range])) > 0))",
-              "instant": true,
-              "refId": "A",
-              "legendFormat": "__auto"
-            }
-          ],
-          "fieldConfig": {
-            "defaults": {
-              "unit": "none",
-              "decimals": 0,
-              "color": {
-                "mode": "fixed",
-                "fixedColor": "blue"
-              },
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "blue",
-                    "value": null
-                  }
-                ]
-              }
-            },
-            "overrides": []
-          },
-          "options": {
-            "reduceOptions": {
-              "values": false,
-              "calcs": [
-                "lastNotNull"
-              ],
-              "fields": ""
-            },
-            "orientation": "auto",
-            "textMode": "value_and_name",
-            "colorMode": "value",
-            "graphMode": "none",
-            "justifyMode": "center",
-            "showPercentChange": false,
-            "wideLayout": true
-          }
-        },
-        {
-          "id": 21,
-          "title": "Cost by Project (Top 10)",
-          "type": "barchart",
-          "gridPos": {
-            "h": 8,
-            "w": 7,
-            "x": 0,
-            "y": 105
-          },
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "targets": [
-            {
-              "expr": "sort_desc(topk(10, sum by (project) (increase(claude_code_cost_usage_USD_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range]))))",
-              "legendFormat": "{{project}}",
-              "instant": true,
-              "format": "table",
-              "refId": "A"
-            }
-          ],
-          "fieldConfig": {
-            "defaults": {
-              "unit": "currencyUSD",
-              "color": {
-                "mode": "palette-classic-by-name"
-              },
-              "custom": {
-                "fillOpacity": 80,
-                "barRadius": 0.1,
-                "thresholdsStyle": {
-                  "mode": "off"
-                }
-              },
-              "mappings": []
-            },
-            "overrides": []
-          },
-          "transformations": [
-            {
-              "id": "organize",
-              "options": {
-                "excludeByName": {
-                  "Time": true
-                }
-              }
-            }
-          ],
-          "options": {
-            "orientation": "horizontal",
-            "xField": "project",
-            "showValue": "always",
-            "barWidth": 0.8,
-            "stacking": "none",
-            "legend": {
-              "displayMode": "hidden",
-              "showLegend": false
-            },
-            "tooltip": {
-              "mode": "single"
-            }
-          }
-        },
-        {
-          "id": 22,
-          "title": "Tokens by Project (Top 10)",
-          "type": "barchart",
-          "gridPos": {
-            "h": 8,
-            "w": 7,
-            "x": 7,
-            "y": 105
-          },
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "targets": [
-            {
-              "expr": "sort_desc(topk(10, sum by (project) (increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range]))))",
-              "legendFormat": "{{project}}",
-              "instant": true,
-              "format": "table",
-              "refId": "A"
-            }
-          ],
-          "fieldConfig": {
-            "defaults": {
-              "unit": "short",
-              "color": {
-                "mode": "palette-classic-by-name"
-              },
-              "custom": {
-                "fillOpacity": 80,
-                "barRadius": 0.1,
-                "thresholdsStyle": {
-                  "mode": "off"
-                }
-              },
-              "mappings": []
-            },
-            "overrides": []
-          },
-          "transformations": [
-            {
-              "id": "organize",
-              "options": {
-                "excludeByName": {
-                  "Time": true
-                }
-              }
-            }
-          ],
-          "options": {
-            "orientation": "horizontal",
-            "xField": "project",
-            "showValue": "always",
-            "barWidth": 0.8,
-            "stacking": "none",
-            "legend": {
-              "displayMode": "hidden",
-              "showLegend": false
-            },
-            "tooltip": {
-              "mode": "single"
-            }
-          }
-        },
-        {
-          "id": 23,
-          "title": "Tool Calls by Project (Top 10)",
-          "type": "barchart",
-          "gridPos": {
-            "h": 8,
-            "w": 7,
-            "x": 14,
-            "y": 105
-          },
-          "datasource": {
-            "type": "loki",
-            "uid": "loki"
-          },
-          "targets": [
-            {
-              "expr": "sort_desc(topk(10, sum by (project) (count_over_time({service_name=~\"claude-code.*\"} |= \"claude_code.tool_result\" | project=~\"$project\" | branch=~\"$branch\" | hostname=~\"$hostname\" [$__range]))))",
-              "legendFormat": "{{project}}",
-              "instant": true,
-              "refId": "A"
-            }
-          ],
-          "fieldConfig": {
-            "defaults": {
-              "unit": "short",
-              "color": {
-                "mode": "palette-classic-by-name"
-              },
-              "custom": {
-                "fillOpacity": 80,
-                "barRadius": 0.1,
-                "thresholdsStyle": {
-                  "mode": "off"
-                }
-              },
-              "mappings": []
-            },
-            "overrides": []
-          },
-          "options": {
-            "orientation": "horizontal",
-            "showValue": "always",
-            "barWidth": 0.8,
-            "stacking": "none",
-            "legend": {
-              "displayMode": "hidden",
-              "showLegend": false
-            },
-            "tooltip": {
-              "mode": "single"
-            }
-          }
-        },
-        {
-          "id": 35,
-          "title": "Unique Projects",
-          "description": "Total distinct project values in the selected time range. Bars above show top 10.",
-          "type": "stat",
-          "gridPos": {
-            "h": 8,
-            "w": 3,
-            "x": 21,
-            "y": 105
-          },
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "targets": [
-            {
-              "expr": "count(count by (project) (sum by (project) (increase(claude_code_cost_usage_USD_total{job=\"otel-collector\",project=~\".+\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range])) > 0))",
-              "instant": true,
-              "refId": "A",
-              "legendFormat": "__auto"
-            }
-          ],
-          "fieldConfig": {
-            "defaults": {
-              "unit": "none",
-              "decimals": 0,
-              "color": {
-                "mode": "fixed",
-                "fixedColor": "blue"
-              },
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "blue",
-                    "value": null
-                  }
-                ]
-              }
-            },
-            "overrides": []
-          },
-          "options": {
-            "reduceOptions": {
-              "values": false,
-              "calcs": [
-                "lastNotNull"
-              ],
-              "fields": ""
-            },
-            "orientation": "auto",
-            "textMode": "value_and_name",
-            "colorMode": "value",
-            "graphMode": "none",
-            "justifyMode": "center",
-            "showPercentChange": false,
-            "wideLayout": true
-          }
-        },
-        {
           "id": 24,
           "title": "Top Tools",
           "type": "barchart",
@@ -2599,7 +2780,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 113
+            "y": 63
           },
           "datasource": {
             "type": "loki",
@@ -2762,7 +2943,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 113
+            "y": 63
           },
           "datasource": {
             "type": "loki",
@@ -2831,14 +3012,14 @@
           }
         },
         {
-          "id": 26,
-          "title": "Token Burn by Session",
+          "id": 11,
+          "title": "Active Sessions",
           "type": "timeseries",
           "gridPos": {
-            "h": 8,
-            "w": 12,
+            "h": 7,
+            "w": 24,
             "x": 0,
-            "y": 121
+            "y": 71
           },
           "datasource": {
             "type": "prometheus",
@@ -2846,14 +3027,18 @@
           },
           "targets": [
             {
-              "expr": "topk(10, sum by (session_id, project, branch, linear_key) (rate(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__rate_interval])))",
-              "legendFormat": "{{project}}/{{branch}} ({{linear_key}})",
+              "expr": "count(count by (session_id) (rate(claude_code_cost_usage_USD_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__rate_interval]) > 0))",
+              "legendFormat": "Active Sessions",
               "refId": "A"
             }
           ],
           "fieldConfig": {
             "defaults": {
               "unit": "short",
+              "color": {
+                "fixedColor": "#B877D9",
+                "mode": "fixed"
+              },
               "custom": {
                 "drawStyle": "line",
                 "lineWidth": 2,
@@ -2878,13 +3063,133 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
+                    "color": "#B877D9",
                     "value": null
                   }
                 ]
               }
             },
             "overrides": []
+          },
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "right",
+              "showLegend": true,
+              "width": 240
+            },
+            "tooltip": {
+              "mode": "single",
+              "sort": "none"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "\u2463 Code & Velocity",
+      "collapsed": true,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 49
+      },
+      "id": 203,
+      "panels": [
+        {
+          "id": 10,
+          "title": "Code Velocity",
+          "type": "timeseries",
+          "gridPos": {
+            "h": 7,
+            "w": 24,
+            "x": 0,
+            "y": 50
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "expr": "sum(rate(claude_code_lines_of_code_count_total{job=\"otel-collector\",type=\"added\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__rate_interval])) * 60",
+              "legendFormat": "Lines Added",
+              "refId": "A"
+            },
+            {
+              "expr": "-sum(rate(claude_code_lines_of_code_count_total{job=\"otel-collector\",type=\"removed\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__rate_interval])) * 60",
+              "legendFormat": "Lines Removed",
+              "refId": "B"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": {
+                "drawStyle": "bars",
+                "fillOpacity": 80,
+                "stacking": {
+                  "mode": "normal",
+                  "group": "A"
+                },
+                "barAlignment": 0,
+                "lineWidth": 1,
+                "showPoints": "never",
+                "spanNulls": false,
+                "gradientMode": "none",
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "lineInterpolation": "linear",
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  }
+                ]
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Lines Added"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "#73BF69",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Lines Removed"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "#F2495C",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              }
+            ]
           },
           "options": {
             "legend": {
@@ -2905,14 +3210,14 @@
           }
         },
         {
-          "id": 27,
-          "title": "Top Sessions",
-          "type": "barchart",
+          "id": 90,
+          "title": "Pull Requests",
+          "type": "timeseries",
           "gridPos": {
-            "h": 8,
+            "h": 7,
             "w": 12,
-            "x": 12,
-            "y": 121
+            "x": 0,
+            "y": 57
           },
           "datasource": {
             "type": "prometheus",
@@ -2920,68 +3225,155 @@
           },
           "targets": [
             {
-              "expr": "topk(10, sum by (session_id, project, branch, linear_key) (increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range])))",
-              "legendFormat": "{{project}}/{{branch}} ({{linear_key}})",
-              "instant": true,
-              "refId": "A",
-              "format": "table"
+              "expr": "sum(increase(claude_code_pull_request_count_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__rate_interval]))",
+              "legendFormat": "PRs created",
+              "refId": "A"
             }
           ],
           "fieldConfig": {
             "defaults": {
               "unit": "short",
               "color": {
-                "mode": "palette-classic-by-name"
+                "fixedColor": "#73BF69",
+                "mode": "fixed"
               },
               "custom": {
-                "fillOpacity": 80,
-                "barRadius": 0.1,
+                "drawStyle": "bars",
+                "lineWidth": 2,
+                "fillOpacity": 60,
+                "gradientMode": "none",
+                "spanNulls": true,
+                "showPoints": "never",
+                "lineInterpolation": "linear",
+                "stacking": {
+                  "mode": "none",
+                  "group": "A"
+                },
+                "scaleDistribution": {
+                  "type": "linear"
+                },
                 "thresholdsStyle": {
                   "mode": "off"
                 }
               },
-              "mappings": []
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "#73BF69",
+                    "value": null
+                  }
+                ]
+              }
             },
             "overrides": []
           },
           "options": {
-            "orientation": "horizontal",
-            "showValue": "always",
-            "barWidth": 0.8,
-            "stacking": "none",
             "legend": {
-              "displayMode": "hidden",
-              "showLegend": false
+              "displayMode": "table",
+              "placement": "right",
+              "showLegend": true,
+              "width": 240,
+              "calcs": [
+                "sum"
+              ]
             },
             "tooltip": {
-              "mode": "single"
-            },
-            "xField": "session_id"
-          },
-          "transformations": [
-            {
-              "id": "organize",
-              "options": {
-                "excludeByName": {
-                  "Time": true
-                }
-              }
+              "mode": "single",
+              "sort": "none"
             }
-          ]
+          }
+        },
+        {
+          "id": 91,
+          "title": "Commits",
+          "type": "timeseries",
+          "gridPos": {
+            "h": 7,
+            "w": 12,
+            "x": 12,
+            "y": 57
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "expr": "sum(increase(claude_code_commit_count_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__rate_interval]))",
+              "legendFormat": "Commits created",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": {
+                "fixedColor": "#5794F2",
+                "mode": "fixed"
+              },
+              "custom": {
+                "drawStyle": "bars",
+                "lineWidth": 2,
+                "fillOpacity": 60,
+                "gradientMode": "none",
+                "spanNulls": true,
+                "showPoints": "never",
+                "lineInterpolation": "linear",
+                "stacking": {
+                  "mode": "none",
+                  "group": "A"
+                },
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "#5794F2",
+                    "value": null
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "right",
+              "showLegend": true,
+              "width": 240,
+              "calcs": [
+                "sum"
+              ]
+            },
+            "tooltip": {
+              "mode": "single",
+              "sort": "none"
+            }
+          }
         }
       ]
     },
     {
       "type": "row",
-      "title": "\u2462 Fleet & Hosts",
+      "title": "\u2464 Fleet & Hosts",
       "collapsed": true,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 48
+        "y": 50
       },
-      "id": 202,
+      "id": 204,
       "panels": [
         {
           "id": 62,
@@ -2995,7 +3387,7 @@
             "h": 8,
             "w": 6,
             "x": 0,
-            "y": 49
+            "y": 51
           },
           "targets": [
             {
@@ -3062,7 +3454,7 @@
             "h": 8,
             "w": 6,
             "x": 6,
-            "y": 49
+            "y": 51
           },
           "targets": [
             {
@@ -3129,7 +3521,7 @@
             "h": 8,
             "w": 6,
             "x": 12,
-            "y": 49
+            "y": 51
           },
           "targets": [
             {
@@ -3196,7 +3588,7 @@
             "h": 8,
             "w": 6,
             "x": 18,
-            "y": 49
+            "y": 51
           },
           "targets": [
             {
@@ -3329,7 +3721,7 @@
             "h": 9,
             "w": 24,
             "x": 0,
-            "y": 57
+            "y": 59
           },
           "targets": [
             {
@@ -3519,7 +3911,7 @@
             "uid": "prometheus"
           },
           "gridPos": {
-            "y": 66,
+            "y": 68,
             "h": 8,
             "w": 24,
             "x": 0
@@ -3599,7 +3991,7 @@
             "uid": "prometheus"
           },
           "gridPos": {
-            "y": 74,
+            "y": 76,
             "h": 8,
             "w": 24,
             "x": 0
@@ -3679,7 +4071,7 @@
             "uid": "prometheus"
           },
           "gridPos": {
-            "y": 82,
+            "y": 84,
             "h": 8,
             "w": 24,
             "x": 0
@@ -3760,7 +4152,7 @@
             "uid": "prometheus"
           },
           "gridPos": {
-            "y": 90,
+            "y": 92,
             "h": 8,
             "w": 24,
             "x": 0
@@ -3825,7 +4217,7 @@
             "h": 8,
             "w": 10,
             "x": 0,
-            "y": 98
+            "y": 100
           },
           "targets": [
             {
@@ -3906,7 +4298,7 @@
             "h": 8,
             "w": 14,
             "x": 10,
-            "y": 98
+            "y": 100
           },
           "targets": [
             {
@@ -3999,7 +4391,7 @@
             "h": 7,
             "w": 24,
             "x": 0,
-            "y": 106
+            "y": 108
           },
           "targets": [
             {
@@ -4055,15 +4447,15 @@
     },
     {
       "type": "row",
-      "title": "\u2463 Limits & Quotas",
+      "title": "\u2465 Limits & Quotas",
       "collapsed": true,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 49
+        "y": 51
       },
-      "id": 203,
+      "id": 205,
       "panels": [
         {
           "id": 61,
@@ -4077,7 +4469,7 @@
             "h": 9,
             "w": 24,
             "x": 0,
-            "y": 50
+            "y": 52
           },
           "targets": [
             {
@@ -4399,7 +4791,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 59
+            "y": 61
           },
           "datasource": {
             "type": "loki",
@@ -4574,7 +4966,7 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 67
+            "y": 69
           },
           "datasource": {
             "type": "loki",
@@ -4656,7 +5048,7 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 75
+            "y": 77
           },
           "datasource": {
             "type": "loki",
@@ -4766,15 +5158,15 @@
     },
     {
       "type": "row",
-      "title": "\u2464 Logs & Debug",
+      "title": "\u2466 Logs & Debug",
       "collapsed": true,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 50
+        "y": 52
       },
-      "id": 204,
+      "id": 206,
       "panels": [
         {
           "id": 32,
@@ -4784,7 +5176,7 @@
             "h": 10,
             "w": 12,
             "x": 0,
-            "y": 51
+            "y": 53
           },
           "datasource": {
             "type": "loki",
@@ -4815,7 +5207,7 @@
             "h": 10,
             "w": 12,
             "x": 12,
-            "y": 51
+            "y": 53
           },
           "datasource": {
             "type": "loki",
@@ -4839,67 +5231,14 @@
           }
         },
         {
-          "id": 28,
-          "title": "Cost by Role",
-          "type": "barchart",
-          "gridPos": {
-            "h": 8,
-            "w": 8,
-            "x": 0,
-            "y": 61
-          },
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "targets": [
-            {
-              "expr": "sum by (catalyst_role) (increase(claude_code_cost_usage_USD_total{job=\"otel-collector\",catalyst_role=~\".+\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range]))",
-              "legendFormat": "{{catalyst_role}}",
-              "instant": true,
-              "refId": "A"
-            }
-          ],
-          "fieldConfig": {
-            "defaults": {
-              "unit": "currencyUSD",
-              "color": {
-                "mode": "palette-classic"
-              },
-              "custom": {
-                "fillOpacity": 80,
-                "barRadius": 0.1,
-                "thresholdsStyle": {
-                  "mode": "off"
-                }
-              },
-              "mappings": []
-            },
-            "overrides": []
-          },
-          "options": {
-            "orientation": "horizontal",
-            "showValue": "always",
-            "barWidth": 0.8,
-            "stacking": "none",
-            "legend": {
-              "displayMode": "hidden",
-              "showLegend": false
-            },
-            "tooltip": {
-              "mode": "single"
-            }
-          }
-        },
-        {
           "id": 29,
           "title": "Worker Activity",
           "type": "timeseries",
           "gridPos": {
             "h": 8,
             "w": 16,
-            "x": 8,
-            "y": 61
+            "x": 0,
+            "y": 63
           },
           "datasource": {
             "type": "prometheus",
@@ -4966,112 +5305,6 @@
           }
         },
         {
-          "id": 38,
-          "title": "Cost by Phase",
-          "type": "barchart",
-          "gridPos": {
-            "h": 8,
-            "w": 8,
-            "x": 0,
-            "y": 69
-          },
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "targets": [
-            {
-              "expr": "sort_desc(sum by (task_type) (increase(claude_code_cost_usage_USD_total{job=\"otel-collector\",task_type=~\".+\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range])))",
-              "legendFormat": "{{task_type}}",
-              "instant": true,
-              "refId": "A"
-            }
-          ],
-          "fieldConfig": {
-            "defaults": {
-              "unit": "currencyUSD",
-              "color": {
-                "mode": "palette-classic"
-              },
-              "custom": {
-                "fillOpacity": 80,
-                "barRadius": 0.1,
-                "thresholdsStyle": {
-                  "mode": "off"
-                }
-              },
-              "mappings": []
-            },
-            "overrides": []
-          },
-          "options": {
-            "orientation": "horizontal",
-            "showValue": "always",
-            "barWidth": 0.8,
-            "stacking": "none",
-            "legend": {
-              "displayMode": "hidden",
-              "showLegend": false
-            },
-            "tooltip": {
-              "mode": "single"
-            }
-          }
-        },
-        {
-          "id": 39,
-          "title": "Tokens by Phase",
-          "type": "barchart",
-          "gridPos": {
-            "h": 8,
-            "w": 8,
-            "x": 8,
-            "y": 69
-          },
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "targets": [
-            {
-              "expr": "sort_desc(sum by (task_type) (increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",task_type=~\".+\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range])))",
-              "legendFormat": "{{task_type}}",
-              "instant": true,
-              "refId": "A"
-            }
-          ],
-          "fieldConfig": {
-            "defaults": {
-              "unit": "short",
-              "color": {
-                "mode": "palette-classic"
-              },
-              "custom": {
-                "fillOpacity": 80,
-                "barRadius": 0.1,
-                "thresholdsStyle": {
-                  "mode": "off"
-                }
-              },
-              "mappings": []
-            },
-            "overrides": []
-          },
-          "options": {
-            "orientation": "horizontal",
-            "showValue": "always",
-            "barWidth": 0.8,
-            "stacking": "none",
-            "legend": {
-              "displayMode": "hidden",
-              "showLegend": false
-            },
-            "tooltip": {
-              "mode": "single"
-            }
-          }
-        },
-        {
           "id": 40,
           "title": "Sessions by Exec Context",
           "type": "piechart",
@@ -5079,7 +5312,7 @@
             "h": 8,
             "w": 8,
             "x": 16,
-            "y": 69
+            "y": 63
           },
           "datasource": {
             "type": "prometheus",
@@ -5134,7 +5367,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 77
+            "y": 71
           },
           "datasource": {
             "type": "loki",
@@ -5180,59 +5413,6 @@
           }
         },
         {
-          "id": 43,
-          "title": "Cost by Dispatch Mode",
-          "type": "barchart",
-          "gridPos": {
-            "h": 8,
-            "w": 12,
-            "x": 12,
-            "y": 77
-          },
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "targets": [
-            {
-              "expr": "sort_desc(sum by (catalyst_dispatch_mode) (increase(claude_code_cost_usage_USD_total{job=\"otel-collector\",catalyst_dispatch_mode=~\".+\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range])))",
-              "legendFormat": "{{catalyst_dispatch_mode}}",
-              "instant": true,
-              "refId": "A"
-            }
-          ],
-          "fieldConfig": {
-            "defaults": {
-              "unit": "currencyUSD",
-              "color": {
-                "mode": "palette-classic"
-              },
-              "custom": {
-                "fillOpacity": 80,
-                "barRadius": 0.1,
-                "thresholdsStyle": {
-                  "mode": "off"
-                }
-              },
-              "mappings": []
-            },
-            "overrides": []
-          },
-          "options": {
-            "orientation": "horizontal",
-            "showValue": "always",
-            "barWidth": 0.8,
-            "stacking": "none",
-            "legend": {
-              "displayMode": "hidden",
-              "showLegend": false
-            },
-            "tooltip": {
-              "mode": "single"
-            }
-          }
-        },
-        {
           "id": 42,
           "title": "Hierarchical Execution (Coming Soon)",
           "type": "text",
@@ -5240,7 +5420,7 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 85
+            "y": 79
           },
           "options": {
             "mode": "markdown",
@@ -5255,7 +5435,7 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 93
+            "y": 87
           },
           "options": {
             "mode": "markdown",
@@ -5274,7 +5454,7 @@
             "h": 8,
             "w": 4,
             "x": 0,
-            "y": 101
+            "y": 95
           },
           "options": {
             "mode": "markdown",
