@@ -31,7 +31,7 @@
         "regex": "/^catalyst\\.(broker|execution-core|monitor|otel-forward)$/",
         "includeAll": true,
         "multi": true,
-        "allValue": "catalyst\\.(broker|execution-core|monitor|otel-forward)",
+        "allValue": "catalyst.(broker|execution-core|monitor|otel-forward)",
         "current": {
           "text": [
             "All"
@@ -118,7 +118,7 @@
             "type": "loki",
             "uid": "loki"
           },
-          "expr": "sum by (service_name, catalyst_node_name) (count_over_time({service_name=~\"$service\"} | log_file_name=~`.+` | catalyst_node_name=~\"$node\" [10m]))",
+          "expr": "sum by (service_name, catalyst_node_name) (count_over_time({service_name=~\"${service:pipe}\"} | log_file_name=~`.+` | catalyst_node_name=~\"${node:pipe}\" [10m]))",
           "refId": "A",
           "queryType": "instant",
           "instant": true
@@ -200,7 +200,7 @@
             "type": "loki",
             "uid": "loki"
           },
-          "expr": "sum by (service_name) (count_over_time({service_name=~\"$service\"} | log_file_name=~`.+` | catalyst_node_name=~\"$node\" [$__auto]))",
+          "expr": "sum by (service_name) (count_over_time({service_name=~\"${service:pipe}\"} | log_file_name=~`.+` | catalyst_node_name=~\"${node:pipe}\" [$__auto]))",
           "refId": "A",
           "queryType": "range",
           "legendFormat": "{{service_name}}"
@@ -264,7 +264,7 @@
             "type": "loki",
             "uid": "loki"
           },
-          "expr": "sum by (catalyst_node_name) (count_over_time({service_name=~\"$service\"} | log_file_name=~`.+` | catalyst_node_name=~\"$node\" [$__auto]))",
+          "expr": "sum by (catalyst_node_name) (count_over_time({service_name=~\"${service:pipe}\"} | log_file_name=~`.+` | catalyst_node_name=~\"${node:pipe}\" [$__auto]))",
           "refId": "A",
           "queryType": "range",
           "legendFormat": "{{catalyst_node_name}}"
@@ -341,7 +341,7 @@
             "type": "loki",
             "uid": "loki"
           },
-          "expr": "sum by (service_name) (count_over_time({service_name=~\"$service\"} | log_file_name=~`.+` | catalyst_node_name=~\"$node\" | level=~`40|50|60` [$__auto]))",
+          "expr": "sum by (service_name) (count_over_time({service_name=~\"${service:pipe}\"} | log_file_name=~`.+` | catalyst_node_name=~\"${node:pipe}\" | level=~`40|50|60` [$__auto]))",
           "refId": "A",
           "queryType": "range",
           "legendFormat": "{{service_name}}"
@@ -405,7 +405,7 @@
             "type": "loki",
             "uid": "loki"
           },
-          "expr": "sum by (catalyst_node_name) (count_over_time({service_name=~\"$service\"} | log_file_name=~`.+` | catalyst_node_name=~\"$node\" | level=~`40|50|60` [$__auto]))",
+          "expr": "sum by (catalyst_node_name) (count_over_time({service_name=~\"${service:pipe}\"} | log_file_name=~`.+` | catalyst_node_name=~\"${node:pipe}\" | level=~`40|50|60` [$__auto]))",
           "refId": "A",
           "queryType": "range",
           "legendFormat": "{{catalyst_node_name}}"
@@ -482,7 +482,7 @@
             "type": "loki",
             "uid": "loki"
           },
-          "expr": "{service_name=~\"$service\"} | log_file_name=~`.+` | catalyst_node_name=~\"$node\" | level=~`40|50|60` | line_format `[{{.catalyst_node_name}}] {{.service_name}} L{{.level}} {{.__line__}}`",
+          "expr": "{service_name=~\"${service:pipe}\"} | log_file_name=~`.+` | catalyst_node_name=~\"${node:pipe}\" | level=~`40|50|60` | line_format `[{{.catalyst_node_name}}] {{.service_name}} L{{.level}} {{.__line__}}`",
           "refId": "A",
           "queryType": "range"
         }
@@ -518,7 +518,7 @@
             "type": "loki",
             "uid": "loki"
           },
-          "expr": "topk(15, sum by (cluster) (count_over_time({service_name=~\"$service\"} | log_file_name=~`.+` | catalyst_node_name=~\"$node\" | level=~`40|50|60` | regexp `^(?P<cluster>[^0-9—\\n]{3,55})` [$__range])))",
+          "expr": "topk(15, sum by (cluster) (count_over_time({service_name=~\"${service:pipe}\"} | log_file_name=~`.+` | catalyst_node_name=~\"${node:pipe}\" | level=~`40|50|60` | regexp `^(?P<cluster>[^0-9—\\n]{3,55})` [$__range])))",
           "refId": "A",
           "queryType": "instant",
           "instant": true
@@ -577,7 +577,7 @@
             "type": "loki",
             "uid": "loki"
           },
-          "expr": "sum(count_over_time({service_name=~\"$service\"} | log_file_name=~`.+` | catalyst_node_name=~\"$node\" |= `holding new-work dispatch` [$__range]))",
+          "expr": "sum(count_over_time({service_name=~\"${service:pipe}\"} | log_file_name=~`.+` | catalyst_node_name=~\"${node:pipe}\" |= `holding new-work dispatch` [$__range]))",
           "refId": "A",
           "queryType": "instant",
           "legendFormat": "holding new-work dispatch",
@@ -588,7 +588,7 @@
             "type": "loki",
             "uid": "loki"
           },
-          "expr": "sum(count_over_time({service_name=~\"$service\"} | log_file_name=~`.+` | catalyst_node_name=~\"$node\" |~ `reconcile( poll)? failed` [$__range]))",
+          "expr": "sum(count_over_time({service_name=~\"${service:pipe}\"} | log_file_name=~`.+` | catalyst_node_name=~\"${node:pipe}\" |~ `reconcile( poll)? failed` [$__range]))",
           "refId": "B",
           "queryType": "instant",
           "legendFormat": "reconcile failed",
@@ -599,7 +599,7 @@
             "type": "loki",
             "uid": "loki"
           },
-          "expr": "sum(count_over_time({service_name=~\"$service\"} | log_file_name=~`.+` | catalyst_node_name=~\"$node\" |~ `liveness warmer.*refresh failed` [$__range]))",
+          "expr": "sum(count_over_time({service_name=~\"${service:pipe}\"} | log_file_name=~`.+` | catalyst_node_name=~\"${node:pipe}\" |~ `liveness warmer.*refresh failed` [$__range]))",
           "refId": "C",
           "queryType": "instant",
           "legendFormat": "liveness warmer: refresh failed",
@@ -610,7 +610,7 @@
             "type": "loki",
             "uid": "loki"
           },
-          "expr": "sum(count_over_time({service_name=~\"$service\"} | log_file_name=~`.+` | catalyst_node_name=~\"$node\" |= `stale fence` [$__range]))",
+          "expr": "sum(count_over_time({service_name=~\"${service:pipe}\"} | log_file_name=~`.+` | catalyst_node_name=~\"${node:pipe}\" |= `stale fence` [$__range]))",
           "refId": "D",
           "queryType": "instant",
           "legendFormat": "stale fence",
@@ -621,7 +621,7 @@
             "type": "loki",
             "uid": "loki"
           },
-          "expr": "sum(count_over_time({service_name=~\"$service\"} | log_file_name=~`.+` | catalyst_node_name=~\"$node\" |= `tick failed` [$__range]))",
+          "expr": "sum(count_over_time({service_name=~\"${service:pipe}\"} | log_file_name=~`.+` | catalyst_node_name=~\"${node:pipe}\" |= `tick failed` [$__range]))",
           "refId": "E",
           "queryType": "instant",
           "legendFormat": "tick failed",
@@ -632,7 +632,7 @@
             "type": "loki",
             "uid": "loki"
           },
-          "expr": "sum(count_over_time({service_name=~\"$service\"} | log_file_name=~`.+` | catalyst_node_name=~\"$node\" |= `registry has 0 projects` [$__range]))",
+          "expr": "sum(count_over_time({service_name=~\"${service:pipe}\"} | log_file_name=~`.+` | catalyst_node_name=~\"${node:pipe}\" |= `registry has 0 projects` [$__range]))",
           "refId": "F",
           "queryType": "instant",
           "legendFormat": "registry has 0 projects",
@@ -643,7 +643,7 @@
             "type": "loki",
             "uid": "loki"
           },
-          "expr": "sum(count_over_time({service_name=~\"$service\"} | log_file_name=~`.+` | catalyst_node_name=~\"$node\" |= `not in the cluster roster` [$__range]))",
+          "expr": "sum(count_over_time({service_name=~\"${service:pipe}\"} | log_file_name=~`.+` | catalyst_node_name=~\"${node:pipe}\" |= `not in the cluster roster` [$__range]))",
           "refId": "G",
           "queryType": "instant",
           "legendFormat": "not in the cluster roster",
@@ -715,7 +715,7 @@
             "type": "loki",
             "uid": "loki"
           },
-          "expr": "sum(count_over_time({service_name=~\"$service\"} | log_file_name=~`.+` | catalyst_node_name=~\"$node\" |= `holding new-work dispatch` [$__auto]))",
+          "expr": "sum(count_over_time({service_name=~\"${service:pipe}\"} | log_file_name=~`.+` | catalyst_node_name=~\"${node:pipe}\" |= `holding new-work dispatch` [$__auto]))",
           "refId": "A",
           "queryType": "range",
           "legendFormat": "holding new-work dispatch"
@@ -725,7 +725,7 @@
             "type": "loki",
             "uid": "loki"
           },
-          "expr": "sum(count_over_time({service_name=~\"$service\"} | log_file_name=~`.+` | catalyst_node_name=~\"$node\" |~ `reconcile( poll)? failed` [$__auto]))",
+          "expr": "sum(count_over_time({service_name=~\"${service:pipe}\"} | log_file_name=~`.+` | catalyst_node_name=~\"${node:pipe}\" |~ `reconcile( poll)? failed` [$__auto]))",
           "refId": "B",
           "queryType": "range",
           "legendFormat": "reconcile failed"
@@ -735,7 +735,7 @@
             "type": "loki",
             "uid": "loki"
           },
-          "expr": "sum(count_over_time({service_name=~\"$service\"} | log_file_name=~`.+` | catalyst_node_name=~\"$node\" |~ `liveness warmer.*refresh failed` [$__auto]))",
+          "expr": "sum(count_over_time({service_name=~\"${service:pipe}\"} | log_file_name=~`.+` | catalyst_node_name=~\"${node:pipe}\" |~ `liveness warmer.*refresh failed` [$__auto]))",
           "refId": "C",
           "queryType": "range",
           "legendFormat": "liveness warmer: refresh failed"
@@ -745,7 +745,7 @@
             "type": "loki",
             "uid": "loki"
           },
-          "expr": "sum(count_over_time({service_name=~\"$service\"} | log_file_name=~`.+` | catalyst_node_name=~\"$node\" |= `stale fence` [$__auto]))",
+          "expr": "sum(count_over_time({service_name=~\"${service:pipe}\"} | log_file_name=~`.+` | catalyst_node_name=~\"${node:pipe}\" |= `stale fence` [$__auto]))",
           "refId": "D",
           "queryType": "range",
           "legendFormat": "stale fence"
@@ -755,7 +755,7 @@
             "type": "loki",
             "uid": "loki"
           },
-          "expr": "sum(count_over_time({service_name=~\"$service\"} | log_file_name=~`.+` | catalyst_node_name=~\"$node\" |= `tick failed` [$__auto]))",
+          "expr": "sum(count_over_time({service_name=~\"${service:pipe}\"} | log_file_name=~`.+` | catalyst_node_name=~\"${node:pipe}\" |= `tick failed` [$__auto]))",
           "refId": "E",
           "queryType": "range",
           "legendFormat": "tick failed"
@@ -765,7 +765,7 @@
             "type": "loki",
             "uid": "loki"
           },
-          "expr": "sum(count_over_time({service_name=~\"$service\"} | log_file_name=~`.+` | catalyst_node_name=~\"$node\" |= `registry has 0 projects` [$__auto]))",
+          "expr": "sum(count_over_time({service_name=~\"${service:pipe}\"} | log_file_name=~`.+` | catalyst_node_name=~\"${node:pipe}\" |= `registry has 0 projects` [$__auto]))",
           "refId": "F",
           "queryType": "range",
           "legendFormat": "registry has 0 projects"
@@ -775,7 +775,7 @@
             "type": "loki",
             "uid": "loki"
           },
-          "expr": "sum(count_over_time({service_name=~\"$service\"} | log_file_name=~`.+` | catalyst_node_name=~\"$node\" |= `not in the cluster roster` [$__auto]))",
+          "expr": "sum(count_over_time({service_name=~\"${service:pipe}\"} | log_file_name=~`.+` | catalyst_node_name=~\"${node:pipe}\" |= `not in the cluster roster` [$__auto]))",
           "refId": "G",
           "queryType": "range",
           "legendFormat": "not in the cluster roster"
@@ -839,7 +839,7 @@
             "type": "loki",
             "uid": "loki"
           },
-          "expr": "{service_name=~\"$service\"} | log_file_name=~`.+` | catalyst_node_name=~\"$node\" |~ `holding new-work dispatch|reconcile( poll)? failed|liveness warmer.*refresh failed|stale fence|tick failed|registry has 0 projects|not in the cluster roster`",
+          "expr": "{service_name=~\"${service:pipe}\"} | log_file_name=~`.+` | catalyst_node_name=~\"${node:pipe}\" |~ `holding new-work dispatch|reconcile( poll)? failed|liveness warmer.*refresh failed|stale fence|tick failed|registry has 0 projects|not in the cluster roster`",
           "refId": "A",
           "queryType": "range"
         }
@@ -888,7 +888,7 @@
             "type": "loki",
             "uid": "loki"
           },
-          "expr": "{service_name=~\"$service\"} | log_file_name=~`.+` | catalyst_node_name=~\"$node\" | line_format `[{{.catalyst_node_name}}] {{.service_name}} {{.__line__}}`",
+          "expr": "{service_name=~\"${service:pipe}\"} | log_file_name=~`.+` | catalyst_node_name=~\"${node:pipe}\" | line_format `[{{.catalyst_node_name}}] {{.service_name}} {{.__line__}}`",
           "refId": "A",
           "queryType": "range"
         }
