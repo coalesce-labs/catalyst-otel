@@ -1,0 +1,907 @@
+{
+  "uid": "catalyst-fleet-daemon-logs",
+  "title": "Catalyst — Fleet Daemon Logs",
+  "tags": [
+    "catalyst",
+    "logs",
+    "fleet"
+  ],
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "graphTooltip": 1,
+  "refresh": "30s",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timezone": "",
+  "templating": {
+    "list": [
+      {
+        "name": "service",
+        "label": "service",
+        "type": "query",
+        "datasource": {
+          "type": "loki",
+          "uid": "loki"
+        },
+        "query": "label_values(service_name)",
+        "definition": "label_values(service_name)",
+        "regex": "/^catalyst\\.(broker|execution-core|monitor|otel-forward)$/",
+        "includeAll": true,
+        "multi": true,
+        "allValue": "catalyst\\.(broker|execution-core|monitor|otel-forward)",
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "refresh": 2,
+        "sort": 1
+      },
+      {
+        "name": "node",
+        "label": "node",
+        "type": "custom",
+        "query": "mini,mini-2,laptop",
+        "options": [
+          {
+            "text": "mini",
+            "value": "mini",
+            "selected": false
+          },
+          {
+            "text": "mini-2",
+            "value": "mini-2",
+            "selected": false
+          },
+          {
+            "text": "laptop",
+            "value": "laptop",
+            "selected": false
+          }
+        ],
+        "includeAll": true,
+        "multi": true,
+        "allValue": ".+",
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        }
+      }
+    ]
+  },
+  "annotations": {
+    "list": []
+  },
+  "links": [],
+  "panels": [
+    {
+      "id": 100,
+      "type": "row",
+      "title": "Fleet Health — is each daemon ticking",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "panels": []
+    },
+    {
+      "id": 1,
+      "type": "table",
+      "title": "Liveness — lines per daemon × node (last 10m; missing row = silent)",
+      "description": "Recent-activity proxy for liveness. A daemon with 0 lines for >10m drops off the matrix (Loki can't assert an absent-but-expected series).",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 1
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "sum by (service_name, catalyst_node_name) (count_over_time({service_name=~\"$service\"} | log_file_name=~`.+` | catalyst_node_name=~\"$node\" [10m]))",
+          "refId": "A",
+          "queryType": "instant",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Lines (10m)"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": null
+                    },
+                    {
+                      "color": "orange",
+                      "value": 1
+                    },
+                    {
+                      "color": "green",
+                      "value": 5
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "sortBy": [
+          {
+            "displayName": "Value",
+            "desc": true
+          }
+        ]
+      },
+      "transformations": []
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Log volume by daemon",
+      "description": "",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 1
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "sum by (service_name) (count_over_time({service_name=~\"$service\"} | log_file_name=~`.+` | catalyst_node_name=~\"$node\" [$__auto]))",
+          "refId": "A",
+          "queryType": "range",
+          "legendFormat": "{{service_name}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "logs",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 12,
+            "showPoints": "never",
+            "spanNulls": false,
+            "lineInterpolation": "smooth",
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "width": 260,
+          "calcs": [
+            "sum"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Log volume by node",
+      "description": "",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 1
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "sum by (catalyst_node_name) (count_over_time({service_name=~\"$service\"} | log_file_name=~`.+` | catalyst_node_name=~\"$node\" [$__auto]))",
+          "refId": "A",
+          "queryType": "range",
+          "legendFormat": "{{catalyst_node_name}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "logs",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 12,
+            "showPoints": "never",
+            "spanNulls": false,
+            "lineInterpolation": "smooth",
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "width": 260,
+          "calcs": [
+            "sum"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 101,
+      "type": "row",
+      "title": "Error / Warn rate",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 9
+      },
+      "panels": []
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "WARN+ERROR+FATAL by daemon",
+      "description": "level 40=WARN 50=ERROR 60=FATAL (severity_text is empty on these streams; pino numeric level used instead).",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 10
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "sum by (service_name) (count_over_time({service_name=~\"$service\"} | log_file_name=~`.+` | catalyst_node_name=~\"$node\" | level=~`40|50|60` [$__auto]))",
+          "refId": "A",
+          "queryType": "range",
+          "legendFormat": "{{service_name}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "logs",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 12,
+            "showPoints": "never",
+            "spanNulls": false,
+            "lineInterpolation": "smooth",
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "width": 260,
+          "calcs": [
+            "sum"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "WARN+ERROR+FATAL by node",
+      "description": "",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 10
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "sum by (catalyst_node_name) (count_over_time({service_name=~\"$service\"} | log_file_name=~`.+` | catalyst_node_name=~\"$node\" | level=~`40|50|60` [$__auto]))",
+          "refId": "A",
+          "queryType": "range",
+          "legendFormat": "{{catalyst_node_name}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "logs",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 12,
+            "showPoints": "never",
+            "spanNulls": false,
+            "lineInterpolation": "smooth",
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "width": 260,
+          "calcs": [
+            "sum"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 102,
+      "type": "row",
+      "title": "What's going wrong",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 17
+      },
+      "panels": []
+    },
+    {
+      "id": 6,
+      "type": "logs",
+      "title": "WARN / ERROR / FATAL feed",
+      "description": "",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "h": 11,
+        "w": 14,
+        "x": 0,
+        "y": 18
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "{service_name=~\"$service\"} | log_file_name=~`.+` | catalyst_node_name=~\"$node\" | level=~`40|50|60` | line_format `[{{.catalyst_node_name}}] {{.service_name}} L{{.level}} {{.__line__}}`",
+          "refId": "A",
+          "queryType": "range"
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "showLabels": false,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": false,
+        "enableLogDetails": true,
+        "dedupStrategy": "none",
+        "sortOrder": "Descending"
+      }
+    },
+    {
+      "id": 7,
+      "type": "table",
+      "title": "Top error/warn clusters (message prefix)",
+      "description": "Heuristic clustering: groups WARN+ lines by their leading non-numeric message prefix (IDs/tails stripped).",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "h": 11,
+        "w": 10,
+        "x": 14,
+        "y": 18
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "topk(15, sum by (cluster) (count_over_time({service_name=~\"$service\"} | log_file_name=~`.+` | catalyst_node_name=~\"$node\" | level=~`40|50|60` | regexp `^(?P<cluster>[^0-9—\\n]{3,55})` [$__range])))",
+          "refId": "A",
+          "queryType": "instant",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "sortBy": [
+          {
+            "displayName": "Value",
+            "desc": true
+          }
+        ]
+      },
+      "transformations": []
+    },
+    {
+      "id": 103,
+      "type": "row",
+      "title": "Control-loop wedge signals (silent-freeze watch)",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 29
+      },
+      "panels": []
+    },
+    {
+      "id": 8,
+      "type": "bargauge",
+      "title": "Wedge signal counts ($__range)",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 0,
+        "y": 30
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "sum(count_over_time({service_name=~\"$service\"} | log_file_name=~`.+` | catalyst_node_name=~\"$node\" |= `holding new-work dispatch` [$__range]))",
+          "refId": "A",
+          "queryType": "instant",
+          "legendFormat": "holding new-work dispatch",
+          "instant": true
+        },
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "sum(count_over_time({service_name=~\"$service\"} | log_file_name=~`.+` | catalyst_node_name=~\"$node\" |~ `reconcile( poll)? failed` [$__range]))",
+          "refId": "B",
+          "queryType": "instant",
+          "legendFormat": "reconcile failed",
+          "instant": true
+        },
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "sum(count_over_time({service_name=~\"$service\"} | log_file_name=~`.+` | catalyst_node_name=~\"$node\" |~ `liveness warmer.*refresh failed` [$__range]))",
+          "refId": "C",
+          "queryType": "instant",
+          "legendFormat": "liveness warmer: refresh failed",
+          "instant": true
+        },
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "sum(count_over_time({service_name=~\"$service\"} | log_file_name=~`.+` | catalyst_node_name=~\"$node\" |= `stale fence` [$__range]))",
+          "refId": "D",
+          "queryType": "instant",
+          "legendFormat": "stale fence",
+          "instant": true
+        },
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "sum(count_over_time({service_name=~\"$service\"} | log_file_name=~`.+` | catalyst_node_name=~\"$node\" |= `tick failed` [$__range]))",
+          "refId": "E",
+          "queryType": "instant",
+          "legendFormat": "tick failed",
+          "instant": true
+        },
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "sum(count_over_time({service_name=~\"$service\"} | log_file_name=~`.+` | catalyst_node_name=~\"$node\" |= `registry has 0 projects` [$__range]))",
+          "refId": "F",
+          "queryType": "instant",
+          "legendFormat": "registry has 0 projects",
+          "instant": true
+        },
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "sum(count_over_time({service_name=~\"$service\"} | log_file_name=~`.+` | catalyst_node_name=~\"$node\" |= `not in the cluster roster` [$__range]))",
+          "refId": "G",
+          "queryType": "instant",
+          "legendFormat": "not in the cluster roster",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "orange",
+                "value": 25
+              },
+              {
+                "color": "red",
+                "value": 100
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "description": "Most should sit at 0 on a healthy fleet. stale fence is a noisy-normal zombie-guard suppression."
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Wedge signals over time",
+      "description": "",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 12,
+        "y": 30
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "sum(count_over_time({service_name=~\"$service\"} | log_file_name=~`.+` | catalyst_node_name=~\"$node\" |= `holding new-work dispatch` [$__auto]))",
+          "refId": "A",
+          "queryType": "range",
+          "legendFormat": "holding new-work dispatch"
+        },
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "sum(count_over_time({service_name=~\"$service\"} | log_file_name=~`.+` | catalyst_node_name=~\"$node\" |~ `reconcile( poll)? failed` [$__auto]))",
+          "refId": "B",
+          "queryType": "range",
+          "legendFormat": "reconcile failed"
+        },
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "sum(count_over_time({service_name=~\"$service\"} | log_file_name=~`.+` | catalyst_node_name=~\"$node\" |~ `liveness warmer.*refresh failed` [$__auto]))",
+          "refId": "C",
+          "queryType": "range",
+          "legendFormat": "liveness warmer: refresh failed"
+        },
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "sum(count_over_time({service_name=~\"$service\"} | log_file_name=~`.+` | catalyst_node_name=~\"$node\" |= `stale fence` [$__auto]))",
+          "refId": "D",
+          "queryType": "range",
+          "legendFormat": "stale fence"
+        },
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "sum(count_over_time({service_name=~\"$service\"} | log_file_name=~`.+` | catalyst_node_name=~\"$node\" |= `tick failed` [$__auto]))",
+          "refId": "E",
+          "queryType": "range",
+          "legendFormat": "tick failed"
+        },
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "sum(count_over_time({service_name=~\"$service\"} | log_file_name=~`.+` | catalyst_node_name=~\"$node\" |= `registry has 0 projects` [$__auto]))",
+          "refId": "F",
+          "queryType": "range",
+          "legendFormat": "registry has 0 projects"
+        },
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "sum(count_over_time({service_name=~\"$service\"} | log_file_name=~`.+` | catalyst_node_name=~\"$node\" |= `not in the cluster roster` [$__auto]))",
+          "refId": "G",
+          "queryType": "range",
+          "legendFormat": "not in the cluster roster"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 12,
+            "showPoints": "never",
+            "spanNulls": false,
+            "lineInterpolation": "smooth",
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "width": 260,
+          "calcs": [
+            "sum"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 10,
+      "type": "logs",
+      "title": "Wedge signal lines",
+      "description": "",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 40
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "{service_name=~\"$service\"} | log_file_name=~`.+` | catalyst_node_name=~\"$node\" |~ `holding new-work dispatch|reconcile( poll)? failed|liveness warmer.*refresh failed|stale fence|tick failed|registry has 0 projects|not in the cluster roster`",
+          "refId": "A",
+          "queryType": "range"
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "showLabels": false,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": false,
+        "enableLogDetails": true,
+        "dedupStrategy": "none",
+        "sortOrder": "Descending"
+      }
+    },
+    {
+      "id": 104,
+      "type": "row",
+      "title": "Live tail — pick $service + $node",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 50
+      },
+      "panels": []
+    },
+    {
+      "id": 11,
+      "type": "logs",
+      "title": "Raw daemon log stream",
+      "description": "Drill-down: filter $service and $node, then tail.",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "h": 13,
+        "w": 24,
+        "x": 0,
+        "y": 51
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "{service_name=~\"$service\"} | log_file_name=~`.+` | catalyst_node_name=~\"$node\" | line_format `[{{.catalyst_node_name}}] {{.service_name}} {{.__line__}}`",
+          "refId": "A",
+          "queryType": "range"
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "showLabels": false,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": false,
+        "enableLogDetails": true,
+        "dedupStrategy": "none",
+        "sortOrder": "Descending"
+      }
+    }
+  ]
+}
