@@ -25,7 +25,7 @@
   "panels": [
     {
       "type": "row",
-      "title": "\u2460 Overview",
+      "title": "\u2460 Spend & Tokens",
       "collapsed": false,
       "gridPos": {
         "h": 1,
@@ -1010,7 +1010,7 @@
     },
     {
       "type": "row",
-      "title": "\u2461 Cost & Attribution",
+      "title": "\u2461 Attribution",
       "collapsed": true,
       "gridPos": {
         "h": 1,
@@ -2157,7 +2157,7 @@
           "type": "timeseries",
           "gridPos": {
             "h": 8,
-            "w": 12,
+            "w": 24,
             "x": 0,
             "y": 85
           },
@@ -2231,9 +2231,9 @@
           "type": "barchart",
           "gridPos": {
             "h": 8,
-            "w": 12,
-            "x": 12,
-            "y": 85
+            "w": 24,
+            "x": 0,
+            "y": 93
           },
           "datasource": {
             "type": "prometheus",
@@ -2298,7 +2298,7 @@
             "h": 8,
             "w": 8,
             "x": 0,
-            "y": 93
+            "y": 101
           },
           "datasource": {
             "type": "prometheus",
@@ -2351,7 +2351,7 @@
             "h": 8,
             "w": 8,
             "x": 8,
-            "y": 93
+            "y": 101
           },
           "datasource": {
             "type": "prometheus",
@@ -2404,7 +2404,7 @@
             "h": 8,
             "w": 8,
             "x": 16,
-            "y": 93
+            "y": 101
           },
           "datasource": {
             "type": "prometheus",
@@ -2457,7 +2457,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 101
+            "y": 109
           },
           "datasource": {
             "type": "prometheus",
@@ -2778,7 +2778,7 @@
           "type": "barchart",
           "gridPos": {
             "h": 8,
-            "w": 12,
+            "w": 24,
             "x": 0,
             "y": 63
           },
@@ -2941,9 +2941,9 @@
           "type": "timeseries",
           "gridPos": {
             "h": 8,
-            "w": 12,
-            "x": 12,
-            "y": 63
+            "w": 24,
+            "x": 0,
+            "y": 71
           },
           "datasource": {
             "type": "loki",
@@ -3019,7 +3019,7 @@
             "h": 7,
             "w": 24,
             "x": 0,
-            "y": 71
+            "y": 79
           },
           "datasource": {
             "type": "prometheus",
@@ -3215,7 +3215,7 @@
           "type": "timeseries",
           "gridPos": {
             "h": 7,
-            "w": 12,
+            "w": 24,
             "x": 0,
             "y": 57
           },
@@ -3291,9 +3291,9 @@
           "type": "timeseries",
           "gridPos": {
             "h": 7,
-            "w": 12,
-            "x": 12,
-            "y": 57
+            "w": 24,
+            "x": 0,
+            "y": 64
           },
           "datasource": {
             "type": "prometheus",
