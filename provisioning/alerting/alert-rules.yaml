@@ -1,0 +1,162 @@
+apiVersion: 1
+
+# Catalyst survivability alert rules (OTL-15). Grafana-MANAGED (not Loki-ruler)
+# so they evaluate ON THE OTEL-STACK HOST and keep firing when the Catalyst node
+# is down — the core survivability requirement.
+#
+# RESOLVE LOGIC (handles the known gap: 0 cleared events exist in Loki today):
+#   query A = count_over_time(raised[20m]) - count_over_time(cleared[20m])
+#   The `or (raised[20m]) * 0` arm injects a zero-valued cleared series for every
+#   label that has raised but no cleared, so the subtraction yields the raised
+#   count (LogQL drops unmatched series otherwise). Net > 0 while raised
+#   heartbeats land and no matching cleared has arrived.
+#   Time-based auto-resolve: when the broker stops re-emitting `raised`, A decays
+#   to empty within 20m -> NoData -> noDataState:OK -> RESOLVED notification.
+#   When a real catalyst.alert.cleared event ships, the (raised-cleared) term
+#   resolves faster/explicitly with NO file change needed.
+#
+# WINDOW: [20m] bridges the observed ~15m max inter-raise heartbeat gap so an
+# active alert does not self-resolve between heartbeats.
+groups:
+  - orgId: 1
+    name: catalyst-survivability
+    folder: Catalyst Alerts
+    interval: 30s
+    rules:
+      - uid: catalyst_alert_needs_human
+        title: Catalyst needs_human_pileup raised
+        condition: C
+        for: 0s
+        noDataState: OK
+        execErrState: Alerting
+        labels:
+          team: catalyst
+          event_label: needs_human_pileup
+          severity: critical
+        annotations:
+          summary: 'Catalyst alert RAISED: needs_human_pileup (operator pile-up — human attention required)'
+          description: >
+            A catalyst.alert.raised event with event_label=needs_human_pileup is
+            active on the broker stream and no paired cleared has arrived.
+            Auto-resolves when raised stops for 20m or a cleared event lands.
+            NOTE: the spec payload {count,source,reason,threshold,sinceMs} is NOT
+            present in Loki — only event_label/host_name/severity_text/timestamp
+            are available.
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 1200
+              to: 0
+            datasourceUid: loki
+            model:
+              datasource:
+                type: loki
+                uid: loki
+              editorMode: code
+              queryType: range
+              refId: A
+              expr: >-
+                sum(count_over_time({service_name=`catalyst.broker`} | event_entity=`alert` | event_label=`needs_human_pileup` | event_action=`raised` [20m]))
+                -
+                (sum(count_over_time({service_name=`catalyst.broker`} | event_entity=`alert` | event_label=`needs_human_pileup` | event_action=`cleared` [20m]))
+                or
+                sum(count_over_time({service_name=`catalyst.broker`} | event_entity=`alert` | event_label=`needs_human_pileup` | event_action=`raised` [20m])) * 0)
+          - refId: B
+            relativeTimeRange:
+              from: 1200
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              expression: A
+              reducer: last
+              datasource:
+                type: __expr__
+                uid: __expr__
+          - refId: C
+            relativeTimeRange:
+              from: 1200
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              refId: C
+              expression: B
+              datasource:
+                type: __expr__
+                uid: __expr__
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+
+      - uid: catalyst_alert_system_down
+        title: Catalyst system_down raised
+        condition: C
+        for: 0s
+        noDataState: OK
+        execErrState: Alerting
+        labels:
+          team: catalyst
+          event_label: system_down
+          severity: critical
+        annotations:
+          summary: 'Catalyst alert RAISED: system_down (Catalyst node/system down — survivability pager)'
+          description: >
+            A catalyst.alert.raised event with event_label=system_down is active
+            on the broker stream and no paired cleared has arrived. This rule
+            evaluates on the otel-stack host so it fires even when the Catalyst
+            node is DOWN. UNVERIFIED against live data — no system_down event has
+            been observed yet (built per spec). Auto-resolves when raised stops
+            for 20m or a cleared event lands.
+            NOTE: spec payload {count,source,reason,threshold,sinceMs} absent from
+            Loki — only event_label/host_name/severity_text/timestamp available.
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 1200
+              to: 0
+            datasourceUid: loki
+            model:
+              datasource:
+                type: loki
+                uid: loki
+              editorMode: code
+              queryType: range
+              refId: A
+              expr: >-
+                sum(count_over_time({service_name=`catalyst.broker`} | event_entity=`alert` | event_label=`system_down` | event_action=`raised` [20m]))
+                -
+                (sum(count_over_time({service_name=`catalyst.broker`} | event_entity=`alert` | event_label=`system_down` | event_action=`cleared` [20m]))
+                or
+                sum(count_over_time({service_name=`catalyst.broker`} | event_entity=`alert` | event_label=`system_down` | event_action=`raised` [20m])) * 0)
+          - refId: B
+            relativeTimeRange:
+              from: 1200
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              expression: A
+              reducer: last
+              datasource:
+                type: __expr__
+                uid: __expr__
+          - refId: C
+            relativeTimeRange:
+              from: 1200
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              refId: C
+              expression: B
+              datasource:
+                type: __expr__
+                uid: __expr__
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]

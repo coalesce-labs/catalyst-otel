@@ -80,10 +80,156 @@
     ]
   },
   "annotations": {
-    "list": []
+    "list": [
+      {
+        "name": "Catalyst alerts raised",
+        "datasource": {
+          "type": "loki",
+          "uid": "loki"
+        },
+        "enable": true,
+        "iconColor": "red",
+        "target": {
+          "expr": "{service_name=`catalyst.broker`} | event_entity=`alert` | event_action=`raised`",
+          "refId": "Anno"
+        }
+      }
+    ]
   },
   "links": [],
   "panels": [
+    {
+      "type": "row",
+      "title": "🚨 Currently-Raised Catalyst Alerts",
+      "collapsed": false,
+      "id": 98,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "panels": []
+    },
+    {
+      "id": 99,
+      "type": "table",
+      "title": "Currently-raised alerts (drops when a paired cleared arrives)",
+      "description": "Survivability alert view over the catalyst.alert.* Loki stream (service_name=catalyst.broker). Shows per (host_name,event_label) the NET raised-minus-cleared count over the last 20m; rows with net>0 are still raised. A row DROPS once its paired cleared event arrives (raised==cleared) or when raised heartbeats stop for 20m. Filters on host_name (the alert stream's field) — NOT catalyst_node_name / $node, which the alert stream does not carry, so this shows ALL raised alerts fleet-wide. KNOWN GAPS: (1) the spec payload {kind,reason,source,count,threshold,sinceMs} is NOT present in Loki — only event_label/host_name/severity_text/timestamp are shown. (2) No cleared event has ever been observed (4 raised / 0 cleared in 30d); the 20m window is the de-facto resolve. (3) Only needs_human_pileup observed live; system_down is built-for but unverified.",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "sum by (host_name, event_label, severity_text) (count_over_time({service_name=`catalyst.broker`} | event_entity=`alert` | event_action=`raised` [20m])) - (sum by (host_name, event_label, severity_text) (count_over_time({service_name=`catalyst.broker`} | event_entity=`alert` | event_action=`cleared` [20m])) or sum by (host_name, event_label, severity_text) (count_over_time({service_name=`catalyst.broker`} | event_entity=`alert` | event_action=`raised` [20m])) * 0)",
+          "refId": "A",
+          "queryType": "instant",
+          "instant": true
+        }
+      ],
+      "transformations": [
+        {
+          "id": "labelsToFields",
+          "options": {}
+        },
+        {
+          "id": "filterByValue",
+          "options": {
+            "type": "include",
+            "match": "all",
+            "filters": [
+              {
+                "fieldName": "Value",
+                "config": {
+                  "id": "greater",
+                  "options": {
+                    "value": 0
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "host_name": "host",
+              "event_label": "alert",
+              "severity_text": "severity",
+              "Value": "raised (net, 20m)"
+            },
+            "excludeByName": {
+              "Time": true
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true,
+            "cellOptions": {
+              "type": "auto"
+            }
+          },
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "noValue": "✅ No alerts currently raised"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "alert"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "sortBy": [
+          {
+            "displayName": "raised (net, 20m)",
+            "desc": true
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 24,
+        "x": 0,
+        "y": 1
+      }
+    },
     {
       "type": "row",
       "title": "Fleet Health — is each daemon ticking",
@@ -93,7 +239,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 0
+        "y": 7
       },
       "panels": []
     },
@@ -229,7 +375,7 @@
         "h": 7,
         "w": 24,
         "x": 0,
-        "y": 1
+        "y": 8
       }
     },
     {
@@ -241,7 +387,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 8
+        "y": 15
       },
       "panels": []
     },
@@ -306,7 +452,7 @@
         "h": 7,
         "w": 24,
         "x": 0,
-        "y": 9
+        "y": 16
       }
     },
     {
@@ -370,7 +516,7 @@
         "h": 7,
         "w": 24,
         "x": 0,
-        "y": 16
+        "y": 23
       }
     },
     {
@@ -434,7 +580,7 @@
         "h": 7,
         "w": 24,
         "x": 0,
-        "y": 23
+        "y": 30
       }
     },
     {
@@ -446,7 +592,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 30
+        "y": 37
       },
       "panels": []
     },
@@ -483,7 +629,7 @@
         "h": 11,
         "w": 24,
         "x": 0,
-        "y": 31
+        "y": 38
       }
     },
     {
@@ -530,7 +676,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 42
+        "y": 49
       }
     },
     {
@@ -542,7 +688,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 51
+        "y": 58
       },
       "panels": []
     },
@@ -765,7 +911,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 52
+        "y": 59
       }
     },
     {
@@ -889,7 +1035,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 60
+        "y": 67
       }
     },
     {
@@ -925,7 +1071,7 @@
         "h": 10,
         "w": 24,
         "x": 0,
-        "y": 68
+        "y": 75
       }
     },
     {
@@ -937,7 +1083,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 78
+        "y": 85
       },
       "panels": []
     },
@@ -974,7 +1120,7 @@
         "h": 13,
         "w": 24,
         "x": 0,
-        "y": 79
+        "y": 86
       }
     }
   ]

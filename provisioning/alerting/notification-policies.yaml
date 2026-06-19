@@ -1,0 +1,20 @@
+apiVersion: 1
+
+# Provisioned notification policy tree (OTL-15). This REPLACES the entire tree.
+#
+# Root receiver = catalyst-pager (defined in contact-points.yaml, so it always
+# exists). Referencing a non-existent receiver — e.g. the assumed built-in
+# 'grafana-default-email', which does NOT exist in this grafana-oss instance —
+# is FATAL at startup (provisioning fails -> crash-loop). This stack's only
+# alert rules are the Catalyst survivability rules, so rooting the whole tree at
+# the pager is correct; group_by keeps system_down and needs_human_pileup as
+# distinct notifications. repeat_interval re-pages hourly while still firing.
+policies:
+  - orgId: 1
+    receiver: catalyst-pager
+    group_by:
+      - alertname
+      - event_label
+    group_wait: 10s
+    group_interval: 1m
+    repeat_interval: 1h
