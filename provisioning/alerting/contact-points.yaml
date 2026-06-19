@@ -1,12 +1,18 @@
 apiVersion: 1
 
 # Catalyst survivability pager (OTL-15).
-# The webhook URL comes from ${CATALYST_ALERT_WEBHOOK_URL} (Grafana ${VAR}
-# interpolation — NOT the collector's ${env:VAR}). Unset -> empty string:
-# Grafana boots fine; an empty URL only errors at *send* time, so this file is
-# startup-safe with the var unset (paging is a silent no-op until set in
-# /home/rozich/otel-stack/.env). Same safe-if-unset pattern as the collector
-# fan-out secrets.
+#
+# IMPORTANT (learned the hard way): Grafana validates contact-point settings at
+# STARTUP, and an EMPTY webhook `url` is FATAL — the provisioning module fails
+# and Grafana refuses to boot (crash-loop). "safe-if-unset" therefore does NOT
+# mean "empty"; it means "always a valid, non-empty URL".
+#
+# So docker-compose supplies a harmless localhost placeholder default for
+# CATALYST_ALERT_WEBHOOK_URL when it is unset. Grafana boots cleanly; a webhook
+# POST to the placeholder simply fails at SEND time (connection refused) — a
+# silent no-op pager until Ryan sets the real URL in the gitignored
+# /home/rozich/otel-stack/.env. Point it at a paging gateway, a PagerDuty
+# Events API endpoint, or a Slack incoming webhook.
 contactPoints:
   - orgId: 1
     name: catalyst-pager
@@ -17,10 +23,3 @@ contactPoints:
         settings:
           url: ${CATALYST_ALERT_WEBHOOK_URL}
           httpMethod: POST
-      - uid: catalyst_pager_slack
-        type: slack
-        disableResolveMessage: false
-        settings:
-          url: ${CATALYST_ALERT_SLACK_WEBHOOK_URL}
-          title: '{{ template "default.title" . }}'
-          text: '{{ template "default.message" . }}'
