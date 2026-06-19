@@ -85,10 +85,10 @@
   "links": [],
   "panels": [
     {
-      "id": 100,
       "type": "row",
       "title": "Fleet Health — is each daemon ticking",
       "collapsed": false,
+      "id": 100,
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -105,13 +105,7 @@
         "uid": "loki"
       },
       "title": "Liveness — daemon × node (lines last 10m; red 0 = silent/down)",
-      "description": "Matrix of recent log volume. 0 (red) = that daemon emitted nothing on that node in the last 10m (dead/wedged); orange = low/sparse; green = healthy.",
-      "gridPos": {
-        "h": 9,
-        "w": 8,
-        "x": 0,
-        "y": 1
-      },
+      "description": "Recent log volume per daemon×node. 0 (red)=silent/wedged, orange=low, green=healthy.",
       "targets": [
         {
           "datasource": {
@@ -160,7 +154,7 @@
             "cellOptions": {
               "type": "auto"
             },
-            "minWidth": 64
+            "minWidth": 80
           },
           "thresholds": {
             "mode": "absolute",
@@ -230,71 +224,26 @@
       },
       "options": {
         "showHeader": true
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 1
       }
     },
     {
-      "id": 2,
-      "type": "timeseries",
-      "title": "Log volume by daemon",
-      "description": "",
-      "datasource": {
-        "type": "loki",
-        "uid": "loki"
-      },
+      "type": "row",
+      "title": "Volume & error rate over time",
+      "collapsed": false,
+      "id": 101,
       "gridPos": {
-        "h": 9,
-        "w": 8,
-        "x": 8,
-        "y": 1
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 8
       },
-      "targets": [
-        {
-          "datasource": {
-            "type": "loki",
-            "uid": "loki"
-          },
-          "expr": "sum by (service_name) (count_over_time({service_name=~\"${service:pipe}\"} | log_file_name=~`.+` | catalyst_node_name=~\"${node:pipe}\" [$__auto]))",
-          "refId": "A",
-          "queryType": "range",
-          "legendFormat": "{{service_name}}"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "logs",
-          "custom": {
-            "drawStyle": "line",
-            "lineWidth": 1,
-            "fillOpacity": 12,
-            "showPoints": "never",
-            "spanNulls": false,
-            "lineInterpolation": "smooth",
-            "stacking": {
-              "mode": "none",
-              "group": "A"
-            }
-          },
-          "color": {
-            "mode": "palette-classic"
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "right",
-          "showLegend": true,
-          "width": 260,
-          "calcs": [
-            "sum"
-          ]
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      }
+      "panels": []
     },
     {
       "id": 3,
@@ -304,12 +253,6 @@
       "datasource": {
         "type": "loki",
         "uid": "loki"
-      },
-      "gridPos": {
-        "h": 9,
-        "w": 8,
-        "x": 16,
-        "y": 1
       },
       "targets": [
         {
@@ -358,20 +301,13 @@
           "mode": "multi",
           "sort": "desc"
         }
-      }
-    },
-    {
-      "id": 101,
-      "type": "row",
-      "title": "Error / Warn rate",
-      "collapsed": false,
+      },
       "gridPos": {
-        "h": 1,
+        "h": 7,
         "w": 24,
         "x": 0,
-        "y": 10
-      },
-      "panels": []
+        "y": 9
+      }
     },
     {
       "id": 4,
@@ -381,12 +317,6 @@
       "datasource": {
         "type": "loki",
         "uid": "loki"
-      },
-      "gridPos": {
-        "h": 7,
-        "w": 12,
-        "x": 0,
-        "y": 11
       },
       "targets": [
         {
@@ -435,6 +365,12 @@
           "mode": "multi",
           "sort": "desc"
         }
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 16
       }
     },
     {
@@ -445,12 +381,6 @@
       "datasource": {
         "type": "loki",
         "uid": "loki"
-      },
-      "gridPos": {
-        "h": 7,
-        "w": 12,
-        "x": 12,
-        "y": 11
       },
       "targets": [
         {
@@ -499,18 +429,24 @@
           "mode": "multi",
           "sort": "desc"
         }
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 23
       }
     },
     {
-      "id": 102,
       "type": "row",
       "title": "What's going wrong",
       "collapsed": false,
+      "id": 102,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 18
+        "y": 30
       },
       "panels": []
     },
@@ -522,12 +458,6 @@
       "datasource": {
         "type": "loki",
         "uid": "loki"
-      },
-      "gridPos": {
-        "h": 11,
-        "w": 24,
-        "x": 0,
-        "y": 19
       },
       "targets": [
         {
@@ -548,6 +478,12 @@
         "enableLogDetails": true,
         "dedupStrategy": "none",
         "sortOrder": "Descending"
+      },
+      "gridPos": {
+        "h": 11,
+        "w": 24,
+        "x": 0,
+        "y": 31
       }
     },
     {
@@ -559,12 +495,6 @@
       },
       "title": "Top error/warn clusters (message prefix)",
       "description": "Heuristic clustering: groups WARN+ lines by their leading non-numeric message prefix (IDs/tails stripped).",
-      "gridPos": {
-        "h": 9,
-        "w": 24,
-        "x": 0,
-        "y": 30
-      },
       "targets": [
         {
           "datasource": {
@@ -595,18 +525,24 @@
           }
         ]
       },
-      "transformations": []
+      "transformations": [],
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 42
+      }
     },
     {
-      "id": 103,
       "type": "row",
       "title": "Control-loop wedge signals (silent-freeze watch)",
       "collapsed": false,
+      "id": 103,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 39
+        "y": 51
       },
       "panels": []
     },
@@ -617,12 +553,6 @@
       "datasource": {
         "type": "loki",
         "uid": "loki"
-      },
-      "gridPos": {
-        "h": 10,
-        "w": 12,
-        "x": 0,
-        "y": 40
       },
       "targets": [
         {
@@ -830,7 +760,13 @@
           "values": false
         }
       },
-      "description": "Most should sit at 0 on a healthy fleet. stale fence is a noisy-normal zombie-guard suppression."
+      "description": "Most should sit at 0 on a healthy fleet. stale fence is a noisy-normal zombie-guard suppression.",
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 52
+      }
     },
     {
       "id": 9,
@@ -840,12 +776,6 @@
       "datasource": {
         "type": "loki",
         "uid": "loki"
-      },
-      "gridPos": {
-        "h": 10,
-        "w": 12,
-        "x": 12,
-        "y": 40
       },
       "targets": [
         {
@@ -954,6 +884,12 @@
           "mode": "multi",
           "sort": "desc"
         }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 60
       }
     },
     {
@@ -964,12 +900,6 @@
       "datasource": {
         "type": "loki",
         "uid": "loki"
-      },
-      "gridPos": {
-        "h": 10,
-        "w": 24,
-        "x": 0,
-        "y": 50
       },
       "targets": [
         {
@@ -990,18 +920,24 @@
         "enableLogDetails": true,
         "dedupStrategy": "none",
         "sortOrder": "Descending"
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 68
       }
     },
     {
-      "id": 104,
       "type": "row",
       "title": "Live tail — pick $service + $node",
       "collapsed": false,
+      "id": 104,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 60
+        "y": 78
       },
       "panels": []
     },
@@ -1013,12 +949,6 @@
       "datasource": {
         "type": "loki",
         "uid": "loki"
-      },
-      "gridPos": {
-        "h": 13,
-        "w": 24,
-        "x": 0,
-        "y": 61
       },
       "targets": [
         {
@@ -1039,6 +969,12 @@
         "enableLogDetails": true,
         "dedupStrategy": "none",
         "sortOrder": "Descending"
+      },
+      "gridPos": {
+        "h": 13,
+        "w": 24,
+        "x": 0,
+        "y": 79
       }
     }
   ]
