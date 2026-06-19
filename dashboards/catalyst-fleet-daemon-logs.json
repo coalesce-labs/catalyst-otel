@@ -906,7 +906,7 @@
           "values": false
         }
       },
-      "description": "Most should sit at 0 on a healthy fleet. stale fence is a noisy-normal zombie-guard suppression.",
+      "description": "**Control-loop wedge signals** — counts over the dashboard range. Each marks *the loop still running but doing no useful work*; on a healthy fleet most sit at **0**.\n\nEach signal marks \"loop still running, but no useful work happening\":\n\n- `holding new-work dispatch` (WARN) — The live worker-count snapshot (`claude agents --json`) is stale or empty, so the scheduler can't trust its in-flight count and admits **zero new tickets** this tick. The daemon looks alive (timers tick, in-flight phases advance) but no *new* work enters the pipeline. If the snapshot never recovers, the team starves with no crash.\n- `reconcile failed` (ERROR) — A `registry.json` change fired a reconcile and it threw. The daemon keeps ticking on the **old** project set: newly registered projects are never picked up, de-registrations never take effect. No restart, no visible error besides this line.\n- `liveness warmer: refresh failed` (WARN) — The short-interval timer that keeps the worker-count snapshot warm between ticks failed to refresh. This warmer is what *prevents* `holding new-work dispatch`; sustained failures make the snapshot go stale and cascade into it — the loop runs but goes blind on worker liveness.\n- `stale fence` (WARN) — On a ≥2-host cluster, this node decided it is **no longer the current owner** of a ticket and **suppressed an outbound Linear/GitHub write** (zombie guard, fail-closed). A single event is the guard **working correctly**. A *sustained high rate* means an un-reaped zombie worker is stuck re-trying — see Fence terms below. Single-host installs never emit this.\n- `tick failed` (ERROR) — An uncaught exception escaped the whole scheduler tick; the top-level catch logged it and scheduled the next tick. The daemon survives but **this entire tick did no work** (no advancement, no dispatch, no sweep). If it recurs every tick, the control loop is frozen while the process stays up.\n- `registry has 0 projects` (WARN) — At boot the registry resolved to **zero** enrolled projects, so there is nothing to ever dispatch. The daemon looks perfectly healthy (PID present, timers armed) but every tick is a no-op. Usually a host that never ran `catalyst-execution-core register`. Emitted once at startup.\n- `not in the cluster roster` (WARN) — This host's name is **absent from a ≥2-host roster**, so under HRW ownership-hashing every ticket routes to some *other* host and this daemon owns zero tickets — a silent self-eviction. Registry is fine; the *ownership partition* excludes this node. Single-host (`roster ≤ 1`) never emits this.",
       "gridPos": {
         "h": 8,
         "w": 24,
@@ -918,7 +918,7 @@
       "id": 9,
       "type": "timeseries",
       "title": "Wedge signals over time",
-      "description": "",
+      "description": "Per-interval count of each of the 7 control-loop wedge signals over time (one series per signal, zero-filled). Each marks *loop still running, no useful work*. See the **Glossary — wedge signals & fence terms** panel below for what each signal means and which are noisy-normal vs alarming.",
       "datasource": {
         "type": "loki",
         "uid": "loki"
@@ -1042,7 +1042,7 @@
       "id": 10,
       "type": "logs",
       "title": "Wedge signal lines",
-      "description": "",
+      "description": "The raw matched daemon-log lines for the 7 wedge signals (newest first, severity-tagged, `[node] service`-prefixed). See the **Glossary — wedge signals & fence terms** panel below for what each signal means and the noisy-normal (single `stale fence`) vs alarm (sustained high rate) distinction.",
       "datasource": {
         "type": "loki",
         "uid": "loki"
@@ -1083,7 +1083,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 85
+        "y": 105
       },
       "panels": []
     },
@@ -1120,8 +1120,24 @@
         "h": 13,
         "w": 24,
         "x": 0,
-        "y": 86
+        "y": 106
       }
+    },
+    {
+      "id": 105,
+      "type": "text",
+      "title": "Glossary — wedge signals & fence terms",
+      "gridPos": {
+        "h": 20,
+        "w": 24,
+        "x": 0,
+        "y": 85
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "## Wedge signals — what each one means\n\nEach signal marks \"loop still running, but no useful work happening\":\n\n- `holding new-work dispatch` (WARN) — The live worker-count snapshot (`claude agents --json`) is stale or empty, so the scheduler can't trust its in-flight count and admits **zero new tickets** this tick. The daemon looks alive (timers tick, in-flight phases advance) but no *new* work enters the pipeline. If the snapshot never recovers, the team starves with no crash.\n- `reconcile failed` (ERROR) — A `registry.json` change fired a reconcile and it threw. The daemon keeps ticking on the **old** project set: newly registered projects are never picked up, de-registrations never take effect. No restart, no visible error besides this line.\n- `liveness warmer: refresh failed` (WARN) — The short-interval timer that keeps the worker-count snapshot warm between ticks failed to refresh. This warmer is what *prevents* `holding new-work dispatch`; sustained failures make the snapshot go stale and cascade into it — the loop runs but goes blind on worker liveness.\n- `stale fence` (WARN) — On a ≥2-host cluster, this node decided it is **no longer the current owner** of a ticket and **suppressed an outbound Linear/GitHub write** (zombie guard, fail-closed). A single event is the guard **working correctly**. A *sustained high rate* means an un-reaped zombie worker is stuck re-trying — see Fence terms below. Single-host installs never emit this.\n- `tick failed` (ERROR) — An uncaught exception escaped the whole scheduler tick; the top-level catch logged it and scheduled the next tick. The daemon survives but **this entire tick did no work** (no advancement, no dispatch, no sweep). If it recurs every tick, the control loop is frozen while the process stays up.\n- `registry has 0 projects` (WARN) — At boot the registry resolved to **zero** enrolled projects, so there is nothing to ever dispatch. The daemon looks perfectly healthy (PID present, timers armed) but every tick is a no-op. Usually a host that never ran `catalyst-execution-core register`. Emitted once at startup.\n- `not in the cluster roster` (WARN) — This host's name is **absent from a ≥2-host roster**, so under HRW ownership-hashing every ticket routes to some *other* host and this daemon owns zero tickets — a silent self-eviction. Registry is fine; the *ownership partition* excludes this node. Single-host (`roster ≤ 1`) never emits this.\n\n### Fence / zombie-guard terms\n\n- **generation** — A monotonic integer (\"fencing token\") stamped on a ticket each time a host claims a phase. A fresh claim, revive, or cross-host takeover bumps it. The highest generation is, by definition, the current owner.\n- **fence** — The check run *before* every external write that compares the generation a worker holds against the generation currently recorded on the ticket. Equal → still the owner, proceed. Not equal → bow out.\n- **stale fence** — A worker's held generation is *lower* than the ticket's current generation: someone took over after this worker started. The fence fires, the write is rejected. The worker is a leftover from a superseded generation.\n- **zombie guard** — The whole protective mechanism: a paused/partitioned worker that wakes *after* another host took its ticket is structurally prevented from corrupting shared Linear/GitHub state, because its stale generation no longer matches.\n- **fail-closed** — When the fence can't be *affirmatively* confirmed current (missing signal/claim, spawn error, timeout, unparseable output), the answer defaults to \"not current\" and the write is suppressed. Only an explicit confirmation permits a write.\n- **A single stale fence is healthy; a high rate is the alarm.** The fence only suppresses the *write*, not the process. If the underlying worker is never reaped it keeps waking, re-hitting the write site, and re-failing — burning ticks forever. A sustained high `stale fence` rate is therefore an alarm for the **reaper layer** (the phantom-reaper problem), not the fence layer."
+      },
+      "transparent": false
     }
   ]
 }
