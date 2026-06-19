@@ -1,0 +1,22 @@
+apiVersion: 1
+
+# Provisioned notification policy tree (OTL-15). NOTE: this REPLACES the whole
+# tree. Root keeps grafana-default so non-Catalyst alerts still route normally;
+# a child route sends team=catalyst alerts to the survivability pager.
+policies:
+  - orgId: 1
+    receiver: grafana-default-email
+    group_by:
+      - grafana_folder
+      - alertname
+    routes:
+      - receiver: catalyst-pager
+        object_matchers:
+          - ['team', '=', 'catalyst']
+        group_by:
+          - alertname
+          - event_label
+        group_wait: 10s
+        group_interval: 1m
+        repeat_interval: 1h
+        continue: false

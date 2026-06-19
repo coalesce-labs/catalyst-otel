@@ -69,6 +69,12 @@ services:
       - GF_FEATURE_TOGGLES_ENABLE=logsSampleInExplore
       - GF_AUTH_ANONYMOUS_ENABLED=true
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      # OTL-15 survivability pager webhook(s). Passed through from host env with
+      # empty defaults so Grafana boots cleanly with NO URL set — an empty
+      # contact-point URL only errors at alert SEND time, never at startup.
+      # Real values live in the gitignored /home/rozich/otel-stack/.env.
+      - CATALYST_ALERT_WEBHOOK_URL=${CATALYST_ALERT_WEBHOOK_URL:-}
+      - CATALYST_ALERT_SLACK_WEBHOOK_URL=${CATALYST_ALERT_SLACK_WEBHOOK_URL:-}
     volumes:
       - ./grafana-datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro
       - ./grafana-dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml:ro
@@ -77,6 +83,11 @@ services:
       # — Grafana then serves stale JSON until the container is recreated
       # (bit us in CTL-812). A directory mount follows renames.
       - ./dashboards:/var/lib/grafana/dashboards:ro
+      # OTL-15: mount the alerting provisioning DIRECTORY (not a single file) so
+      # git-pull renames are followed (CTL-812). Grafana reads unified-alerting
+      # provisioning from /etc/grafana/provisioning/alerting/ at STARTUP ONLY —
+      # a container recreate (operator step) is needed to load rule changes.
+      - ./provisioning/alerting:/etc/grafana/provisioning/alerting:ro
     ports:
       - "13001:3000"
     restart: unless-stopped

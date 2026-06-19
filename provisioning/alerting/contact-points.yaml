@@ -1,0 +1,26 @@
+apiVersion: 1
+
+# Catalyst survivability pager (OTL-15).
+# The webhook URL comes from ${CATALYST_ALERT_WEBHOOK_URL} (Grafana ${VAR}
+# interpolation — NOT the collector's ${env:VAR}). Unset -> empty string:
+# Grafana boots fine; an empty URL only errors at *send* time, so this file is
+# startup-safe with the var unset (paging is a silent no-op until set in
+# /home/rozich/otel-stack/.env). Same safe-if-unset pattern as the collector
+# fan-out secrets.
+contactPoints:
+  - orgId: 1
+    name: catalyst-pager
+    receivers:
+      - uid: catalyst_pager_webhook
+        type: webhook
+        disableResolveMessage: false
+        settings:
+          url: ${CATALYST_ALERT_WEBHOOK_URL}
+          httpMethod: POST
+      - uid: catalyst_pager_slack
+        type: slack
+        disableResolveMessage: false
+        settings:
+          url: ${CATALYST_ALERT_SLACK_WEBHOOK_URL}
+          title: '{{ template "default.title" . }}'
+          text: '{{ template "default.message" . }}'
