@@ -134,11 +134,20 @@
           "options": {}
         },
         {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "Value": "count",
+              "Value #A": "count"
+            }
+          }
+        },
+        {
           "id": "groupingToMatrix",
           "options": {
             "columnField": "catalyst_node_name",
             "rowField": "service_name",
-            "valueField": "Value",
+            "valueField": "count",
             "emptyValue": "zero"
           }
         }
