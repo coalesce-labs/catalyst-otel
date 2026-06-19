@@ -118,7 +118,7 @@
             "type": "loki",
             "uid": "loki"
           },
-          "expr": "sum by (service_name, catalyst_node_name) (count_over_time({service_name=~\"${service:pipe}\"} | log_file_name=~`.+` | catalyst_node_name=~\"${node:pipe}\" [10m]))",
+          "expr": "sum by (service_name, catalyst_node_name) (count_over_time({service_name=~\"${service:pipe}\"} | log_file_name=~`.+` | catalyst_node_name=~\"${node:pipe}\" | label_format service_name=`{{ trimPrefix \"catalyst.\" .service_name }}` [10m]))",
           "refId": "A",
           "queryType": "instant",
           "instant": true
