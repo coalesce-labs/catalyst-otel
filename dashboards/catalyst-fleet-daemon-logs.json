@@ -130,6 +130,10 @@
           "options": {}
         },
         {
+          "id": "merge",
+          "options": {}
+        },
+        {
           "id": "groupingToMatrix",
           "options": {
             "columnField": "catalyst_node_name",
