@@ -100,14 +100,14 @@
     {
       "id": 1,
       "type": "table",
-      "title": "Liveness — lines per daemon × node (last 10m; missing row = silent)",
-      "description": "Recent-activity proxy for liveness. A daemon with 0 lines for >10m drops off the matrix (Loki can't assert an absent-but-expected series).",
       "datasource": {
         "type": "loki",
         "uid": "loki"
       },
+      "title": "Liveness — daemon × node (lines last 10m; red 0 = silent/down)",
+      "description": "Matrix of recent log volume. 0 (red) = that daemon emitted nothing on that node in the last 10m (dead/wedged); orange = low/sparse; green = healthy.",
       "gridPos": {
-        "h": 8,
+        "h": 9,
         "w": 8,
         "x": 0,
         "y": 1
@@ -124,18 +124,57 @@
           "instant": true
         }
       ],
+      "transformations": [
+        {
+          "id": "labelsToFields",
+          "options": {}
+        },
+        {
+          "id": "groupingToMatrix",
+          "options": {
+            "columnField": "catalyst_node_name",
+            "rowField": "service_name",
+            "valueField": "Value",
+            "emptyValue": "zero"
+          }
+        }
+      ],
       "fieldConfig": {
         "defaults": {
+          "unit": "short",
           "custom": {
-            "align": "auto",
-            "filterable": true
+            "align": "center",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "minWidth": 64
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              },
+              {
+                "color": "green",
+                "value": 10
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
           }
         },
         "overrides": [
           {
             "matcher": {
               "id": "byName",
-              "options": "Lines (10m)"
+              "options": "mini"
             },
             "properties": [
               {
@@ -143,25 +182,33 @@
                 "value": {
                   "type": "color-background"
                 }
-              },
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "mini-2"
+            },
+            "properties": [
               {
-                "id": "thresholds",
+                "id": "custom.cellOptions",
                 "value": {
-                  "mode": "absolute",
-                  "steps": [
-                    {
-                      "color": "red",
-                      "value": null
-                    },
-                    {
-                      "color": "orange",
-                      "value": 1
-                    },
-                    {
-                      "color": "green",
-                      "value": 5
-                    }
-                  ]
+                  "type": "color-background"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "laptop"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background"
                 }
               }
             ]
@@ -169,15 +216,8 @@
         ]
       },
       "options": {
-        "showHeader": true,
-        "sortBy": [
-          {
-            "displayName": "Value",
-            "desc": true
-          }
-        ]
-      },
-      "transformations": []
+        "showHeader": true
+      }
     },
     {
       "id": 2,
@@ -189,7 +229,7 @@
         "uid": "loki"
       },
       "gridPos": {
-        "h": 8,
+        "h": 9,
         "w": 8,
         "x": 8,
         "y": 1
@@ -253,7 +293,7 @@
         "uid": "loki"
       },
       "gridPos": {
-        "h": 8,
+        "h": 9,
         "w": 8,
         "x": 16,
         "y": 1
@@ -316,7 +356,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 9
+        "y": 10
       },
       "panels": []
     },
@@ -324,7 +364,7 @@
       "id": 4,
       "type": "timeseries",
       "title": "WARN+ERROR+FATAL by daemon",
-      "description": "level 40=WARN 50=ERROR 60=FATAL (severity_text is empty on these streams; pino numeric level used instead).",
+      "description": "level 40=WARN 50=ERROR 60=FATAL (severity_text is empty on these streams; pino numeric level used).",
       "datasource": {
         "type": "loki",
         "uid": "loki"
@@ -333,7 +373,7 @@
         "h": 7,
         "w": 12,
         "x": 0,
-        "y": 10
+        "y": 11
       },
       "targets": [
         {
@@ -397,7 +437,7 @@
         "h": 7,
         "w": 12,
         "x": 12,
-        "y": 10
+        "y": 11
       },
       "targets": [
         {
@@ -457,7 +497,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 17
+        "y": 18
       },
       "panels": []
     },
@@ -472,9 +512,9 @@
       },
       "gridPos": {
         "h": 11,
-        "w": 14,
+        "w": 24,
         "x": 0,
-        "y": 18
+        "y": 19
       },
       "targets": [
         {
@@ -500,17 +540,17 @@
     {
       "id": 7,
       "type": "table",
-      "title": "Top error/warn clusters (message prefix)",
-      "description": "Heuristic clustering: groups WARN+ lines by their leading non-numeric message prefix (IDs/tails stripped).",
       "datasource": {
         "type": "loki",
         "uid": "loki"
       },
+      "title": "Top error/warn clusters (message prefix)",
+      "description": "Heuristic clustering: groups WARN+ lines by their leading non-numeric message prefix (IDs/tails stripped).",
       "gridPos": {
-        "h": 11,
-        "w": 10,
-        "x": 14,
-        "y": 18
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 30
       },
       "targets": [
         {
@@ -537,7 +577,7 @@
         "showHeader": true,
         "sortBy": [
           {
-            "displayName": "Value",
+            "displayName": "Value #A",
             "desc": true
           }
         ]
@@ -553,7 +593,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 29
+        "y": 39
       },
       "panels": []
     },
@@ -569,7 +609,7 @@
         "h": 10,
         "w": 12,
         "x": 0,
-        "y": 30
+        "y": 40
       },
       "targets": [
         {
@@ -577,7 +617,7 @@
             "type": "loki",
             "uid": "loki"
           },
-          "expr": "sum(count_over_time({service_name=~\"${service:pipe}\"} | log_file_name=~`.+` | catalyst_node_name=~\"${node:pipe}\" |= `holding new-work dispatch` [$__range]))",
+          "expr": "sum(count_over_time({service_name=~\"${service:pipe}\"} | log_file_name=~`.+` | catalyst_node_name=~\"${node:pipe}\" |= `holding new-work dispatch` [$__range])) or vector(0)",
           "refId": "A",
           "queryType": "instant",
           "legendFormat": "holding new-work dispatch",
@@ -588,7 +628,7 @@
             "type": "loki",
             "uid": "loki"
           },
-          "expr": "sum(count_over_time({service_name=~\"${service:pipe}\"} | log_file_name=~`.+` | catalyst_node_name=~\"${node:pipe}\" |~ `reconcile( poll)? failed` [$__range]))",
+          "expr": "sum(count_over_time({service_name=~\"${service:pipe}\"} | log_file_name=~`.+` | catalyst_node_name=~\"${node:pipe}\" |~ `reconcile( poll)? failed` [$__range])) or vector(0)",
           "refId": "B",
           "queryType": "instant",
           "legendFormat": "reconcile failed",
@@ -599,7 +639,7 @@
             "type": "loki",
             "uid": "loki"
           },
-          "expr": "sum(count_over_time({service_name=~\"${service:pipe}\"} | log_file_name=~`.+` | catalyst_node_name=~\"${node:pipe}\" |~ `liveness warmer.*refresh failed` [$__range]))",
+          "expr": "sum(count_over_time({service_name=~\"${service:pipe}\"} | log_file_name=~`.+` | catalyst_node_name=~\"${node:pipe}\" |~ `liveness warmer.*refresh failed` [$__range])) or vector(0)",
           "refId": "C",
           "queryType": "instant",
           "legendFormat": "liveness warmer: refresh failed",
@@ -610,7 +650,7 @@
             "type": "loki",
             "uid": "loki"
           },
-          "expr": "sum(count_over_time({service_name=~\"${service:pipe}\"} | log_file_name=~`.+` | catalyst_node_name=~\"${node:pipe}\" |= `stale fence` [$__range]))",
+          "expr": "sum(count_over_time({service_name=~\"${service:pipe}\"} | log_file_name=~`.+` | catalyst_node_name=~\"${node:pipe}\" |= `stale fence` [$__range])) or vector(0)",
           "refId": "D",
           "queryType": "instant",
           "legendFormat": "stale fence",
@@ -621,7 +661,7 @@
             "type": "loki",
             "uid": "loki"
           },
-          "expr": "sum(count_over_time({service_name=~\"${service:pipe}\"} | log_file_name=~`.+` | catalyst_node_name=~\"${node:pipe}\" |= `tick failed` [$__range]))",
+          "expr": "sum(count_over_time({service_name=~\"${service:pipe}\"} | log_file_name=~`.+` | catalyst_node_name=~\"${node:pipe}\" |= `tick failed` [$__range])) or vector(0)",
           "refId": "E",
           "queryType": "instant",
           "legendFormat": "tick failed",
@@ -632,7 +672,7 @@
             "type": "loki",
             "uid": "loki"
           },
-          "expr": "sum(count_over_time({service_name=~\"${service:pipe}\"} | log_file_name=~`.+` | catalyst_node_name=~\"${node:pipe}\" |= `registry has 0 projects` [$__range]))",
+          "expr": "sum(count_over_time({service_name=~\"${service:pipe}\"} | log_file_name=~`.+` | catalyst_node_name=~\"${node:pipe}\" |= `registry has 0 projects` [$__range])) or vector(0)",
           "refId": "F",
           "queryType": "instant",
           "legendFormat": "registry has 0 projects",
@@ -643,7 +683,7 @@
             "type": "loki",
             "uid": "loki"
           },
-          "expr": "sum(count_over_time({service_name=~\"${service:pipe}\"} | log_file_name=~`.+` | catalyst_node_name=~\"${node:pipe}\" |= `not in the cluster roster` [$__range]))",
+          "expr": "sum(count_over_time({service_name=~\"${service:pipe}\"} | log_file_name=~`.+` | catalyst_node_name=~\"${node:pipe}\" |= `not in the cluster roster` [$__range])) or vector(0)",
           "refId": "G",
           "queryType": "instant",
           "legendFormat": "not in the cluster roster",
@@ -678,7 +718,92 @@
             "mode": "thresholds"
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "A"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "holding new-work dispatch"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "B"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "reconcile failed"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "C"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "liveness warmer: refresh failed"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "D"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "stale fence"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "E"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "tick failed"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "F"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "registry has 0 projects"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "G"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "not in the cluster roster"
+              }
+            ]
+          }
+        ]
       },
       "options": {
         "orientation": "horizontal",
@@ -707,7 +832,7 @@
         "h": 10,
         "w": 12,
         "x": 12,
-        "y": 30
+        "y": 40
       },
       "targets": [
         {
@@ -715,7 +840,7 @@
             "type": "loki",
             "uid": "loki"
           },
-          "expr": "sum(count_over_time({service_name=~\"${service:pipe}\"} | log_file_name=~`.+` | catalyst_node_name=~\"${node:pipe}\" |= `holding new-work dispatch` [$__auto]))",
+          "expr": "sum(count_over_time({service_name=~\"${service:pipe}\"} | log_file_name=~`.+` | catalyst_node_name=~\"${node:pipe}\" |= `holding new-work dispatch` [$__auto])) or vector(0)",
           "refId": "A",
           "queryType": "range",
           "legendFormat": "holding new-work dispatch"
@@ -725,7 +850,7 @@
             "type": "loki",
             "uid": "loki"
           },
-          "expr": "sum(count_over_time({service_name=~\"${service:pipe}\"} | log_file_name=~`.+` | catalyst_node_name=~\"${node:pipe}\" |~ `reconcile( poll)? failed` [$__auto]))",
+          "expr": "sum(count_over_time({service_name=~\"${service:pipe}\"} | log_file_name=~`.+` | catalyst_node_name=~\"${node:pipe}\" |~ `reconcile( poll)? failed` [$__auto])) or vector(0)",
           "refId": "B",
           "queryType": "range",
           "legendFormat": "reconcile failed"
@@ -735,7 +860,7 @@
             "type": "loki",
             "uid": "loki"
           },
-          "expr": "sum(count_over_time({service_name=~\"${service:pipe}\"} | log_file_name=~`.+` | catalyst_node_name=~\"${node:pipe}\" |~ `liveness warmer.*refresh failed` [$__auto]))",
+          "expr": "sum(count_over_time({service_name=~\"${service:pipe}\"} | log_file_name=~`.+` | catalyst_node_name=~\"${node:pipe}\" |~ `liveness warmer.*refresh failed` [$__auto])) or vector(0)",
           "refId": "C",
           "queryType": "range",
           "legendFormat": "liveness warmer: refresh failed"
@@ -745,7 +870,7 @@
             "type": "loki",
             "uid": "loki"
           },
-          "expr": "sum(count_over_time({service_name=~\"${service:pipe}\"} | log_file_name=~`.+` | catalyst_node_name=~\"${node:pipe}\" |= `stale fence` [$__auto]))",
+          "expr": "sum(count_over_time({service_name=~\"${service:pipe}\"} | log_file_name=~`.+` | catalyst_node_name=~\"${node:pipe}\" |= `stale fence` [$__auto])) or vector(0)",
           "refId": "D",
           "queryType": "range",
           "legendFormat": "stale fence"
@@ -755,7 +880,7 @@
             "type": "loki",
             "uid": "loki"
           },
-          "expr": "sum(count_over_time({service_name=~\"${service:pipe}\"} | log_file_name=~`.+` | catalyst_node_name=~\"${node:pipe}\" |= `tick failed` [$__auto]))",
+          "expr": "sum(count_over_time({service_name=~\"${service:pipe}\"} | log_file_name=~`.+` | catalyst_node_name=~\"${node:pipe}\" |= `tick failed` [$__auto])) or vector(0)",
           "refId": "E",
           "queryType": "range",
           "legendFormat": "tick failed"
@@ -765,7 +890,7 @@
             "type": "loki",
             "uid": "loki"
           },
-          "expr": "sum(count_over_time({service_name=~\"${service:pipe}\"} | log_file_name=~`.+` | catalyst_node_name=~\"${node:pipe}\" |= `registry has 0 projects` [$__auto]))",
+          "expr": "sum(count_over_time({service_name=~\"${service:pipe}\"} | log_file_name=~`.+` | catalyst_node_name=~\"${node:pipe}\" |= `registry has 0 projects` [$__auto])) or vector(0)",
           "refId": "F",
           "queryType": "range",
           "legendFormat": "registry has 0 projects"
@@ -775,7 +900,7 @@
             "type": "loki",
             "uid": "loki"
           },
-          "expr": "sum(count_over_time({service_name=~\"${service:pipe}\"} | log_file_name=~`.+` | catalyst_node_name=~\"${node:pipe}\" |= `not in the cluster roster` [$__auto]))",
+          "expr": "sum(count_over_time({service_name=~\"${service:pipe}\"} | log_file_name=~`.+` | catalyst_node_name=~\"${node:pipe}\" |= `not in the cluster roster` [$__auto])) or vector(0)",
           "refId": "G",
           "queryType": "range",
           "legendFormat": "not in the cluster roster"
@@ -831,7 +956,7 @@
         "h": 10,
         "w": 24,
         "x": 0,
-        "y": 40
+        "y": 50
       },
       "targets": [
         {
@@ -839,7 +964,7 @@
             "type": "loki",
             "uid": "loki"
           },
-          "expr": "{service_name=~\"${service:pipe}\"} | log_file_name=~`.+` | catalyst_node_name=~\"${node:pipe}\" |~ `holding new-work dispatch|reconcile( poll)? failed|liveness warmer.*refresh failed|stale fence|tick failed|registry has 0 projects|not in the cluster roster`",
+          "expr": "{service_name=~\"${service:pipe}\"} | log_file_name=~`.+` | catalyst_node_name=~\"${node:pipe}\" |~ `holding new-work dispatch|reconcile( poll)? failed|liveness warmer.*refresh failed|stale fence|tick failed|registry has 0 projects|not in the cluster roster` | label_format sev=`{{ if eq .level \"30\" }}INFO{{ else if eq .level \"40\" }}WARN{{ else if eq .level \"50\" }}ERROR{{ else if eq .level \"60\" }}FATAL{{ else }}L{{ .level }}{{ end }}` | line_format `[{{ .catalyst_node_name }}] {{ .service_name }} {{ .sev }} | {{ __line__ }}`",
           "refId": "A",
           "queryType": "range"
         }
@@ -863,7 +988,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 50
+        "y": 60
       },
       "panels": []
     },
@@ -880,7 +1005,7 @@
         "h": 13,
         "w": 24,
         "x": 0,
-        "y": 51
+        "y": 61
       },
       "targets": [
         {
