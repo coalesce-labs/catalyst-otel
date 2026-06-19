@@ -1,0 +1,852 @@
+{
+  "uid": "catalyst-control-loop-live",
+  "title": "Catalyst — Watch the Control Loop Live",
+  "tags": [
+    "catalyst",
+    "control-loop",
+    "loki",
+    "otl-18"
+  ],
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "graphTooltip": 1,
+  "refresh": "30s",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timezone": "",
+  "templating": {
+    "list": [
+      {
+        "name": "service",
+        "label": "service",
+        "type": "query",
+        "datasource": {
+          "type": "loki",
+          "uid": "loki"
+        },
+        "query": "label_values(service_name)",
+        "definition": "label_values(service_name)",
+        "regex": "/^catalyst\\..+/",
+        "includeAll": true,
+        "multi": true,
+        "allValue": "catalyst..+",
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "refresh": 2,
+        "sort": 1
+      },
+      {
+        "name": "node",
+        "label": "node",
+        "type": "custom",
+        "description": "Filters EVENT panels on host_name and the daemon-LOG panels on catalyst_node_name. 'All' = .* (keeps every event, incl. the ~16% with empty host_name plus historical FQDN-alias hosts). A specific node matches the canonical short name EXACTLY (Loki anchors pipeline label-matchers), so it will MISS that node's historical FQDN aliases (e.g. RyansMini250233.rozich) and empty-host events — exactly the gap CTL-1291 asks to fix. Use All for complete history.",
+        "query": "mini,mini-2,laptop",
+        "options": [
+          { "text": "mini", "value": "mini", "selected": false },
+          { "text": "mini-2", "value": "mini-2", "selected": false },
+          { "text": "laptop", "value": "laptop", "selected": false }
+        ],
+        "includeAll": true,
+        "multi": true,
+        "allValue": ".*",
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        }
+      },
+      {
+        "name": "ev",
+        "label": "event filter",
+        "type": "textbox",
+        "description": "Substring filter for the raw event-log tail and the volume panels — matches on the event name (the log body); plain text only, no regex/backslashes. Empty = all events. Examples: recovery. · phase.dispatch. · linear. · github.pr · session.heartbeat",
+        "query": "",
+        "current": {
+          "text": "",
+          "value": ""
+        }
+      }
+    ]
+  },
+  "annotations": {
+    "list": [
+      {
+        "name": "Recovery escalations",
+        "datasource": {
+          "type": "loki",
+          "uid": "loki"
+        },
+        "enable": true,
+        "iconColor": "red",
+        "target": {
+          "expr": "{service_name=~\"${service:pipe}\"} |= \"recovery.escalated\"",
+          "refId": "Anno"
+        }
+      }
+    ]
+  },
+  "links": [],
+  "panels": [
+    {
+      "type": "row",
+      "title": "▶ Watch the loop — is it thinking right now?",
+      "collapsed": false,
+      "id": 100,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "panels": []
+    },
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Recovery ticks (range)",
+      "description": "Per-tick evaluation summary events (recovery.tick, CTL-1287). NOTE: this event name is not currently emitted to Loki anywhere (verified over 14d) — it lights up when the delegate recovery pass runs in enforce mode. Reads 0 until then. See glossary.",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "sum(count_over_time({service_name=~\"${service:pipe}\"} |= \"recovery.tick\" | host_name=~\"${node:pipe}\" [$__range])) or vector(0)",
+          "refId": "A",
+          "queryType": "instant",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "0",
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "text", "value": null } ] }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": [ "lastNotNull" ], "fields": "", "values": false },
+        "colorMode": "none",
+        "graphMode": "area",
+        "textMode": "auto",
+        "justifyMode": "auto"
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 1 }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Recovery decisions (range)",
+      "description": "Per-item classification events (recovery.decision, CTL-1287). Not currently emitted to Loki (verified over 14d) — lights up in enforce mode. Reads 0 until then. See glossary.",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "sum(count_over_time({service_name=~\"${service:pipe}\"} |= \"recovery.decision\" | host_name=~\"${node:pipe}\" [$__range])) or vector(0)",
+          "refId": "A",
+          "queryType": "instant",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "0",
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "text", "value": null } ] }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": [ "lastNotNull" ], "fields": "", "values": false },
+        "colorMode": "none",
+        "graphMode": "area",
+        "textMode": "auto",
+        "justifyMode": "auto"
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 1 }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Fixes (range)",
+      "description": "recovery.fixed — the delegate autonomously repaired a flagged item.",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "sum(count_over_time({service_name=~\"${service:pipe}\"} |= \"recovery.fixed\" | host_name=~\"${node:pipe}\" [$__range])) or vector(0)",
+          "refId": "A",
+          "queryType": "instant",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "0",
+          "color": { "mode": "fixed", "fixedColor": "green" },
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null } ] }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": [ "lastNotNull" ], "fields": "", "values": false },
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "auto",
+        "justifyMode": "auto"
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 1 }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Escalations (range)",
+      "description": "recovery.escalated — the delegate handed an item to a human (WARN). Also drawn as red annotations on the timelines.",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "sum(count_over_time({service_name=~\"${service:pipe}\"} |= \"recovery.escalated\" | host_name=~\"${node:pipe}\" [$__range])) or vector(0)",
+          "refId": "A",
+          "queryType": "instant",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "0",
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "orange", "value": 1 } ] }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": [ "lastNotNull" ], "fields": "", "values": false },
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "auto",
+        "justifyMode": "auto"
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 1 }
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Would-fix (shadow)",
+      "description": "recovery.would-fix — shadow-mode diagnostic: what the delegate WOULD have fixed if it were enforcing. The dominant recovery signal today.",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "sum(count_over_time({service_name=~\"${service:pipe}\"} |= \"recovery.would-fix\" | host_name=~\"${node:pipe}\" [$__range])) or vector(0)",
+          "refId": "A",
+          "queryType": "instant",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "0",
+          "color": { "mode": "fixed", "fixedColor": "blue" },
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "blue", "value": null } ] }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": [ "lastNotNull" ], "fields": "", "values": false },
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "auto",
+        "justifyMode": "auto"
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 1 }
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "Dispatches launched (range)",
+      "description": "phase.dispatch.launched — workers the scheduler actually started this window. Proof the dispatch cycle is moving work.",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "sum(count_over_time({service_name=~\"${service:pipe}\"} |= \"phase.dispatch.launched\" | host_name=~\"${node:pipe}\" [$__range])) or vector(0)",
+          "refId": "A",
+          "queryType": "instant",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "0",
+          "color": { "mode": "fixed", "fixedColor": "purple" },
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "purple", "value": null } ] }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": [ "lastNotNull" ], "fields": "", "values": false },
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "auto",
+        "justifyMode": "auto"
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 20, "y": 1 }
+    },
+    {
+      "type": "row",
+      "title": "① Tick timeline — watch the ticks (Tier 1)",
+      "collapsed": false,
+      "id": 101,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
+      "panels": []
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Recovery pass activity by type",
+      "description": "Per-interval count of each recovery.* event the delegate emits (would-fix / fixed / escalated, and tick/decision once enforce mode ships). This is the live 'the recovery loop is evaluating and acting' signal. Recovery events are sparse — widen the time range if empty.",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "sum by (event_name) (count_over_time({service_name=~\"${service:pipe}\"} |= \"recovery.\" | host_name=~\"${node:pipe}\" [$__auto]))",
+          "refId": "A",
+          "queryType": "range",
+          "legendFormat": "{{event_name}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "bars",
+            "lineWidth": 1,
+            "fillOpacity": 70,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": { "mode": "normal", "group": "A" }
+          },
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right", "showLegend": true, "width": 300, "calcs": [ "sum" ] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 6 }
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Recovery ticks by node (enforce mode)",
+      "description": "recovery.tick per node — each scheduler tick the delegate evaluated flagged work. NOT EMITTED TODAY (verified 14d): populates only when the recovery pass runs in enforce mode (rMode != off AND rItems > 0). Empty is expected until then; see glossary and CTL-1291.",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "sum by (host_name) (count_over_time({service_name=~\"${service:pipe}\"} |= \"recovery.tick\" | host_name=~\"${node:pipe}\" [$__auto]))",
+          "refId": "A",
+          "queryType": "range",
+          "legendFormat": "{{host_name}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "bars",
+            "lineWidth": 1,
+            "fillOpacity": 60,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": { "mode": "none", "group": "A" }
+          },
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right", "showLegend": true, "width": 220, "calcs": [ "sum" ] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 14 }
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "Scheduler ticks by node — loop heartbeat",
+      "description": "phase.scheduler.* sampling events per node (parallelism-sampled + autotune-gauge). Proves the control loop itself is ticking on each node even when the recovery delegate is idle. High-volume, always-on liveness.",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "sum by (host_name) (count_over_time({service_name=~\"${service:pipe}\"} |= \"phase.scheduler.\" | host_name=~\"${node:pipe}\" [$__auto]))",
+          "refId": "A",
+          "queryType": "range",
+          "legendFormat": "{{host_name}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 12,
+            "showPoints": "never",
+            "spanNulls": false,
+            "lineInterpolation": "smooth",
+            "stacking": { "mode": "none", "group": "A" }
+          },
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right", "showLegend": true, "width": 220, "calcs": [ "sum" ] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 14 }
+    },
+    {
+      "type": "row",
+      "title": "② Decisions, outcomes & the raw event stream (Tier 2)",
+      "collapsed": false,
+      "id": 102,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 22 },
+      "panels": []
+    },
+    {
+      "id": 20,
+      "type": "logs",
+      "title": "Recovery decision & outcome stream",
+      "description": "Every recovery.* lifecycle event (decision/would-fix/fixed/escalated), newest first, showing node · ticket · fix_class · action. Expand a line for all fields. NOTE: rule / decision / reason live in the event's body.payload and do NOT reach Loki (CTL-1291) — only ticket (event_label) and fix_class (recovery_fix_class) are queryable today.",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "{service_name=~\"${service:pipe}\"} | event_name=~`recovery\\..+` | host_name=~\"${node:pipe}\" | line_format `[{{ if .host_name }}{{ .host_name }}{{ else }}—{{ end }}] {{ .event_name }}{{ if .event_label }} · {{ .event_label }}{{ end }}{{ if .recovery_fix_class }} · fix_class={{ .recovery_fix_class }}{{ end }}`",
+          "refId": "A",
+          "queryType": "range"
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "showLabels": false,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": false,
+        "enableLogDetails": true,
+        "dedupStrategy": "none",
+        "sortOrder": "Descending"
+      },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 23 }
+    },
+    {
+      "id": 21,
+      "type": "table",
+      "title": "Recovery outcomes by fix class (range)",
+      "description": "Distribution of recovery.* events by recovery_fix_class (e.g. bounded-llm) and type. fix_class is present on would-fix/fixed events; escalations carry none (shown as empty).",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "sum by (recovery_fix_class, event_name) (count_over_time({service_name=~\"${service:pipe}\"} | event_name=~`recovery\\..+` | host_name=~\"${node:pipe}\" [$__range]))",
+          "refId": "A",
+          "queryType": "instant",
+          "instant": true
+        }
+      ],
+      "transformations": [
+        { "id": "labelsToFields", "options": {} },
+        { "id": "merge", "options": {} },
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": { "recovery_fix_class": "fix_class", "event_name": "event", "Value": "count", "Value #A": "count" },
+            "excludeByName": { "Time": true }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "custom": { "align": "auto", "filterable": true }, "noValue": "no recovery events in range" },
+        "overrides": []
+      },
+      "options": { "showHeader": true, "sortBy": [ { "displayName": "count", "desc": true } ] },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 33 }
+    },
+    {
+      "id": 22,
+      "type": "table",
+      "title": "Recovery outcomes by ticket (range)",
+      "description": "Top tickets the delegate acted on, by recovery event type. event_label is the Linear ticket key.",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "topk(25, sum by (event_label, event_name) (count_over_time({service_name=~\"${service:pipe}\"} | event_name=~`recovery\\..+` | host_name=~\"${node:pipe}\" [$__range])))",
+          "refId": "A",
+          "queryType": "instant",
+          "instant": true
+        }
+      ],
+      "transformations": [
+        { "id": "labelsToFields", "options": {} },
+        { "id": "merge", "options": {} },
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": { "event_label": "ticket", "event_name": "event", "Value": "count", "Value #A": "count" },
+            "excludeByName": { "Time": true }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "custom": { "align": "auto", "filterable": true }, "noValue": "no recovery events in range" },
+        "overrides": []
+      },
+      "options": { "showHeader": true, "sortBy": [ { "displayName": "count", "desc": true } ] },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 33 }
+    },
+    {
+      "id": 23,
+      "type": "logs",
+      "title": "Unified event-log live tail — all catalyst.* events ($ev filters)",
+      "description": "The raw unified event stream landing in Loki, newest first: [node] service · event_name (label). Type in the $ev box to filter by event name (e.g. recovery. , phase.dispatch. , linear. , github.pr). This is every catalyst.* EVENT record (event_name present); daemon LOG lines are excluded.",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "{service_name=~\"${service:pipe}\"} | event_name=~\".+\" | host_name=~\"${node:pipe}\" |= \"${ev}\" | line_format `[{{ if .host_name }}{{ .host_name }}{{ else }}—{{ end }}] {{ .service_name }} · {{ .event_name }}{{ if .event_label }} ({{ .event_label }}){{ end }}`",
+          "refId": "A",
+          "queryType": "range"
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "showLabels": false,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": false,
+        "enableLogDetails": true,
+        "dedupStrategy": "none",
+        "sortOrder": "Descending"
+      },
+      "gridPos": { "h": 14, "w": 24, "x": 0, "y": 41 }
+    },
+    {
+      "id": 24,
+      "type": "timeseries",
+      "title": "Event volume by type — top 25 ($ev filters)",
+      "description": "Per-interval volume of the busiest event names. Bounded by topk(25) to keep the high-cardinality phase.<step>.<action>.<TICKET> family well under Loki's 500-series cap at the supported 6h–14d ranges (~400 distinct series at 14d; the unbounded form trips the cap there). Very wide ranges (30d+) approach the limit.",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "topk(25, sum by (event_name) (count_over_time({service_name=~\"${service:pipe}\"} | event_name=~\".+\" | host_name=~\"${node:pipe}\" |= \"${ev}\" [$__auto])))",
+          "refId": "A",
+          "queryType": "range",
+          "legendFormat": "{{event_name}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "lineInterpolation": "smooth",
+            "stacking": { "mode": "none", "group": "A" }
+          },
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right", "showLegend": true, "width": 320, "calcs": [ "sum" ] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 55 }
+    },
+    {
+      "id": 25,
+      "type": "timeseries",
+      "title": "Event volume by service",
+      "description": "Per-interval event volume per catalyst.* service (low cardinality, always safe). execution-core dominates; session/agent/github/linear follow.",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "sum by (service_name) (count_over_time({service_name=~\"${service:pipe}\"} | event_name=~\".+\" | host_name=~\"${node:pipe}\" |= \"${ev}\" [$__auto]))",
+          "refId": "A",
+          "queryType": "range",
+          "legendFormat": "{{service_name}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 12,
+            "showPoints": "never",
+            "spanNulls": false,
+            "lineInterpolation": "smooth",
+            "stacking": { "mode": "none", "group": "A" }
+          },
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right", "showLegend": true, "width": 260, "calcs": [ "sum" ] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 55 }
+    },
+    {
+      "type": "row",
+      "title": "③ Dispatch cycle — slots, holds & throughput (Tier 3)",
+      "collapsed": false,
+      "id": 103,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 63 },
+      "panels": []
+    },
+    {
+      "id": 30,
+      "type": "timeseries",
+      "title": "Dispatch throughput — requested vs launched",
+      "description": "phase.dispatch.* events by action. 'requested' = the scheduler wanted to start a worker; 'launched' = it actually did. A persistent gap (requested >> launched) is back-pressure: the scheduler wants to dispatch but can't get slots. This is the live dispatch signal until CTL-1265's dispatch.held ships.",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "sum by (event_action) (count_over_time({service_name=~\"${service:pipe}\"} |= \"phase.dispatch.\" | host_name=~\"${node:pipe}\" [$__auto]))",
+          "refId": "A",
+          "queryType": "range",
+          "legendFormat": "{{event_action}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "bars",
+            "lineWidth": 1,
+            "fillOpacity": 60,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": { "mode": "none", "group": "A" }
+          },
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "launched" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } } ] },
+          { "matcher": { "id": "byName", "options": "requested" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "blue" } } ] },
+          { "matcher": { "id": "byName", "options": "failed" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } } ] },
+          { "matcher": { "id": "byName", "options": "escalated" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "orange" } } ] }
+        ]
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right", "showLegend": true, "width": 220, "calcs": [ "sum" ] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 64 }
+    },
+    {
+      "id": 31,
+      "type": "timeseries",
+      "title": "Scheduler sampling by action",
+      "description": "phase.scheduler.* events by action (parallelism-sampled, autotune-gauge). Confirms the scheduler is sampling its parallelism budget each tick. The sampled VALUES (current parallelism / slots) are not in Loki — see CTL-1291; this shows the sampling cadence.",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "sum by (event_action) (count_over_time({service_name=~\"${service:pipe}\"} |= \"phase.scheduler.\" | host_name=~\"${node:pipe}\" [$__auto]))",
+          "refId": "A",
+          "queryType": "range",
+          "legendFormat": "{{event_action}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 12,
+            "showPoints": "never",
+            "spanNulls": false,
+            "lineInterpolation": "smooth",
+            "stacking": { "mode": "none", "group": "A" }
+          },
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right", "showLegend": true, "width": 240, "calcs": [ "sum" ] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 64 }
+    },
+    {
+      "id": 32,
+      "type": "bargauge",
+      "title": "Back-pressure & hold signals (range)",
+      "description": "Counts of the signals that mean 'the loop is up but admitting no new work'. On a healthy fleet most are low. 'holding new-work dispatch' and 'triage dispatch skipped' come from the daemon LOG stream (catalyst_node_name); the others from the EVENT stream (host_name). dispatch.held is the not-yet-deployed CTL-1265 event (will read 0 until it ships).",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "sum(count_over_time({service_name=~\"${service:pipe}\"} | log_file_name=~`.+` | catalyst_node_name=~\"${node:pipe}\" |= `holding new-work dispatch` [$__range])) or vector(0)",
+          "refId": "A",
+          "queryType": "instant",
+          "instant": true,
+          "legendFormat": "holding new-work dispatch (log)"
+        },
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "sum(count_over_time({service_name=~\"${service:pipe}\"} | log_file_name=~`.+` | catalyst_node_name=~\"${node:pipe}\" |= `triage dispatch skipped` [$__range])) or vector(0)",
+          "refId": "B",
+          "queryType": "instant",
+          "instant": true,
+          "legendFormat": "triage dispatch skipped (log)"
+        },
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "sum(count_over_time({service_name=~\"${service:pipe}\"} |= `phase.advance.held` | host_name=~\"${node:pipe}\" [$__range])) or vector(0)",
+          "refId": "C",
+          "queryType": "instant",
+          "instant": true,
+          "legendFormat": "phase.advance.held (event)"
+        },
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "sum(count_over_time({service_name=~\"${service:pipe}\"} |= `dispatch.held` | host_name=~\"${node:pipe}\" [$__range])) or vector(0)",
+          "refId": "D",
+          "queryType": "instant",
+          "instant": true,
+          "legendFormat": "dispatch.held (event — pending CTL-1265)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 1 }, { "color": "orange", "value": 50 }, { "color": "red", "value": 500 } ] }
+        },
+        "overrides": [
+          { "matcher": { "id": "byFrameRefID", "options": "A" }, "properties": [ { "id": "displayName", "value": "holding new-work dispatch (log)" } ] },
+          { "matcher": { "id": "byFrameRefID", "options": "B" }, "properties": [ { "id": "displayName", "value": "triage dispatch skipped (log)" } ] },
+          { "matcher": { "id": "byFrameRefID", "options": "C" }, "properties": [ { "id": "displayName", "value": "phase.advance.held (event)" } ] },
+          { "matcher": { "id": "byFrameRefID", "options": "D" }, "properties": [ { "id": "displayName", "value": "dispatch.held (pending CTL-1265)" } ] }
+        ]
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "reduceOptions": { "calcs": [ "lastNotNull" ], "fields": "", "values": false }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 72 }
+    },
+    {
+      "id": 33,
+      "type": "timeseries",
+      "title": "Node heartbeats by node (liveness)",
+      "description": "node.heartbeat per node — each node's daemon publishing its periodic liveness beat. A node that flatlines here has stopped ticking. The closest available proxy for 'which nodes are alive and dispatching'.",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "sum by (host_name) (count_over_time({service_name=~\"${service:pipe}\"} |= \"node.heartbeat\" | host_name=~\"${node:pipe}\" [$__auto]))",
+          "refId": "A",
+          "queryType": "range",
+          "legendFormat": "{{host_name}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 12,
+            "showPoints": "never",
+            "spanNulls": false,
+            "lineInterpolation": "smooth",
+            "stacking": { "mode": "none", "group": "A" }
+          },
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right", "showLegend": true, "width": 220, "calcs": [ "sum" ] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 72 }
+    },
+    {
+      "id": 34,
+      "type": "logs",
+      "title": "Hold / dispatch-skip log signals (live)",
+      "description": "The raw daemon-log lines behind the back-pressure gauge: 'holding new-work dispatch' (liveness snapshot stale → admitting zero new tickets, CTL-731) and 'triage dispatch skipped — respect-assignment' (CTL-781). Daemon LOG stream — filtered by catalyst_node_name.",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "{service_name=~\"${service:pipe}\"} | log_file_name=~`.+` | catalyst_node_name=~\"${node:pipe}\" |~ `holding new-work dispatch|triage dispatch skipped` | line_format `[{{ .catalyst_node_name }}] {{ .service_name }} | {{ __line__ }}`",
+          "refId": "A",
+          "queryType": "range"
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "showLabels": false,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": false,
+        "enableLogDetails": true,
+        "dedupStrategy": "none",
+        "sortOrder": "Descending"
+      },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 80 }
+    },
+    {
+      "type": "row",
+      "title": "Glossary & data-path notes",
+      "collapsed": false,
+      "id": 104,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 88 },
+      "panels": []
+    },
+    {
+      "id": 40,
+      "type": "text",
+      "title": "How to read this dashboard — and what Loki can / can't show",
+      "gridPos": { "h": 18, "w": 24, "x": 0, "y": 89 },
+      "options": {
+        "mode": "markdown",
+        "content": "## What this dashboard is\n\nThe live **watch the control loop think** view (OTL-18): the recovery delegate's evaluations and actions, the dispatch cycle, and the raw unified event stream — all from the `catalyst.*` Loki streams shipped by `otel-forward`. Sibling **OTL-17** is the higher-level health view. Filters: **$service** (which daemons), **$node** (which host), **$ev** (substring filter for the raw tail + volume panels). Default range is **6h** so the latest sparse recovery events are in view; widen for history.\n\n## The data-path reality (read this before trusting a number)\n\nThis dashboard is **Loki-only**, and the catalyst event path has hard limits — these are documented gaps, not bugs in the panels (tracked in **CTL-1291**):\n\n- **Event payloads don't reach Loki.** Each event's numeric `body.payload` (recovery tick's `queueSize`/`processed`/`actions{}`, decision's `rule`/`decision`/`reason`, the scheduler's `parallelism`/`slots-in-use`) is dropped at forward time — the Loki log line is just the event name. So every panel here charts **event occurrences / rates and promoted dimensions**, never the inner values. The only queryable dimensions are `event_name`, `event_entity`, `event_action`, `event_label` (the ticket/subject), `recovery_fix_class`, `host_name`, `host_id`, `catalyst_orchestration`. There are **no catalyst application metrics in Prometheus** either, so the numerics aren't recoverable elsewhere today.\n- **`recovery.tick` and `recovery.decision` are not emitted yet.** Over 14d, the only recovery events in Loki are `recovery.would-fix`, `recovery.fixed`, `recovery.escalated`. The tick/decision panels (and their stat cards) are wired correctly and will populate the moment the delegate runs in **enforce mode**; until then they read **0**. The live recovery signal today is the **Recovery pass activity** panel (would-fix/fixed/escalated).\n- **`dispatch.held` (CTL-1265) is not deployed** — it reads 0. The real, live dispatch signals are **requested-vs-launched** (the gap = back-pressure) and the **'holding new-work dispatch'** daemon-log line, which is currently very active.\n- **Node identity on events is non-canonical.** Events carry `host_name`, which has ~10 raw values (incl. historical FQDN aliases like `RyansMini250233.rozich`) plus a ~16% **empty** bucket; the clean `catalyst_node_name` is only on daemon **logs**. So **$node = All** uses `.*` (keeps everything, incl. empty-host and alias events). Picking a **specific** node matches the canonical short name **exactly** (Loki anchors pipeline label-matchers) — it will MISS that node's historical FQDN aliases and empty-host events, so use **All** for complete history. CTL-1291 asks to stamp a canonical node name on events to fix this. The two **(log)** signals in the back-pressure gauge and the hold-log panel filter on `catalyst_node_name` instead — that's why they split cleanly by node.\n\n## Event vs log streams\n\nThe same `catalyst.*` `service_name` carries two record kinds. **EVENT** records have an `event_name` (this dashboard's main subject) and node = `host_name`. **LOG** records have a `log_file_name` and node = `catalyst_node_name`. Event panels use `| event_name=~\".+\" | host_name=~\"$node\"`; the two daemon-log panels use `| log_file_name=~\\`.+\\` | catalyst_node_name=~\"$node\"`.\n\n## Why `topk` on the volume panel\n\n`event_name` is high-cardinality (the `phase.<step>.<action>.<TICKET>` family is 2,900+ distinct names over 14d). A bare `sum by (event_name)` over a wide range trips Loki's 500-series cap and blanks the panel, so the volume-by-type panel is bounded with `topk(25, …)` (≈400 series at 14d, safely under the cap; 30d+ approaches it). Volume-by-service is low-cardinality and unbounded.\n\n## Acceptance-criteria map (OTL-18)\n\n- **Tier 1 — watch the ticks:** Recovery pass activity + Recovery ticks by node + Scheduler ticks (loop heartbeat).\n- **Tier 2 — decisions + raw stream:** Recovery decision & outcome stream + outcomes tables + the **Unified event-log live tail** (filterable by `$ev`).\n- **Tier 3 — dispatch visibility:** requested-vs-launched throughput + scheduler sampling + back-pressure/hold gauge + node heartbeats + hold-log feed."
+      },
+      "transparent": false
+    }
+  ]
+}
