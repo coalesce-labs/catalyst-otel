@@ -550,7 +550,7 @@
           "displayMode": "table",
           "placement": "right",
           "showLegend": true,
-          "width": 260,
+          "width": 360,
           "calcs": [
             "lastNotNull",
             "sum"
@@ -616,7 +616,7 @@
           "displayMode": "table",
           "placement": "right",
           "showLegend": true,
-          "width": 260,
+          "width": 360,
           "calcs": [
             "lastNotNull",
             "sum"
@@ -683,7 +683,7 @@
           "displayMode": "table",
           "placement": "right",
           "showLegend": true,
-          "width": 260,
+          "width": 360,
           "calcs": [
             "lastNotNull",
             "sum"
@@ -977,7 +977,7 @@
           "displayMode": "table",
           "placement": "right",
           "showLegend": true,
-          "width": 260,
+          "width": 360,
           "calcs": [
             "lastNotNull",
             "sum"
@@ -1044,7 +1044,7 @@
           "displayMode": "table",
           "placement": "right",
           "showLegend": true,
-          "width": 260,
+          "width": 360,
           "calcs": [
             "lastNotNull",
             "sum"
@@ -1184,7 +1184,7 @@
           "displayMode": "table",
           "placement": "right",
           "showLegend": true,
-          "width": 260,
+          "width": 360,
           "calcs": [
             "lastNotNull",
             "sum"
@@ -1251,7 +1251,7 @@
           "displayMode": "table",
           "placement": "right",
           "showLegend": true,
-          "width": 260,
+          "width": 360,
           "calcs": [
             "lastNotNull",
             "sum"
@@ -1471,7 +1471,7 @@
           "displayMode": "table",
           "placement": "right",
           "showLegend": true,
-          "width": 260,
+          "width": 360,
           "calcs": [
             "lastNotNull",
             "sum"
@@ -1651,7 +1651,7 @@
           "displayMode": "table",
           "placement": "right",
           "showLegend": true,
-          "width": 260,
+          "width": 360,
           "calcs": [
             "lastNotNull",
             "max"
@@ -1755,7 +1755,7 @@
           "displayMode": "table",
           "placement": "right",
           "showLegend": true,
-          "width": 260,
+          "width": 360,
           "calcs": [
             "lastNotNull",
             "mean"
