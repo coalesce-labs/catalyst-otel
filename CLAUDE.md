@@ -336,6 +336,39 @@ otelcol_exporter_sent_metric_points
 sum by (event_name) (count_over_time({service_name="claude-code"} | json [1h]))
 ```
 
+## Linear Ticket Workflow & PR Linking
+
+Tickets live in the **OTL** Linear team. As you work a ticket, keep its Linear state, PR link, and progress trail current — do not leave a shipped ticket in Backlog.
+
+### How PR ↔ ticket linking actually works (read this first)
+
+Linear's **native GitHub integration** (webhook-driven, server-side — *not* subject to the `linearis` API rate limit) auto-attaches a PR to a ticket and advances its status. It links a PR to a ticket **only when the `OTL-NN` token appears in the PR _branch name_, _title_, or _body_ — NEVER in commit messages.**
+
+- `Closes OTL-NN` (or `Fixes`/`Resolves`) in the **PR body** → ticket auto-advances **Backlog → PR** (PR open) → **Done** (merged).
+- A bare `Refs OTL-NN` links the PR but is `contributes` — it will **not** auto-Done on merge. Prefer `Closes`.
+- The OTL team's workflow state names are literally `Backlog → Research → Plan → Implement → Validate → PR → Done` (use these exact names with `--status`).
+
+### Rules
+
+1. **One ticket per branch/PR is the default.** Branch `otl-NN-slug`; PR title starts with `OTL-NN`; PR body has `Closes OTL-NN`. The catalyst-dev skills automate the rest: `/catalyst-dev:create-pr` → moves to `PR` + writes the Refs line; `/catalyst-dev:merge-pr` → moves to `Done`. Prefer these skills.
+2. **File the ticket _before_ writing code** so the branch can carry its id and the integration attaches the PR on open. (OTL-22 was filed *after* its commit → it never linked.)
+3. **Bundling multiple tickets in one PR requires manual care.** The branch names only one ticket; the body is scanned for all. List **every** delivered ticket in the body, each with its own keyword: `Closes OTL-18 · Closes OTL-22`. Preflight before opening a PR:
+   ```bash
+   git log --oneline origin/main..HEAD | grep -oE 'OTL-[0-9]+' | sort -u
+   # if >1 id appears, ensure each is in the PR body (or split into separate PRs)
+   ```
+4. **Post a progress trail to the ticket** (commit-as-you-go is fine; at minimum post at PR time). Mirror research/build/verification summaries onto the ticket and attach artifacts — don't leave the narrative only in the PR body:
+   ```bash
+   linearis issues discuss OTL-NN --body "…what shipped, how verified, PR link, gap refs…"
+   linearis files upload screenshot.png        # → returns assetUrl; embed as ![](assetUrl) in the comment
+   linearis attachments create OTL-NN --url <url> --title "…"   # first-class link/artifact
+   ```
+5. **Reconciling a bundled/secondary ticket by hand** (when its code shipped on another ticket's branch): add its `Closes OTL-NN` to the PR body (the integration then attaches + advances it), then `linearis issues update OTL-NN --status PR` and post a comment noting it shipped bundled (commit SHA + primary ticket).
+
+### `linearis` syntax (do not guess — `linearis issues usage`)
+
+Everything is **plural** `linearis issues <verb>`; there is **no** singular `linearis issue` command. Read = `issues read OTL-NN` (NOT `issue get`); comment = `issues discuss OTL-NN --body`; status = `issues update OTL-NN --status`; attach = `attachments create OTL-NN --url`; upload = `files upload <file>`. The `catalyst-dev:linearis` skill's "Common mistakes" section is authoritative. JSON echo from mutations is sometimes unparseable even though the mutation succeeded. The Linear API rate limit (2500/hr) is **fleet-shared** — when it's hot, do forensics via `gh`/`git` and reserve `linearis` for fields only Linear has.
+
 ## Development Workflow
 
 ### Research Notes
