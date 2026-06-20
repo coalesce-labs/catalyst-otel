@@ -550,10 +550,9 @@
           "displayMode": "table",
           "placement": "right",
           "showLegend": true,
-          "width": 260,
+          "width": 400,
           "calcs": [
-            "lastNotNull",
-            "sum"
+            "lastNotNull"
           ],
           "sortBy": "Last *",
           "sortDesc": true
@@ -616,10 +615,9 @@
           "displayMode": "table",
           "placement": "right",
           "showLegend": true,
-          "width": 260,
+          "width": 400,
           "calcs": [
-            "lastNotNull",
-            "sum"
+            "lastNotNull"
           ],
           "sortBy": "Last *",
           "sortDesc": true
@@ -683,10 +681,9 @@
           "displayMode": "table",
           "placement": "right",
           "showLegend": true,
-          "width": 260,
+          "width": 400,
           "calcs": [
-            "lastNotNull",
-            "sum"
+            "lastNotNull"
           ],
           "sortBy": "Last *",
           "sortDesc": true
@@ -977,10 +974,9 @@
           "displayMode": "table",
           "placement": "right",
           "showLegend": true,
-          "width": 260,
+          "width": 400,
           "calcs": [
-            "lastNotNull",
-            "sum"
+            "lastNotNull"
           ],
           "sortBy": "Last *",
           "sortDesc": true
@@ -1044,10 +1040,9 @@
           "displayMode": "table",
           "placement": "right",
           "showLegend": true,
-          "width": 260,
+          "width": 400,
           "calcs": [
-            "lastNotNull",
-            "sum"
+            "lastNotNull"
           ],
           "sortBy": "Last *",
           "sortDesc": true
@@ -1184,10 +1179,9 @@
           "displayMode": "table",
           "placement": "right",
           "showLegend": true,
-          "width": 260,
+          "width": 400,
           "calcs": [
-            "lastNotNull",
-            "sum"
+            "lastNotNull"
           ],
           "sortBy": "Last *",
           "sortDesc": true
@@ -1251,10 +1245,9 @@
           "displayMode": "table",
           "placement": "right",
           "showLegend": true,
-          "width": 260,
+          "width": 400,
           "calcs": [
-            "lastNotNull",
-            "sum"
+            "lastNotNull"
           ],
           "sortBy": "Last *",
           "sortDesc": true
@@ -1471,10 +1464,9 @@
           "displayMode": "table",
           "placement": "right",
           "showLegend": true,
-          "width": 260,
+          "width": 400,
           "calcs": [
-            "lastNotNull",
-            "sum"
+            "lastNotNull"
           ],
           "sortBy": "Last *",
           "sortDesc": true
@@ -1651,10 +1643,9 @@
           "displayMode": "table",
           "placement": "right",
           "showLegend": true,
-          "width": 260,
+          "width": 400,
           "calcs": [
-            "lastNotNull",
-            "max"
+            "lastNotNull"
           ],
           "sortBy": "Last *",
           "sortDesc": true
@@ -1755,10 +1746,9 @@
           "displayMode": "table",
           "placement": "right",
           "showLegend": true,
-          "width": 260,
+          "width": 400,
           "calcs": [
-            "lastNotNull",
-            "mean"
+            "lastNotNull"
           ],
           "sortBy": "Last *",
           "sortDesc": true
