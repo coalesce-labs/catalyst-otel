@@ -834,19 +834,234 @@
       "title": "Glossary & data-path notes",
       "collapsed": false,
       "id": 104,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 88 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 96 },
       "panels": []
     },
     {
       "id": 40,
       "type": "text",
       "title": "How to read this dashboard — and what Loki can / can't show",
-      "gridPos": { "h": 18, "w": 24, "x": 0, "y": 89 },
+      "gridPos": { "h": 18, "w": 24, "x": 0, "y": 97 },
       "options": {
         "mode": "markdown",
         "content": "## What this dashboard is\n\nThe live **watch the control loop think** view (OTL-18): the recovery delegate's evaluations and actions, the dispatch cycle, and the raw unified event stream — all from the `catalyst.*` Loki streams shipped by `otel-forward`. Sibling **OTL-17** is the higher-level health view. Filters: **$service** (which daemons), **$node** (which host), **$ev** (substring filter for the raw tail + volume panels). Default range is **6h** so the latest sparse recovery events are in view; widen for history.\n\n## The data-path reality (read this before trusting a number)\n\nThis dashboard is **Loki-only**, and the catalyst event path has hard limits — these are documented gaps, not bugs in the panels (tracked in **CTL-1291**):\n\n- **Event payloads don't reach Loki.** Each event's numeric `body.payload` (recovery tick's `queueSize`/`processed`/`actions{}`, decision's `rule`/`decision`/`reason`, the scheduler's `parallelism`/`slots-in-use`) is dropped at forward time — the Loki log line is just the event name. So every panel here charts **event occurrences / rates and promoted dimensions**, never the inner values. The only queryable dimensions are `event_name`, `event_entity`, `event_action`, `event_label` (the ticket/subject), `recovery_fix_class`, `host_name`, `host_id`, `catalyst_orchestration`. There are **no catalyst application metrics in Prometheus** either, so the numerics aren't recoverable elsewhere today.\n- **`recovery.tick` and `recovery.decision` are not emitted yet.** Over 14d, the only recovery events in Loki are `recovery.would-fix`, `recovery.fixed`, `recovery.escalated`. The tick/decision panels (and their stat cards) are wired correctly and will populate the moment the delegate runs in **enforce mode**; until then they read **0**. The live recovery signal today is the **Recovery pass activity** panel (would-fix/fixed/escalated).\n- **`dispatch.held` (CTL-1265) is not deployed** — it reads 0. The real, live dispatch signals are **requested-vs-launched** (the gap = back-pressure) and the **'holding new-work dispatch'** daemon-log line, which is currently very active.\n- **Node identity on events is non-canonical.** Events carry `host_name`, which has ~10 raw values (incl. historical FQDN aliases like `RyansMini250233.rozich`) plus a ~16% **empty** bucket; the clean `catalyst_node_name` is only on daemon **logs**. So **$node = All** uses `.*` (keeps everything, incl. empty-host and alias events). Picking a **specific** node matches the canonical short name **exactly** (Loki anchors pipeline label-matchers) — it will MISS that node's historical FQDN aliases and empty-host events, so use **All** for complete history. CTL-1291 asks to stamp a canonical node name on events to fix this. The two **(log)** signals in the back-pressure gauge and the hold-log panel filter on `catalyst_node_name` instead — that's why they split cleanly by node.\n\n## Event vs log streams\n\nThe same `catalyst.*` `service_name` carries two record kinds. **EVENT** records have an `event_name` (this dashboard's main subject) and node = `host_name`. **LOG** records have a `log_file_name` and node = `catalyst_node_name`. Event panels use `| event_name=~\".+\" | host_name=~\"$node\"`; the two daemon-log panels use `| log_file_name=~\\`.+\\` | catalyst_node_name=~\"$node\"`.\n\n## Why `topk` on the volume panel\n\n`event_name` is high-cardinality (the `phase.<step>.<action>.<TICKET>` family is 2,900+ distinct names over 14d). A bare `sum by (event_name)` over a wide range trips Loki's 500-series cap and blanks the panel, so the volume-by-type panel is bounded with `topk(25, …)` (≈400 series at 14d, safely under the cap; 30d+ approaches it). Volume-by-service is low-cardinality and unbounded.\n\n## Acceptance-criteria map (OTL-18)\n\n- **Tier 1 — watch the ticks:** Recovery pass activity + Recovery ticks by node + Scheduler ticks (loop heartbeat).\n- **Tier 2 — decisions + raw stream:** Recovery decision & outcome stream + outcomes tables + the **Unified event-log live tail** (filterable by `$ev`).\n- **Tier 3 — dispatch visibility:** requested-vs-launched throughput + scheduler sampling + back-pressure/hold gauge + node heartbeats + hold-log feed."
       },
       "transparent": false
+    },
+    {
+      "id": 35,
+      "type": "timeseries",
+      "title": "Scheduler slots per node — current · target · effective · running",
+      "description": "The autotuner's slot ceiling vs actual usage, per node, charted directly from the scheduler's own gauges (CTL-1291 promoted these to Loki structured metadata). target/effective come from phase.scheduler.autotune-gauge; current from phase.scheduler.parallelism-sampled; running_workers (actual concurrent workers = real slots in use) from autotune-gauge. When running approaches effective the node is saturated; when current/target diverge the autotuner is throttling.",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "avg_over_time({service_name=~\"${service:pipe}\"} | event_name=~`phase.scheduler.parallelism-sampled\\..+` | host_name=~\"${node:pipe}\" | unwrap scheduler_max_parallel_current [$__auto]) by (host_name)",
+          "refId": "A",
+          "queryType": "range",
+          "legendFormat": "{{host_name}} · current"
+        },
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "avg_over_time({service_name=~\"${service:pipe}\"} | event_name=~`phase.scheduler.autotune-gauge\\..+` | host_name=~\"${node:pipe}\" | unwrap scheduler_max_parallel_target [$__auto]) by (host_name)",
+          "refId": "B",
+          "queryType": "range",
+          "legendFormat": "{{host_name}} · target"
+        },
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "avg_over_time({service_name=~\"${service:pipe}\"} | event_name=~`phase.scheduler.autotune-gauge\\..+` | host_name=~\"${node:pipe}\" | unwrap scheduler_max_parallel_effective [$__auto]) by (host_name)",
+          "refId": "C",
+          "queryType": "range",
+          "legendFormat": "{{host_name}} · effective"
+        },
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "avg_over_time({service_name=~\"${service:pipe}\"} | event_name=~`phase.scheduler.autotune-gauge\\..+` | host_name=~\"${node:pipe}\" | unwrap scheduler_running_workers [$__auto]) by (host_name)",
+          "refId": "D",
+          "queryType": "range",
+          "legendFormat": "{{host_name}} · running"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": true,
+            "lineInterpolation": "stepAfter",
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": ".*running.*"
+            },
+            "properties": [
+              {
+                "id": "custom.fillOpacity",
+                "value": 24
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 2
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "width": 240,
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 88
+      }
+    },
+    {
+      "id": 36,
+      "type": "timeseries",
+      "title": "Node load & free memory per node",
+      "description": "Per-node scheduler load (1-min load average) and free-memory %, from phase.scheduler.parallelism-sampled structured metadata (CTL-1291). These are the headroom signals the autotuner reacts to: rising load1 / falling mem_free_pct is what pulls effective parallelism down. load1 on the left axis (short), free-memory % on the right axis (percent).",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "avg_over_time({service_name=~\"${service:pipe}\"} | event_name=~`phase.scheduler.parallelism-sampled\\..+` | host_name=~\"${node:pipe}\" | unwrap scheduler_load1 [$__auto]) by (host_name)",
+          "refId": "A",
+          "queryType": "range",
+          "legendFormat": "{{host_name}} · load1"
+        },
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "avg_over_time({service_name=~\"${service:pipe}\"} | event_name=~`phase.scheduler.parallelism-sampled\\..+` | host_name=~\"${node:pipe}\" | unwrap scheduler_mem_free_pct [$__auto]) by (host_name)",
+          "refId": "B",
+          "queryType": "range",
+          "legendFormat": "{{host_name}} · mem free %"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": true,
+            "lineInterpolation": "smooth",
+            "axisPlacement": "left",
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": ".*mem free.*"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "max",
+                "value": 100
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "free memory %"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "width": 240,
+          "calcs": [
+            "lastNotNull",
+            "mean"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 88
+      }
     }
   ]
 }
