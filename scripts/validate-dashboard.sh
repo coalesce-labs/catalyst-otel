@@ -161,8 +161,13 @@ if echo "$STRIPPED" | grep -qE '^\s+(logs|metrics|traces)/[A-Za-z0-9_]+:'; then
 else
   pass "no parallel per-vendor pipelines (payload-parity invariant)"
 fi
+# Count pipelines ONLY within service.pipelines. Connectors (e.g. count,
+# signal_to_metrics — OTL-20) declare `logs:`/`metrics:` INPUT keys at the same
+# indent, so a whole-file grep miscounts them as pipelines. Scope to the
+# pipelines: block (it is the last section under service:).
+PIPELINES_BLOCK=$(echo "$STRIPPED" | awk '/^  pipelines:/{f=1;next} f')
 for sig in logs metrics; do
-  COUNT=$(echo "$STRIPPED" | grep -cE "^\s+${sig}:\s*$" || true)
+  COUNT=$(echo "$PIPELINES_BLOCK" | grep -cE "^    ${sig}:\s*$" || true)
   if [ "$COUNT" -eq 1 ]; then
     pass "exactly one ${sig} pipeline"
   else

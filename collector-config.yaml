@@ -102,6 +102,82 @@ processors:
           - set(attributes["process_ticket"], attributes["process.ticket"])
           - set(attributes["process_phase"], attributes["process.phase"])
 
+  # OTL-20: normalize the CLASS B catalyst attribute keys the logs->metrics
+  # connectors group/read by. Loki sanitizes dot->underscore on ingest, so the
+  # underscore names seen in Loki are ambiguous about the in-collector form;
+  # catalyst's emit convention (<namespace>.<field>, see transform/logs above)
+  # implies these arrive DOT-form. Each guarded copy creates the underscore key
+  # from the dot source when present; if the emitter is already underscore-native
+  # the `where dot != nil` guard is false and it is a no-op. Correct either way.
+  # (CLASS A fields — host.*/process.*/ratelimit.* — already get underscore
+  # copies from transform/logs above, so they are NOT repeated here.) The
+  # connectors consume the logs pipeline AFTER this processor.
+  transform/metrics_normalize:
+    error_mode: ignore
+    log_statements:
+      - context: log
+        statements:
+          # event decomposition (low-card enums + the routing key event_name)
+          - set(attributes["event_entity"], attributes["event.entity"]) where attributes["event.entity"] != nil
+          - set(attributes["event_action"], attributes["event.action"]) where attributes["event.action"] != nil
+          - set(attributes["event_name"], attributes["event.name"]) where attributes["event.name"] != nil
+          # host.name is a RESOURCE attribute on catalyst events (clean short form:
+          # mini, mini-2), NOT a log attribute. Every derived metric labels by
+          # host_name, so without this copy EVERY datapoint is dropped for a
+          # missing grouping key. Source it from the resource, not the log record.
+          - set(attributes["host_name"], resource.attributes["host.name"]) where resource.attributes["host.name"] != nil
+          # catalyst emits catalyst.ticket.type (all dots), not catalyst.ticket_type.
+          - set(attributes["catalyst_ticket_type"], attributes["catalyst.ticket.type"]) where attributes["catalyst.ticket.type"] != nil
+          # recovery decision/board-scan enums + invariant gauge
+          - set(attributes["recovery_decision"], attributes["recovery.decision"]) where attributes["recovery.decision"] != nil
+          - set(attributes["recovery_fix_class"], attributes["recovery.fix_class"]) where attributes["recovery.fix_class"] != nil
+          - set(attributes["recovery_mode"], attributes["recovery.mode"]) where attributes["recovery.mode"] != nil
+          - set(attributes["recovery_gate_decision"], attributes["recovery.gate_decision"]) where attributes["recovery.gate_decision"] != nil
+          - set(attributes["recovery_invariants_failed"], attributes["recovery.invariants_failed"]) where attributes["recovery.invariants_failed"] != nil
+          # scheduler gauges (autotune-gauge + parallelism-sampled events)
+          - set(attributes["scheduler_load1"], attributes["scheduler.load1"]) where attributes["scheduler.load1"] != nil
+          - set(attributes["scheduler_load_per_core"], attributes["scheduler.load_per_core"]) where attributes["scheduler.load_per_core"] != nil
+          - set(attributes["scheduler_max_parallel_target"], attributes["scheduler.max_parallel_target"]) where attributes["scheduler.max_parallel_target"] != nil
+          - set(attributes["scheduler_max_parallel_effective"], attributes["scheduler.max_parallel_effective"]) where attributes["scheduler.max_parallel_effective"] != nil
+          - set(attributes["scheduler_max_parallel_current"], attributes["scheduler.max_parallel_current"]) where attributes["scheduler.max_parallel_current"] != nil
+          - set(attributes["scheduler_running_workers"], attributes["scheduler.running_workers"]) where attributes["scheduler.running_workers"] != nil
+          - set(attributes["scheduler_bg_count"], attributes["scheduler.bg_count"]) where attributes["scheduler.bg_count"] != nil
+          - set(attributes["scheduler_mem_free_pct"], attributes["scheduler.mem_free_pct"]) where attributes["scheduler.mem_free_pct"] != nil
+          # host gauges not already renamed by transform/logs (underscore-native suspected)
+          - set(attributes["host_disk_avail_gb"], attributes["host.disk_avail_gb"]) where attributes["host.disk_avail_gb"] != nil
+          - set(attributes["host_disk_free_pct"], attributes["host.disk_free_pct"]) where attributes["host.disk_free_pct"] != nil
+
+  # OTL-20: the count connector emits Delta-temporality sums; Prometheus needs
+  # Cumulative. Passes already-cumulative metrics (claude_code_* OTLP) through
+  # unchanged, so it is safe on the shared metrics pipeline.
+  deltatocumulative: {}
+
+  # OTL-20: the connectors set host_name as a metric ATTRIBUTE (controlled
+  # low-card label). But the prometheus exporter's resource_to_telemetry_conversion
+  # ALSO turns the RESOURCE attribute host.name into a host_name label -> a
+  # duplicate-label collision that makes the exporter silently drop the ENTIRE
+  # connector metric (symptom: zero catalyst_* series on :8889 while claude_code_*
+  # still export fine). Delete resource host.name on connector-scoped metrics so
+  # only the connector's own host_name attribute survives. claude_code metrics
+  # (different scope) keep resource host.name -> host_name exactly as before.
+  transform/connector_metric_fixup:
+    error_mode: ignore
+    metric_statements:
+      - context: metric
+        conditions:
+          - 'IsMatch(instrumentation_scope.name, "connector")'
+        statements:
+          - delete_key(resource.attributes, "host.name")
+
+  # OTL-20: the signal_to_metrics connector stamps a per-run
+  # signal_to_metrics.service.instance.id onto its output resource, which
+  # resource_to_telemetry_conversion would turn into a churny label that changes
+  # on every collector restart. Drop it (no-op for metrics that lack it).
+  resource/strip_connector_iid:
+    attributes:
+      - key: signal_to_metrics.service.instance.id
+        action: delete
+
 exporters:
   prometheus:
     endpoint: "0.0.0.0:8889"
@@ -167,6 +243,264 @@ exporters:
     headers:
       Authorization: Bearer ${env:DASH0_AUTH_TOKEN}
 
+# ---------------------------------------------------------------------------
+# OTL-20: derive Prometheus metrics from catalyst log events (logs->metrics).
+# High-volume catalyst signals (event occurrences, scheduler/host gauges,
+# decisions, rate-limit usage) live ONLY as Loki log lines today; aggregating
+# them means count_over_time at dashboard load — expensive, and it trips Loki's
+# max_query_series=500 cap on the high-card event_name family. These connectors
+# turn them into cheap, uncapped, alertable Prometheus series.
+#
+# CARDINALITY RULE (hard): labels are ONLY low-card enums — event_entity,
+# event_action, host_name, recovery_*, catalyst_ticket_type, rate_limit_tier.
+# NEVER event_name / event_label / session.id / linear_key / ticket / branch /
+# account_email (PII) / process_command (dirty). Spend & tokens are already
+# native Prometheus counters (claude_code_*); not duplicated here.
+#
+# Wiring (respects the OTL-1 one-pipeline-per-signal invariant): the connectors
+# are EXPORTERS on the existing logs pipeline (consumed AFTER transform/logs +
+# transform/metrics_normalize, so every key is underscore form) and RECEIVERS on
+# the existing metrics pipeline (-> prometheus + fan-out). deltatocumulative on
+# the metrics pipeline converts the count connector's Delta sums to Cumulative.
+# ---------------------------------------------------------------------------
+connectors:
+  # Occurrence / decision counters (Delta sums -> deltatocumulative -> Prometheus).
+  # NOTE: do NOT set `error_mode: ignore` on these connectors — in otelcol 0.154.0
+  # it suppresses ALL metric output (produces zero series). Verified empirically:
+  # default error_mode already drops bad datapoints gracefully (a non-numeric /
+  # empty / missing field returns HTTP 200, not a 5xx back to the sender), so the
+  # shared logs batch is never failed. Leave error_mode at its default.
+  count:
+    logs:
+      catalyst_event_total:
+        description: "Catalyst events by entity/action/host (replaces Loki count_over_time; uncapped)"
+        conditions:
+          - 'attributes["event_entity"] != nil'
+        attributes:
+          - key: event_entity
+          - key: event_action
+          - key: host_name
+      catalyst_dispatch_total:
+        description: "Catalyst phase-dispatch outcomes (requested/launched/failed/escalated/runaway)"
+        conditions:
+          - 'IsMatch(attributes["event_name"], "^phase.dispatch.")'
+        attributes:
+          - key: event_action
+          - key: catalyst_ticket_type
+          - key: host_name
+      catalyst_recovery_decision_total:
+        description: "Recovery-controller fix/escalate decisions by fix_class and mode"
+        conditions:
+          - 'attributes["event_name"] == "recovery.decision"'
+        attributes:
+          - key: recovery_decision
+          - key: recovery_fix_class
+          - key: recovery_mode
+          - key: host_name
+      catalyst_recovery_board_scan_total:
+        description: "Recovery board-scan gate verdicts (proceed/skip) by mode"
+        conditions:
+          - 'attributes["event_name"] == "recovery.board-scan"'
+        attributes:
+          - key: recovery_gate_decision
+          - key: recovery_mode
+          - key: host_name
+
+  # Numeric gauges from event fields. Values are strings in transit -> Double() cast.
+  # Do NOT set `error_mode: ignore` here — in otelcol 0.154.0 it suppresses ALL
+  # gauge output. The default already handles a bad Double() cast safely: the
+  # offending datapoint is dropped and the log batch still returns HTTP 200
+  # (verified against missing / empty / non-numeric field values), so a malformed
+  # sample can't 5xx the shared logs ingestion path.
+  signal_to_metrics:
+    logs:
+      # --- scheduler autotune-gauge (phase.scheduler.autotune-gauge.<orchestration>) ---
+      - name: catalyst_scheduler_load1
+        description: "Scheduler 1-min load average"
+        conditions: ['IsMatch(attributes["event_name"], "^phase.scheduler.autotune-gauge")']
+        attributes:
+          - key: host_name
+        gauge:
+          value: 'Double(attributes["scheduler_load1"])'
+      - name: catalyst_scheduler_load_per_core
+        description: "Scheduler load normalized by core count"
+        conditions: ['IsMatch(attributes["event_name"], "^phase.scheduler.autotune-gauge")']
+        attributes:
+          - key: host_name
+        gauge:
+          value: 'Double(attributes["scheduler_load_per_core"])'
+      - name: catalyst_scheduler_max_parallel_target
+        description: "Autotuner target parallel-slot count"
+        conditions: ['IsMatch(attributes["event_name"], "^phase.scheduler.autotune-gauge")']
+        attributes:
+          - key: host_name
+        gauge:
+          value: 'Double(attributes["scheduler_max_parallel_target"])'
+      - name: catalyst_scheduler_max_parallel_effective
+        description: "Effective (applied) parallel-slot count after autotune clamp"
+        conditions: ['IsMatch(attributes["event_name"], "^phase.scheduler.autotune-gauge")']
+        attributes:
+          - key: host_name
+        gauge:
+          value: 'Double(attributes["scheduler_max_parallel_effective"])'
+      - name: catalyst_scheduler_running_workers
+        description: "Concurrent running workers at sample time"
+        conditions: ['IsMatch(attributes["event_name"], "^phase.scheduler.autotune-gauge")']
+        attributes:
+          - key: host_name
+        gauge:
+          value: 'Double(attributes["scheduler_running_workers"])'
+      - name: catalyst_scheduler_mem_free_pct
+        description: "Scheduler view of free memory percent"
+        conditions: ['IsMatch(attributes["event_name"], "^phase.scheduler.autotune-gauge")']
+        attributes:
+          - key: host_name
+        gauge:
+          value: 'Double(attributes["scheduler_mem_free_pct"])'
+      # --- scheduler parallelism-sampled (phase.scheduler.parallelism-sampled.<orchestration>) ---
+      - name: catalyst_scheduler_max_parallel_current
+        description: "Current max-parallel observed at sample time"
+        conditions: ['IsMatch(attributes["event_name"], "^phase.scheduler.parallelism-sampled")']
+        attributes:
+          - key: host_name
+        gauge:
+          value: 'Double(attributes["scheduler_max_parallel_current"])'
+      - name: catalyst_scheduler_bg_count
+        description: "Background/queued job count at sample time"
+        conditions: ['IsMatch(attributes["event_name"], "^phase.scheduler.parallelism-sampled")']
+        attributes:
+          - key: host_name
+        gauge:
+          value: 'Double(attributes["scheduler_bg_count"])'
+      # --- host metrics (host.metrics.sampled, exact match) ---
+      - name: catalyst_host_cpu_pct
+        description: "Host CPU utilization percent (agent-reported)"
+        conditions: ['attributes["event_name"] == "host.metrics.sampled"']
+        attributes:
+          - key: host_name
+        gauge:
+          value: 'Double(attributes["host_cpu_pct"])'
+      - name: catalyst_host_load1
+        description: "Host 1-min load average (agent-reported)"
+        conditions: ['attributes["event_name"] == "host.metrics.sampled"']
+        attributes:
+          - key: host_name
+        gauge:
+          value: 'Double(attributes["host_load1"])'
+      - name: catalyst_host_cpu_count
+        description: "Host core count (capacity)"
+        conditions: ['attributes["event_name"] == "host.metrics.sampled"']
+        attributes:
+          - key: host_name
+        gauge:
+          value: 'Double(attributes["host_cpu_count"])'
+      - name: catalyst_host_mem_used_pct
+        description: "Host memory utilization percent"
+        conditions: ['attributes["event_name"] == "host.metrics.sampled"']
+        attributes:
+          - key: host_name
+        gauge:
+          value: 'Double(attributes["host_mem_used_pct"])'
+      - name: catalyst_host_mem_used_mb
+        description: "Host memory used (MB)"
+        conditions: ['attributes["event_name"] == "host.metrics.sampled"']
+        attributes:
+          - key: host_name
+        gauge:
+          value: 'Double(attributes["host_mem_used_mb"])'
+      - name: catalyst_host_mem_total_mb
+        description: "Host total RAM (MB, capacity)"
+        conditions: ['attributes["event_name"] == "host.metrics.sampled"']
+        attributes:
+          - key: host_name
+        gauge:
+          value: 'Double(attributes["host_mem_total_mb"])'
+      - name: catalyst_host_disk_used_pct
+        description: "Host disk utilization percent"
+        conditions: ['attributes["event_name"] == "host.metrics.sampled"']
+        attributes:
+          - key: host_name
+        gauge:
+          value: 'Double(attributes["host_disk_used_pct"])'
+      - name: catalyst_host_disk_free_pct
+        description: "Host disk free percent"
+        conditions: ['attributes["event_name"] == "host.metrics.sampled"']
+        attributes:
+          - key: host_name
+        gauge:
+          value: 'Double(attributes["host_disk_free_pct"])'
+      - name: catalyst_host_disk_avail_gb
+        description: "Host disk available (GB) — absolute headroom"
+        conditions: ['attributes["event_name"] == "host.metrics.sampled"']
+        attributes:
+          - key: host_name
+        gauge:
+          value: 'Double(attributes["host_disk_avail_gb"])'
+      - name: catalyst_host_disk_used_gb
+        description: "Host disk used (GB)"
+        conditions: ['attributes["event_name"] == "host.metrics.sampled"']
+        attributes:
+          - key: host_name
+        gauge:
+          value: 'Double(attributes["host_disk_used_gb"])'
+      - name: catalyst_host_disk_total_gb
+        description: "Host disk total (GB, capacity)"
+        conditions: ['attributes["event_name"] == "host.metrics.sampled"']
+        attributes:
+          - key: host_name
+        gauge:
+          value: 'Double(attributes["host_disk_total_gb"])'
+      # --- account rate-limit usage (account.ratelimit.sampled; CTL-787 gap, no Prom equiv) ---
+      - name: catalyst_account_ratelimit_five_hour_pct
+        description: "Account 5-hour rate-limit utilization percent"
+        conditions: ['attributes["event_name"] == "account.ratelimit.sampled"']
+        attributes:
+          - key: host_name
+          - key: rate_limit_tier
+        gauge:
+          value: 'Double(attributes["ratelimit_five_hour_pct"])'
+      - name: catalyst_account_ratelimit_seven_day_pct
+        description: "Account 7-day rate-limit utilization percent"
+        conditions: ['attributes["event_name"] == "account.ratelimit.sampled"']
+        attributes:
+          - key: host_name
+          - key: rate_limit_tier
+        gauge:
+          value: 'Double(attributes["ratelimit_seven_day_pct"])'
+      - name: catalyst_account_ratelimit_seven_day_sonnet_pct
+        description: "Account 7-day Sonnet-model rate-limit utilization percent"
+        conditions: ['attributes["event_name"] == "account.ratelimit.sampled"']
+        attributes:
+          - key: host_name
+          - key: rate_limit_tier
+        gauge:
+          value: 'Double(attributes["ratelimit_seven_day_sonnet_pct"])'
+      - name: catalyst_account_ratelimit_five_hour_pace
+        description: "Account 5-hour burn-rate pace (signed; <0 = under pace)"
+        conditions: ['attributes["event_name"] == "account.ratelimit.sampled"']
+        attributes:
+          - key: host_name
+          - key: rate_limit_tier
+        gauge:
+          value: 'Double(attributes["ratelimit_five_hour_pace"])'
+      - name: catalyst_account_ratelimit_seven_day_pace
+        description: "Account 7-day burn-rate pace (signed)"
+        conditions: ['attributes["event_name"] == "account.ratelimit.sampled"']
+        attributes:
+          - key: host_name
+          - key: rate_limit_tier
+        gauge:
+          value: 'Double(attributes["ratelimit_seven_day_pace"])'
+      # --- recovery fleet-health gauge (recovery.board-scan) ---
+      - name: catalyst_recovery_invariants_failed
+        description: "Count of failed recovery invariants per board-scan (0..7)"
+        conditions: ['attributes["event_name"] == "recovery.board-scan"']
+        attributes:
+          - key: host_name
+          - key: recovery_mode
+        gauge:
+          value: 'Double(attributes["recovery_invariants_failed"])'
+
 service:
   # PAYLOAD-PARITY INVARIANT (OTL-1): exactly ONE pipeline per signal type.
   # Fan out by appending exporters to the existing pipeline (after the shared
@@ -174,8 +508,12 @@ service:
   # payload. Never add a parallel per-vendor pipeline (logs/xxx, metrics/xxx).
   pipelines:
     metrics:
-      receivers: [otlp]
-      processors: [resource]
+      # OTL-20: the count + signal_to_metrics connectors feed catalyst-derived
+      # metrics into this one metrics pipeline (no parallel pipeline — invariant).
+      # deltatocumulative converts the count connector's Delta sums to Cumulative;
+      # resource/strip_connector_iid drops the connector's per-run instance id.
+      receivers: [otlp, count, signal_to_metrics]
+      processors: [deltatocumulative, transform/connector_metric_fixup, resource, resource/strip_connector_iid]
       # To fan metrics out to Honeycomb/Dash0 as well, append the SAME exporter
       # ids here once their blocks are uncommented, e.g.:
       #
@@ -186,7 +524,9 @@ service:
     
     logs:
       receivers: [otlp]
-      processors: [resource, transform/logs]
+      # OTL-20: transform/metrics_normalize runs AFTER transform/logs so the
+      # logs->metrics connectors (exporters below) see underscore-form keys.
+      processors: [resource, transform/logs, transform/metrics_normalize]
       # otlp_http = Loki (OTL-8 rename). To turn on the CTL-812 fan-out:
       # (1) uncomment the matching exporter block above, (2) set the env vars in
       # docker-compose.yml, and (3) replace the line below with the "enable
@@ -197,4 +537,10 @@ service:
       # (Enable only the destinations you have keys for — e.g. omit
       # otlp_http/dash0 if DASH0_* is unset, and leave its exporter block
       # commented so the empty endpoint can't fail validation.)
-      exporters: [debug, otlp_http, otlp_http/honeycomb, otlp_http/dash0]
+      #
+      # OTL-20: count + signal_to_metrics are connector-exporters here — they
+      # derive Prometheus metrics from these (post-transform) log records and
+      # emit into the metrics pipeline above. They are derivation, not storage,
+      # so the payload-parity invariant (identical payload to every STORAGE
+      # destination) is unaffected.
+      exporters: [debug, otlp_http, otlp_http/honeycomb, otlp_http/dash0, count, signal_to_metrics]
