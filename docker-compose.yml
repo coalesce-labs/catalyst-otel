@@ -4,7 +4,12 @@ networks:
 
 services:
   otel-collector:
-    image: otel/opentelemetry-collector-contrib:latest   # ≈ 50 MB
+    # PINNED (OTL-20): the logs->metrics pipeline needs the signal_to_metrics
+    # connector, which does NOT exist in older builds (e.g. 0.149.0 only has
+    # count/sum). A floating :latest silently drifted home to a build without it,
+    # so the collector is pinned to a known-good version that ships
+    # signal_to_metrics + deltatocumulative. Bump deliberately, not by drift.
+    image: otel/opentelemetry-collector-contrib:0.154.0   # ≈ 50 MB
     container_name: otel-collector
     command: ["--config=/etc/otel/collector-config.yaml"]
     # Fan-out exporter secrets (CTL-812). Passed through from the host env with
