@@ -24,11 +24,17 @@ datasources:
     type: loki
     access: proxy
     url: http://otel-loki:3100
-    # OTL-25 logs->traces: catalyst already stamps trace_id onto its Loki logs
-    # (as structured metadata). A derived field turns that into a "View Trace in
-    # Tempo" link. NOTE on `$${...}`: Grafana runs one pass of ${} env
-    # substitution over provisioning files, so the value interpolation must be
-    # double-dollar-escaped here (a single $ would be eaten as an env lookup).
+    # OTL-25 logs->traces derived field. NOTE (verified live 2026-06-24): catalyst
+    # canonical EVENTS carry a deterministic trace_id as structured metadata, but
+    # that id is derived per-ORCHESTRATOR (sha256(orchestratorId)) and is NOT a span
+    # Tempo holds (404), and the Tier-1 daemon `.log` tick-timing lines carry no
+    # trace_id at all. So this "View Trace in Tempo" link does not round-trip yet —
+    # it lights up once CATALYST stamps a deterministic PER-TICK id onto the span +
+    # the tick-timing line (CTL fast-follow, paired with OTL-30). The field config is
+    # harmless meanwhile (no-op until the ids match). NOTE on `$${...}`: Grafana runs
+    # one pass of ${} env substitution over provisioning files, so the value
+    # interpolation must be double-dollar-escaped here (a single $ would be eaten as
+    # an env lookup).
     jsonData:
       derivedFields:
         # Primary: structured-metadata / label matcher. matcherType:label means
@@ -52,9 +58,13 @@ datasources:
   # OTL-25: Tempo (traces). Anonymous/open like the Prom/Loki proxies. Reached
   # in-cluster at otel-tempo:3200. tracesToLogsV2 wires the reverse direction
   # (traces -> logs): the "Logs for this span" button jumps to Loki, scoped by
-  # trace id + service + a time window around the span. The exact tag mapping
-  # should be reconfirmed once real spans flow (producer = CTL-1330); until then
-  # Tempo is healthy-but-empty so correlation can't be end-to-end tested.
+  # service.name + a time window around the span. RECONFIRMED LIVE 2026-06-24 with
+  # real CTL-1330 spans: span trace_ids are SDK-random and do NOT match the
+  # per-orchestrator trace_id on catalyst logs/events, so filterByTraceID is set
+  # false here — scoping by service + time window lands on the right daemon's logs
+  # around the tick (degraded but useful). Exact per-trace filtering re-enables once
+  # CATALYST stamps a deterministic per-tick id on both span + log (CTL fast-follow
+  # <-> OTL-30).
   - name: Tempo
     uid: tempo
     type: tempo
