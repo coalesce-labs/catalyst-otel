@@ -65,6 +65,34 @@ services:
     networks:
       - otel-network
 
+  # OTL-25: Tempo — distributed-tracing backend (the traces sibling of Loki/Prom).
+  # The collector's traces pipeline forwards spans here over OTLP; Grafana reads
+  # them back. Runs healthy-but-EMPTY until the daemons emit spans (CTL-1330).
+  otel-tempo:
+    # PINNED (OTL-25): single-binary Tempo. 2.10.7 = the GitHub releases/latest
+    # stable line (the 3.0.x track ships a different config schema). Bump
+    # deliberately, not by :latest drift (the OTL-20 lesson). Config boot-tested
+    # on a throwaway 2.10.7 container.
+    image: grafana/tempo:2.10.7
+    container_name: otel-tempo
+    command: ["-config.file=/etc/tempo.yaml"]
+    volumes:
+      - ./tempo.yaml:/etc/tempo.yaml:ro
+      # Named volume (NOT a host bind mount): Docker seeds it with the image's
+      # /var/tempo ownership (UID 10001), so Tempo's non-root user can write —
+      # no `user:` override needed (verified empirically). A host bind mount
+      # would be root-owned and crash Tempo with "permission denied".
+      - otel-tempo-data:/var/tempo
+    ports:
+      # Publish ONLY the HTTP API / query / health port (3200). Tempo's OTLP
+      # receiver (4317/4318) is reached INTERNALLY by the collector at
+      # otel-tempo:4317 and must NOT be published — it would collide with the
+      # collector's own 4317/4318 host bindings.
+      - "3200:3200"
+    restart: unless-stopped
+    networks:
+      - otel-network
+
   otel-grafana:
     image: grafana/grafana-oss:latest
     container_name: otel-grafana
@@ -97,10 +125,11 @@ services:
     ports:
       - "13001:3000"
     restart: unless-stopped
-    depends_on: [otel-prometheus, otel-loki]
+    depends_on: [otel-prometheus, otel-loki, otel-tempo]
     networks:
       - otel-network
 
 volumes:
   otel-prometheus-data:
   otel-loki-data:
+  otel-tempo-data:

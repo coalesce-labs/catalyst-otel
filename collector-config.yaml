@@ -178,6 +178,29 @@ processors:
       - key: signal_to_metrics.service.instance.id
         action: delete
 
+  # OTL-25: traces tail sampling. Keeps every span that matters — slow ticks
+  # (the event-loop-blocking wedge signal) and errors — and probabilistically
+  # samples the rest so trace volume stays bounded once the daemons emit spans
+  # (producer side = CTL-1330). tail_sampling buffers each trace until
+  # decision_wait, then ORs the policies: a trace is kept if ANY policy matches.
+  # We run a single collector instance, so all spans of a trace arrive here and
+  # the decision is complete. Inert until traces actually flow.
+  tail_sampling:
+    decision_wait: 10s
+    policies:
+      - name: keep-errors
+        type: status_code
+        status_code:
+          status_codes: [ERROR]
+      - name: keep-slow-ticks
+        type: latency
+        latency:
+          threshold_ms: 1000
+      - name: sample-the-rest
+        type: probabilistic
+        probabilistic:
+          sampling_percentage: 20
+
 exporters:
   prometheus:
     endpoint: "0.0.0.0:8889"
@@ -242,6 +265,16 @@ exporters:
     endpoint: ${env:DASH0_OTLP_ENDPOINT}
     headers:
       Authorization: Bearer ${env:DASH0_AUTH_TOKEN}
+
+  # OTL-25: Tempo (traces). STATIC endpoint — never env-driven. A declared
+  # exporter with an empty endpoint crash-loops the collector at boot (the
+  # reason the env-gated otlp_http/dash0 leg stays commented out of its pipeline
+  # when DASH0_* is unset). Tempo is in-cluster so plaintext gRPC with
+  # tls.insecure is correct; we reach it at the container name on otel-network.
+  otlp/tempo:
+    endpoint: otel-tempo:4317
+    tls:
+      insecure: true
 
 # ---------------------------------------------------------------------------
 # OTL-20: derive Prometheus metrics from catalyst log events (logs->metrics).
@@ -506,6 +539,29 @@ service:
   # Fan out by appending exporters to the existing pipeline (after the shared
   # processors) so every destination receives the identical post-transform
   # payload. Never add a parallel per-vendor pipeline (logs/xxx, metrics/xxx).
+  #
+  # ---------------------------------------------------------------------------
+  # PER-DESTINATION FORWARDING (OTL-25 §2) — which signal goes where.
+  # The collector has no "user flag" primitive beyond a pipeline's `exporters:`
+  # list, so routing IS that list. To send a signal to a destination, add its
+  # exporter id to the pipeline below (and uncomment the env-gated exporter
+  # block above + set its env vars). Defaults:
+  #
+  #   signal   | destination(s)                      | change via
+  #   ---------|-------------------------------------|-------------------------
+  #   metrics  | prometheus (+ honeycomb, dash0)     | metrics.exporters list
+  #   logs     | otlp_http=Loki (+ honeycomb, dash0) | logs.exporters list
+  #   traces   | otlp/tempo  ONLY                    | traces.exporters list
+  #
+  # TRACES ROUTE TO TEMPO ONLY, BY DESIGN — do NOT add other trace destinations:
+  #   * Loki cannot ingest traces (404s -> retries/drops).
+  #   * Honeycomb & Dash0 bill PER SPAN, and traces are far higher volume than
+  #     logs/metrics, so a trace fan-out balloons cost. Enable a vendor trace
+  #     leg only deliberately, and only AFTER tail_sampling (already wired into
+  #     the traces pipeline) trims volume — never with an empty/env-driven
+  #     endpoint (that crash-loops the collector at boot).
+  # The vendor env-gated legs (honeycomb/dash0) stay on metrics + logs only.
+  # ---------------------------------------------------------------------------
   pipelines:
     metrics:
       # OTL-20: the count + signal_to_metrics connectors feed catalyst-derived
@@ -544,3 +600,13 @@ service:
       # so the payload-parity invariant (identical payload to every STORAGE
       # destination) is unaffected.
       exporters: [debug, otlp_http, otlp_http/honeycomb, otlp_http/dash0, count, signal_to_metrics]
+
+    traces:
+      # OTL-25: spans -> Tempo ONLY (see the forwarding table above). NO
+      # transform/logs here — that is a logs-only Loki-shaping step, wrong for
+      # traces. `resource` stamps environment=production; `tail_sampling` keeps
+      # slow ticks (>1s) + errors and samples the rest. One pipeline per signal
+      # (OTL-1). Runs healthy-but-empty until the daemons emit spans (CTL-1330).
+      receivers: [otlp]
+      processors: [resource, tail_sampling]
+      exporters: [otlp/tempo, debug]

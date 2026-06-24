@@ -8,6 +8,8 @@ deleteDatasources:
     orgId: 1
   - name: loki
     orgId: 1
+  - name: Tempo
+    orgId: 1
 
 datasources:
   - name: prometheus
@@ -22,3 +24,64 @@ datasources:
     type: loki
     access: proxy
     url: http://otel-loki:3100
+    # OTL-25 logs->traces derived field. NOTE (verified live 2026-06-24): catalyst
+    # canonical EVENTS carry a deterministic trace_id as structured metadata, but
+    # that id is derived per-ORCHESTRATOR (sha256(orchestratorId)) and is NOT a span
+    # Tempo holds (404), and the Tier-1 daemon `.log` tick-timing lines carry no
+    # trace_id at all. So this "View Trace in Tempo" link does not round-trip yet —
+    # it lights up once CATALYST stamps a deterministic PER-TICK id onto the span +
+    # the tick-timing line (CTL fast-follow, paired with OTL-30). The field config is
+    # harmless meanwhile (no-op until the ids match). NOTE on `$${...}`: Grafana runs
+    # one pass of ${} env substitution over provisioning files, so the value
+    # interpolation must be double-dollar-escaped here (a single $ would be eaten as
+    # an env lookup).
+    jsonData:
+      derivedFields:
+        # Primary: structured-metadata / label matcher. matcherType:label means
+        # matcherRegex is the FIELD KEY name (not a regex). Grafana's label
+        # matcher resolves both Loki stream labels and structured metadata.
+        - name: TraceID
+          matcherType: label
+          matcherRegex: trace_id
+          datasourceUid: tempo
+          url: "$${__value.raw}"
+          urlDisplayLabel: View Trace in Tempo
+        # Fallback: regex on the log body, in case trace_id is only in the text.
+        # Remove once the label matcher above is confirmed against real spans.
+        - name: TraceID (body)
+          matcherType: regex
+          matcherRegex: '(?:trace_id|traceID|traceId)[=:" ]+([0-9a-fA-F]{16,32})'
+          datasourceUid: tempo
+          url: "$${__value.raw}"
+          urlDisplayLabel: View Trace in Tempo (regex)
+
+  # OTL-25: Tempo (traces). Anonymous/open like the Prom/Loki proxies. Reached
+  # in-cluster at otel-tempo:3200. tracesToLogsV2 wires the reverse direction
+  # (traces -> logs): the "Logs for this span" button jumps to Loki, scoped by
+  # service.name + a time window around the span. RECONFIRMED LIVE 2026-06-24 with
+  # real CTL-1330 spans: span trace_ids are SDK-random and do NOT match the
+  # per-orchestrator trace_id on catalyst logs/events, so filterByTraceID is set
+  # false here — scoping by service + time window lands on the right daemon's logs
+  # around the tick (degraded but useful). Exact per-trace filtering re-enables once
+  # CATALYST stamps a deterministic per-tick id on both span + log (CTL fast-follow
+  # <-> OTL-30).
+  - name: Tempo
+    uid: tempo
+    type: tempo
+    access: proxy
+    url: http://otel-tempo:3200
+    isDefault: false
+    jsonData:
+      tracesToLogsV2:
+        datasourceUid: loki
+        spanStartTimeShift: "-1m"
+        spanEndTimeShift: "1m"
+        filterByTraceID: true
+        filterBySpanID: false
+        # service.name (span/resource attr) -> service_name (Loki stream label).
+        tags: [{ key: 'service.name', value: 'service_name' }]
+      # nodeGraph tab inside a trace view — free to enable; shows edges only when
+      # the backend emits them. serviceMap is intentionally OMITTED (needs the
+      # metrics-generator, which we don't run in v1).
+      nodeGraph:
+        enabled: true

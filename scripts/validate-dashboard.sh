@@ -98,8 +98,8 @@ else
 fi
 
 # --- dashboard: Catalyst Orchestration row contains expected panel count ---
-ROW_COUNT=$(jq '.panels[] | select(.title=="Catalyst Orchestration") | .panels | length' "$DASH")
-if [ "$ROW_COUNT" -eq 8 ]; then
+ROW_COUNT=$(jq '[.panels[] | select(.title=="Catalyst Orchestration") | .panels | length] | add // 0' "$DASH")
+if [ "${ROW_COUNT:-0}" -eq 8 ]; then
   pass "Catalyst Orchestration row has 8 panels"
 else
   fail "Catalyst Orchestration row has $ROW_COUNT panels (expected 8)"
@@ -132,14 +132,11 @@ else
   fail "panel 52 still has $BARE bare catalyst.execution-core selector(s)"
 fi
 
-if [ "$FAIL" -ne 0 ]; then
-  echo ""
-  echo "Validation FAILED — see FAIL lines above"
-  exit 1
-fi
-
-echo ""
-echo "All checks passed."
+# NOTE: the single pass/fail gate is at the END of this file (not here), so every
+# check below — the scoreboard check and ALL collector invariant checks (OTL-1
+# one-pipeline-per-signal, OTL-25 traces-only-Tempo) — runs on every invocation
+# regardless of dashboard-panel state. A mid-script early-exit here used to make
+# those collector gates dead code whenever any dashboard assertion was red.
 
 # --- scoreboard (panel 61): LogQL must use last_over_time (current value) and
 #     the topk-by wrapper — `count_over_time(...) by (...)` is a LogQL parse
@@ -166,7 +163,7 @@ fi
 # indent, so a whole-file grep miscounts them as pipelines. Scope to the
 # pipelines: block (it is the last section under service:).
 PIPELINES_BLOCK=$(echo "$STRIPPED" | awk '/^  pipelines:/{f=1;next} f')
-for sig in logs metrics; do
+for sig in logs metrics traces; do
   COUNT=$(echo "$PIPELINES_BLOCK" | grep -cE "^    ${sig}:\s*$" || true)
   if [ "$COUNT" -eq 1 ]; then
     pass "exactly one ${sig} pipeline"
@@ -174,3 +171,37 @@ for sig in logs metrics; do
     fail "expected exactly one ${sig} pipeline, found ${COUNT}"
   fi
 done
+
+# --- collector: OTL-25 traces route to Tempo ONLY. Allowlist (not denylist):
+#     the traces pipeline's exporter set must be a SUBSET of {otlp/tempo, debug}.
+#     This fails on Loki (can't ingest traces), the per-span-billed vendors
+#     (honeycomb/dash0), ANY future otlp/<vendor> trace leg, AND the case where
+#     otlp/tempo is dropped entirely. The traces pipeline is last in the block. ---
+TRACES_EXPORTERS=$(echo "$PIPELINES_BLOCK" | awk '/^    traces:/{f=1} f' | grep -E "^\s+exporters:" | head -1)
+TRACES_IDS=$(echo "$TRACES_EXPORTERS" | sed -E 's/.*\[//; s/\].*//; s/,/ /g')
+BAD_TRACE_EXP=""
+HAVE_TEMPO=0
+for id in $TRACES_IDS; do
+  case "$id" in
+    otlp/tempo) HAVE_TEMPO=1 ;;
+    debug) : ;;
+    *) BAD_TRACE_EXP="$BAD_TRACE_EXP $id" ;;
+  esac
+done
+if [ -n "$BAD_TRACE_EXP" ]; then
+  fail "traces pipeline exports to non-Tempo backend(s) (OTL-25: traces -> Tempo only):$BAD_TRACE_EXP"
+elif [ "$HAVE_TEMPO" -eq 1 ]; then
+  pass "traces pipeline routes to Tempo only (exporters subset of {otlp/tempo, debug})"
+else
+  fail "traces pipeline is missing the otlp/tempo exporter (OTL-25: traces -> Tempo)"
+fi
+
+# --- single pass/fail gate (moved here from mid-script so all checks run) ---
+if [ "$FAIL" -ne 0 ]; then
+  echo ""
+  echo "Validation FAILED — see FAIL lines above"
+  exit 1
+fi
+
+echo ""
+echo "All checks passed."
