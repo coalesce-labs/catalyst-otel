@@ -1,0 +1,55 @@
+# Tempo — single-binary (monolithic) distributed-tracing backend (OTL-25).
+#
+# Mirrors the role Loki plays for logs and Prometheus for metrics: the
+# otel-collector's traces pipeline forwards spans here over OTLP, and Grafana
+# reads them back for waterfall / flame-graph views and trace<->logs
+# correlation. Catalyst already stamps trace_id/span_id onto its Loki logs, so
+# spans auto-correlate once the daemons start emitting them (producer side =
+# CTL-1330; until that lands Tempo runs healthy-but-empty).
+#
+# Pinned image: grafana/tempo:2.10.7 (the GitHub `releases/latest` stable line
+# as of 2026-06-24 — NOT the 3.0.x line, which is a separate newer track).
+# Pin deliberately; don't float to :latest (the OTL-20 drift lesson). Config
+# below was boot-validated against 2.10.7 on a throwaway container.
+
+server:
+  http_listen_port: 3200          # HTTP API + /ready health endpoint (Gatus probes this)
+
+distributor:
+  receivers:
+    otlp:
+      protocols:
+        # Bind 0.0.0.0, NOT the 127.0.0.1 default — Tempo 2.7+ defaults the OTLP
+        # receiver to localhost, which silently drops cross-container ingestion
+        # (the collector reaches us at otel-tempo:4317 over the docker network).
+        grpc:
+          endpoint: 0.0.0.0:4317
+        http:
+          endpoint: 0.0.0.0:4318
+
+ingester:
+  # Flush blocks promptly at our low volume (~few-k traces/day/host) so traces
+  # become queryable within minutes instead of waiting for a large block to fill.
+  max_block_duration: 5m
+
+compactor:
+  compaction:
+    # Bounded retention (OTL-25 AC). 336h = 14 days on local-disk blocks.
+    # (2.10.7's default is already 336h; set explicitly so it's self-documenting.)
+    block_retention: 336h
+
+storage:
+  trace:
+    backend: local                # single-binary local filesystem (WAL -> Parquet blocks)
+    wal:
+      path: /var/tempo/wal
+    local:
+      path: /var/tempo/blocks
+
+# metrics-generator is intentionally NOT configured: no service graphs / span
+# metrics in v1 (it would remote-write extra series to Prometheus). Add later if
+# a service map is wanted. Tempo logs a benign "metrics-generator is not
+# configured" warning at boot — expected.
+
+usage_report:
+  reporting_enabled: false        # no anonymous phone-home
