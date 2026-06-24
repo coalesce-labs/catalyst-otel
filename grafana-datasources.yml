@@ -76,7 +76,7 @@ datasources:
         datasourceUid: loki
         spanStartTimeShift: "-1m"
         spanEndTimeShift: "1m"
-        filterByTraceID: true
+        filterByTraceID: false
         filterBySpanID: false
         # service.name (span/resource attr) -> service_name (Loki stream label).
         tags: [{ key: 'service.name', value: 'service_name' }]
