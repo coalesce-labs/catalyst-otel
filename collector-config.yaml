@@ -121,8 +121,13 @@ processors:
           - set(attributes["event_entity"], attributes["event.entity"]) where attributes["event.entity"] != nil
           - set(attributes["event_action"], attributes["event.action"]) where attributes["event.action"] != nil
           - set(attributes["event_name"], attributes["event.name"]) where attributes["event.name"] != nil
-          - set(attributes["host_name"], attributes["host.name"]) where attributes["host.name"] != nil
-          - set(attributes["catalyst_ticket_type"], attributes["catalyst.ticket_type"]) where attributes["catalyst.ticket_type"] != nil
+          # host.name is a RESOURCE attribute on catalyst events (clean short form:
+          # mini, mini-2), NOT a log attribute. Every derived metric labels by
+          # host_name, so without this copy EVERY datapoint is dropped for a
+          # missing grouping key. Source it from the resource, not the log record.
+          - set(attributes["host_name"], resource.attributes["host.name"]) where resource.attributes["host.name"] != nil
+          # catalyst emits catalyst.ticket.type (all dots), not catalyst.ticket_type.
+          - set(attributes["catalyst_ticket_type"], attributes["catalyst.ticket.type"]) where attributes["catalyst.ticket.type"] != nil
           # recovery decision/board-scan enums + invariant gauge
           - set(attributes["recovery_decision"], attributes["recovery.decision"]) where attributes["recovery.decision"] != nil
           - set(attributes["recovery_fix_class"], attributes["recovery.fix_class"]) where attributes["recovery.fix_class"] != nil
@@ -146,6 +151,23 @@ processors:
   # Cumulative. Passes already-cumulative metrics (claude_code_* OTLP) through
   # unchanged, so it is safe on the shared metrics pipeline.
   deltatocumulative: {}
+
+  # OTL-20: the connectors set host_name as a metric ATTRIBUTE (controlled
+  # low-card label). But the prometheus exporter's resource_to_telemetry_conversion
+  # ALSO turns the RESOURCE attribute host.name into a host_name label -> a
+  # duplicate-label collision that makes the exporter silently drop the ENTIRE
+  # connector metric (symptom: zero catalyst_* series on :8889 while claude_code_*
+  # still export fine). Delete resource host.name on connector-scoped metrics so
+  # only the connector's own host_name attribute survives. claude_code metrics
+  # (different scope) keep resource host.name -> host_name exactly as before.
+  transform/connector_metric_fixup:
+    error_mode: ignore
+    metric_statements:
+      - context: metric
+        conditions:
+          - 'IsMatch(instrumentation_scope.name, "connector")'
+        statements:
+          - delete_key(resource.attributes, "host.name")
 
   # OTL-20: the signal_to_metrics connector stamps a per-run
   # signal_to_metrics.service.instance.id onto its output resource, which
@@ -243,10 +265,12 @@ exporters:
 # ---------------------------------------------------------------------------
 connectors:
   # Occurrence / decision counters (Delta sums -> deltatocumulative -> Prometheus).
+  # NOTE: do NOT set `error_mode: ignore` on these connectors — in otelcol 0.154.0
+  # it suppresses ALL metric output (produces zero series). Verified empirically:
+  # default error_mode already drops bad datapoints gracefully (a non-numeric /
+  # empty / missing field returns HTTP 200, not a 5xx back to the sender), so the
+  # shared logs batch is never failed. Leave error_mode at its default.
   count:
-    # Never let a bad condition eval on one record 5xx the shared logs batch
-    # back to the sender (would trigger retries -> duplicate Loki logs).
-    error_mode: ignore
     logs:
       catalyst_event_total:
         description: "Catalyst events by entity/action/host (replaces Loki count_over_time; uncapped)"
@@ -283,12 +307,12 @@ connectors:
           - key: host_name
 
   # Numeric gauges from event fields. Values are strings in transit -> Double() cast.
-  # error_mode: ignore is CRITICAL — without it, a present-but-non-numeric/empty
-  # field makes Double() error and PROPAGATE, returning 5xx to the catalyst agent
-  # for the whole shared logs batch (retries -> duplicate logs + double counts).
-  # With ignore, the bad cast is skipped and good sibling records still derive.
+  # Do NOT set `error_mode: ignore` here — in otelcol 0.154.0 it suppresses ALL
+  # gauge output. The default already handles a bad Double() cast safely: the
+  # offending datapoint is dropped and the log batch still returns HTTP 200
+  # (verified against missing / empty / non-numeric field values), so a malformed
+  # sample can't 5xx the shared logs ingestion path.
   signal_to_metrics:
-    error_mode: ignore
     logs:
       # --- scheduler autotune-gauge (phase.scheduler.autotune-gauge.<orchestration>) ---
       - name: catalyst_scheduler_load1
@@ -489,7 +513,7 @@ service:
       # deltatocumulative converts the count connector's Delta sums to Cumulative;
       # resource/strip_connector_iid drops the connector's per-run instance id.
       receivers: [otlp, count, signal_to_metrics]
-      processors: [deltatocumulative, resource, resource/strip_connector_iid]
+      processors: [deltatocumulative, transform/connector_metric_fixup, resource, resource/strip_connector_iid]
       # To fan metrics out to Honeycomb/Dash0 as well, append the SAME exporter
       # ids here once their blocks are uncommented, e.g.:
       #
