@@ -432,7 +432,7 @@
           "legendFormat": "phantom-sweep \u00b7 {{host_name}}"
         }
       ],
-      "title": "Per-pass p99 by node \u2014 reclaim FIXED (flat); recovery-pass & phantom-sweep now dominate",
+      "title": "Per-pass p99 by node \u2014 reclaim flat (born ~1ms @ lap-split \u2014 NOT a crater); recovery-pass & phantom-sweep now dominate",
       "type": "timeseries"
     },
     {
@@ -523,6 +523,41 @@
       ],
       "title": "Liveness refresh outcomes \u2014 timeout = wedge alarm",
       "type": "timeseries"
+    },
+    {
+      "id": 8,
+      "type": "logs",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "title": "Slow ticks (>3s) \u2014 expand a row, click trace_id \u2192 its Tempo flame graph (OTL-30 trace-jump; now single-tick per CTL-1362)",
+      "description": "Loki logs of slow scheduler ticks. Each carries a per-tick trace_id (CTL-1337) now unique per boot+tick (CTL-1362). Expand a row \u2192 the trace_id field has a 'View Trace in Tempo' link (Loki derivedField) \u2192 opens that exact tick's span waterfall. Note: scheduler.pass spans are leaves (no per-read children), so the waterfall localizes to the pass, not inside it.",
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 30
+      },
+      "options": {
+        "showTime": true,
+        "showLabels": false,
+        "wrapLogMessage": true,
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "sortOrder": "Descending"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "refId": "A",
+          "queryType": "range",
+          "expr": "{service_name=\"catalyst.execution-core\"} | json | total_ms > 3000 | line_format \"{{.catalyst_node_name}}  tick={{.tick_id}}  total={{.total_ms}}ms  slowest={{.slowest_pass}}  (expand for trace_id link)\""
+        }
+      ]
     }
   ],
   "refresh": "30s",
@@ -539,5 +574,5 @@
   "timezone": "browser",
   "title": "Fleet \u00b7 Scheduler Health",
   "uid": "catalyst-fleet-scheduler-health",
-  "version": 1
+  "version": 2
 }
