@@ -147,6 +147,48 @@ processors:
           - set(attributes["host_disk_avail_gb"], attributes["host.disk_avail_gb"]) where attributes["host.disk_avail_gb"] != nil
           - set(attributes["host_disk_free_pct"], attributes["host.disk_free_pct"]) where attributes["host.disk_free_pct"] != nil
 
+  # OTL-31: Tier-1 daemon scheduler-health logs (service_name=catalyst.execution-core,
+  # CTL-1330/1332 full-pino-body) carry their fields ONLY in the JSON body string.
+  transform/scheduler_health_promote:
+    error_mode: ignore
+    log_statements:
+      - context: log
+        conditions:
+          - 'resource.attributes["service.name"] == "catalyst.execution-core" and IsMatch(body, "^\\{")'
+        statements:
+          - merge_maps(cache, ParseJSON(body), "upsert")
+          - set(attributes["host_name"], cache["host_name"]) where cache["host_name"] != nil
+          - replace_pattern(attributes["host_name"], "\\..*$", "")
+
+          - set(attributes["sched_tick_total_ms"], cache["total_ms"]) where cache["total_ms"] != nil
+          - set(attributes["sched_free_slots"], cache["free_slots"]) where cache["free_slots"] != nil
+          - set(attributes["sched_eligible_count"], cache["eligible_count"]) where cache["eligible_count"] != nil
+          - set(attributes["sched_liveness_fresh"], cache["liveness_fresh"]) where cache["liveness_fresh"] != nil
+          - set(attributes["sched_is_tick"], "1") where cache["total_ms"] != nil
+
+          - set(attributes["pass_eligible_read_ms"], cache["pass_durations"]["eligible-read"]) where cache["pass_durations"] != nil
+          - set(attributes["pass_phantom_sweep_ms"], cache["pass_durations"]["phantom-sweep"]) where cache["pass_durations"] != nil
+          - set(attributes["pass_watchdog_ms"], cache["pass_durations"]["watchdog"]) where cache["pass_durations"] != nil
+          - set(attributes["pass_cost_cap_ms"], cache["pass_durations"]["cost-cap"]) where cache["pass_durations"] != nil
+          - set(attributes["pass_stall_janitor_ms"], cache["pass_durations"]["stall-janitor"]) where cache["pass_durations"] != nil
+          - set(attributes["pass_unstuck_sweep_ms"], cache["pass_durations"]["unstuck-sweep"]) where cache["pass_durations"] != nil
+          - set(attributes["pass_recovery_pass_ms"], cache["pass_durations"]["recovery-pass"]) where cache["pass_durations"] != nil
+          - set(attributes["pass_liveness_read_ms"], cache["pass_durations"]["liveness-read"]) where cache["pass_durations"] != nil
+          - set(attributes["pass_board_health_ms"], cache["pass_durations"]["board-health"]) where cache["pass_durations"] != nil
+          - set(attributes["pass_preemption_sweep_ms"], cache["pass_durations"]["preemption-sweep"]) where cache["pass_durations"] != nil
+          - set(attributes["pass_advancement_ms"], cache["pass_durations"]["advancement"]) where cache["pass_durations"] != nil
+          - set(attributes["pass_new_work_pull_ms"], cache["pass_durations"]["new-work-pull"]) where cache["pass_durations"] != nil
+          - set(attributes["pass_terminal_sweep_ms"], cache["pass_durations"]["terminal-sweep"]) where cache["pass_durations"] != nil
+          - set(attributes["pass_cooldown_gc_ms"], cache["pass_durations"]["cooldown-gc"]) where cache["pass_durations"] != nil
+
+          - set(attributes["event_loop_p50_ms"], cache["event_loop_p50_ms"]) where cache["event_loop_p50_ms"] != nil
+          - set(attributes["event_loop_p99_ms"], cache["event_loop_p99_ms"]) where cache["event_loop_p99_ms"] != nil
+          - set(attributes["event_loop_max_ms"], cache["event_loop_max_ms"]) where cache["event_loop_max_ms"] != nil
+          - set(attributes["sched_is_event_loop"], "1") where cache["event_loop_p99_ms"] != nil
+
+          - set(attributes["liveness_outcome"], cache["outcome"]) where cache["outcome"] != nil
+          - set(attributes["sched_is_liveness"], "1") where cache["outcome"] != nil
+
   # OTL-20: the count connector emits Delta-temporality sums; Prometheus needs
   # Cumulative. Passes already-cumulative metrics (claude_code_* OTLP) through
   # unchanged, so it is safe on the shared metrics pipeline.
@@ -314,11 +356,12 @@ connectors:
           - key: event_action
           - key: host_name
       catalyst_dispatch_total:
-        description: "Catalyst phase-dispatch outcomes (requested/launched/failed/escalated/runaway)"
+        description: "Phase-dispatch outcomes (requested/launched/failed/runaway/enqueued). Hero = rate(action=launched); per-TICKET suffix kept OUT of labels."
         conditions:
           - 'IsMatch(attributes["event_name"], "^phase.dispatch.")'
         attributes:
           - key: event_action
+          - key: reason
           - key: catalyst_ticket_type
           - key: host_name
       catalyst_recovery_decision_total:
@@ -337,6 +380,13 @@ connectors:
         attributes:
           - key: recovery_gate_decision
           - key: recovery_mode
+          - key: host_name
+      catalyst_liveness_refresh_total:
+        description: "Liveness-refresh outcomes (resolved/timeout/error). rate(outcome=timeout)>0 = wedge alarm"
+        conditions:
+          - 'attributes["sched_is_liveness"] == "1"'
+        attributes:
+          - key: liveness_outcome
           - key: host_name
 
   # Numeric gauges from event fields. Values are strings in transit -> Double() cast.
@@ -534,6 +584,230 @@ connectors:
         gauge:
           value: 'Double(attributes["recovery_invariants_failed"])'
 
+      # OTL-31 scheduler-health HISTOGRAMS
+      - name: catalyst_scheduler_tick_duration_seconds
+        description: "Scheduler full-tick wall time (seconds)."
+        conditions: ['attributes["sched_is_tick"] == "1"']
+        attributes:
+          - key: host_name
+            default_value: unknown
+        histogram:
+          buckets: [0.05, 0.1, 0.25, 0.5, 1, 2, 3, 5, 8, 13]
+          value: 'Double(attributes["sched_tick_total_ms"]) / 1000'
+
+      - name: catalyst_scheduler_pass_duration_seconds
+        description: "Per-pass duration (seconds), pass=eligible-read"
+        conditions: ['attributes["pass_eligible_read_ms"] != nil']
+        attributes:
+          - key: host_name
+            default_value: unknown
+          - key: pass
+            default_value: eligible-read
+        histogram:
+          buckets: [0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2]
+          value: 'Double(attributes["pass_eligible_read_ms"]) / 1000'
+      - name: catalyst_scheduler_pass_duration_seconds
+        description: "Per-pass duration (seconds), pass=phantom-sweep"
+        conditions: ['attributes["pass_phantom_sweep_ms"] != nil']
+        attributes:
+          - key: host_name
+            default_value: unknown
+          - key: pass
+            default_value: phantom-sweep
+        histogram:
+          buckets: [0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2]
+          value: 'Double(attributes["pass_phantom_sweep_ms"]) / 1000'
+      - name: catalyst_scheduler_pass_duration_seconds
+        description: "Per-pass duration (seconds), pass=watchdog"
+        conditions: ['attributes["pass_watchdog_ms"] != nil']
+        attributes:
+          - key: host_name
+            default_value: unknown
+          - key: pass
+            default_value: watchdog
+        histogram:
+          buckets: [0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2]
+          value: 'Double(attributes["pass_watchdog_ms"]) / 1000'
+      - name: catalyst_scheduler_pass_duration_seconds
+        description: "Per-pass duration (seconds), pass=cost-cap"
+        conditions: ['attributes["pass_cost_cap_ms"] != nil']
+        attributes:
+          - key: host_name
+            default_value: unknown
+          - key: pass
+            default_value: cost-cap
+        histogram:
+          buckets: [0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2]
+          value: 'Double(attributes["pass_cost_cap_ms"]) / 1000'
+      - name: catalyst_scheduler_pass_duration_seconds
+        description: "Per-pass duration (seconds), pass=stall-janitor"
+        conditions: ['attributes["pass_stall_janitor_ms"] != nil']
+        attributes:
+          - key: host_name
+            default_value: unknown
+          - key: pass
+            default_value: stall-janitor
+        histogram:
+          buckets: [0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2]
+          value: 'Double(attributes["pass_stall_janitor_ms"]) / 1000'
+      - name: catalyst_scheduler_pass_duration_seconds
+        description: "Per-pass duration (seconds), pass=unstuck-sweep"
+        conditions: ['attributes["pass_unstuck_sweep_ms"] != nil']
+        attributes:
+          - key: host_name
+            default_value: unknown
+          - key: pass
+            default_value: unstuck-sweep
+        histogram:
+          buckets: [0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2]
+          value: 'Double(attributes["pass_unstuck_sweep_ms"]) / 1000'
+      - name: catalyst_scheduler_pass_duration_seconds
+        description: "Per-pass duration (seconds), pass=recovery-pass"
+        conditions: ['attributes["pass_recovery_pass_ms"] != nil']
+        attributes:
+          - key: host_name
+            default_value: unknown
+          - key: pass
+            default_value: recovery-pass
+        histogram:
+          buckets: [0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2]
+          value: 'Double(attributes["pass_recovery_pass_ms"]) / 1000'
+      - name: catalyst_scheduler_pass_duration_seconds
+        description: "Per-pass duration (seconds), pass=liveness-read"
+        conditions: ['attributes["pass_liveness_read_ms"] != nil']
+        attributes:
+          - key: host_name
+            default_value: unknown
+          - key: pass
+            default_value: liveness-read
+        histogram:
+          buckets: [0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2]
+          value: 'Double(attributes["pass_liveness_read_ms"]) / 1000'
+      - name: catalyst_scheduler_pass_duration_seconds
+        description: "Per-pass duration (seconds), pass=board-health"
+        conditions: ['attributes["pass_board_health_ms"] != nil']
+        attributes:
+          - key: host_name
+            default_value: unknown
+          - key: pass
+            default_value: board-health
+        histogram:
+          buckets: [0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2]
+          value: 'Double(attributes["pass_board_health_ms"]) / 1000'
+      - name: catalyst_scheduler_pass_duration_seconds
+        description: "Per-pass duration (seconds), pass=preemption-sweep"
+        conditions: ['attributes["pass_preemption_sweep_ms"] != nil']
+        attributes:
+          - key: host_name
+            default_value: unknown
+          - key: pass
+            default_value: preemption-sweep
+        histogram:
+          buckets: [0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2]
+          value: 'Double(attributes["pass_preemption_sweep_ms"]) / 1000'
+      - name: catalyst_scheduler_pass_duration_seconds
+        description: "Per-pass duration (seconds), pass=advancement"
+        conditions: ['attributes["pass_advancement_ms"] != nil']
+        attributes:
+          - key: host_name
+            default_value: unknown
+          - key: pass
+            default_value: advancement
+        histogram:
+          buckets: [0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2]
+          value: 'Double(attributes["pass_advancement_ms"]) / 1000'
+      - name: catalyst_scheduler_pass_duration_seconds
+        description: "Per-pass duration (seconds), pass=new-work-pull"
+        conditions: ['attributes["pass_new_work_pull_ms"] != nil']
+        attributes:
+          - key: host_name
+            default_value: unknown
+          - key: pass
+            default_value: new-work-pull
+        histogram:
+          buckets: [0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2]
+          value: 'Double(attributes["pass_new_work_pull_ms"]) / 1000'
+      - name: catalyst_scheduler_pass_duration_seconds
+        description: "Per-pass duration (seconds), pass=terminal-sweep"
+        conditions: ['attributes["pass_terminal_sweep_ms"] != nil']
+        attributes:
+          - key: host_name
+            default_value: unknown
+          - key: pass
+            default_value: terminal-sweep
+        histogram:
+          buckets: [0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2]
+          value: 'Double(attributes["pass_terminal_sweep_ms"]) / 1000'
+      - name: catalyst_scheduler_pass_duration_seconds
+        description: "Per-pass duration (seconds), pass=cooldown-gc"
+        conditions: ['attributes["pass_cooldown_gc_ms"] != nil']
+        attributes:
+          - key: host_name
+            default_value: unknown
+          - key: pass
+            default_value: cooldown-gc
+        histogram:
+          buckets: [0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2]
+          value: 'Double(attributes["pass_cooldown_gc_ms"]) / 1000'
+
+      # OTL-31 event-loop delay GAUGES (3 quantile series)
+      - name: catalyst_scheduler_event_loop_delay_seconds
+        description: "Event-loop delay p50 (seconds)"
+        conditions: ['attributes["sched_is_event_loop"] == "1"']
+        attributes:
+          - key: host_name
+            default_value: unknown
+          - key: quantile
+            default_value: p50
+        gauge:
+          value: 'Double(attributes["event_loop_p50_ms"]) / 1000'
+      - name: catalyst_scheduler_event_loop_delay_seconds
+        description: "Event-loop delay p99 (seconds)"
+        conditions: ['attributes["sched_is_event_loop"] == "1"']
+        attributes:
+          - key: host_name
+            default_value: unknown
+          - key: quantile
+            default_value: p99
+        gauge:
+          value: 'Double(attributes["event_loop_p99_ms"]) / 1000'
+      - name: catalyst_scheduler_event_loop_delay_seconds
+        description: "Event-loop delay max (seconds)"
+        conditions: ['attributes["sched_is_event_loop"] == "1"']
+        attributes:
+          - key: host_name
+            default_value: unknown
+          - key: quantile
+            default_value: max
+        gauge:
+          value: 'Double(attributes["event_loop_max_ms"]) / 1000'
+
+      # OTL-31 wedge primitives
+      - name: catalyst_scheduler_liveness_fresh
+        description: "1 when liveness is fresh, 0 when stale"
+        conditions: ['attributes["sched_is_tick"] == "1"']
+        attributes:
+          - key: host_name
+            default_value: unknown
+        gauge:
+          value: 'Double(attributes["sched_liveness_fresh"])'
+      - name: catalyst_scheduler_free_slots
+        description: "Free dispatch slots at tick time"
+        conditions: ['attributes["sched_is_tick"] == "1"']
+        attributes:
+          - key: host_name
+            default_value: unknown
+        gauge:
+          value: 'Double(attributes["sched_free_slots"])'
+      - name: catalyst_scheduler_eligible_work
+        description: "Eligible-but-undispatched ticket count at tick time"
+        conditions: ['attributes["sched_is_tick"] == "1"']
+        attributes:
+          - key: host_name
+            default_value: unknown
+        gauge:
+          value: 'Double(attributes["sched_eligible_count"])'
+
 service:
   # PAYLOAD-PARITY INVARIANT (OTL-1): exactly ONE pipeline per signal type.
   # Fan out by appending exporters to the existing pipeline (after the shared
@@ -582,7 +856,7 @@ service:
       receivers: [otlp]
       # OTL-20: transform/metrics_normalize runs AFTER transform/logs so the
       # logs->metrics connectors (exporters below) see underscore-form keys.
-      processors: [resource, transform/logs, transform/metrics_normalize]
+      processors: [resource, transform/logs, transform/metrics_normalize, transform/scheduler_health_promote]
       # otlp_http = Loki (OTL-8 rename). To turn on the CTL-812 fan-out:
       # (1) uncomment the matching exporter block above, (2) set the env vars in
       # docker-compose.yml, and (3) replace the line below with the "enable
