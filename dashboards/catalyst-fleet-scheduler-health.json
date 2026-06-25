@@ -1,0 +1,175 @@
+{
+  "uid": "catalyst-fleet-scheduler-health",
+  "title": "Fleet · Scheduler Health (preview)",
+  "tags": ["catalyst", "scheduler", "wedge", "preview"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      },
+      {
+        "name": "Catalyst deploys (PR merged)",
+        "datasource": { "type": "loki", "uid": "loki" },
+        "enable": true,
+        "iconColor": "semi-dark-orange",
+        "target": {
+          "expr": "{service_name=\"catalyst.github\"} |= `merged`",
+          "refId": "deploys",
+          "queryType": "range"
+        }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Tick p99 (1h) — worst node",
+      "description": "p99 of synchronous scheduler tick duration (total_ms). 3s = the liveness deadline; above it the loop risks wedging.",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "loki", "uid": "loki" }, "expr": "max(quantile_over_time(0.99, {service_name=\"catalyst.execution-core\"} | json | unwrap total_ms [1h]))", "queryType": "instant" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 2000 }, { "color": "red", "value": 3000 } ] }
+        },
+        "overrides": []
+      },
+      "options": { "colorMode": "background", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] } }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Recovery-pass p99 (1h)",
+      "description": "The dominant synchronous pass — the dispatch prelude (createWorktree + spawnSync). Target of CTL-1331/1335.",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "loki", "uid": "loki" }, "expr": "max(quantile_over_time(0.99, {service_name=\"catalyst.execution-core\"} | json | unwrap pass_durations_recovery_pass [1h]))", "queryType": "instant" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 1000 }, { "color": "red", "value": 3000 } ] }
+        },
+        "overrides": []
+      },
+      "options": { "colorMode": "background", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] } }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Liveness timeouts (1h)",
+      "description": "Count of liveness-refresh timeouts. outcome=timeout ⇒ new-work admission held ⇒ the wedge. Any > 0 is a signal.",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "loki", "uid": "loki" }, "expr": "sum(count_over_time({service_name=\"catalyst.execution-core\"} |= \"liveness: refresh\" | json | outcome = \"timeout\" [1h]))", "queryType": "instant" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 1 } ] }
+        },
+        "overrides": []
+      },
+      "options": { "colorMode": "background", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] } }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "New-work-pull p99 (1h)",
+      "description": "Linear hydration pass (spawnSync curl). The second culprit; target of CTL-1335#2 async-ification.",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "loki", "uid": "loki" }, "expr": "max(quantile_over_time(0.99, {service_name=\"catalyst.execution-core\"} | json | unwrap pass_durations_new_work_pull [1h]))", "queryType": "instant" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 1000 }, { "color": "red", "value": 3000 } ] }
+        },
+        "overrides": []
+      },
+      "options": { "colorMode": "background", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] } }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Tick duration p99 by node — headline (orange lines = deploys)",
+      "description": "Rolling p99 of synchronous tick time. Should fall below the red 3s line and stay as the tick goes async.",
+      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 4 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "loki", "uid": "loki" }, "expr": "quantile_over_time(0.99, {service_name=\"catalyst.execution-core\"} | json | unwrap total_ms [5m]) by (catalyst_node_name)", "legendFormat": "{{catalyst_node_name}}", "queryType": "range" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 8, "showPoints": "never", "thresholdsStyle": { "mode": "line" } },
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 3000 } ] }
+        },
+        "overrides": []
+      },
+      "options": { "legend": { "displayMode": "table", "placement": "right", "width": 300, "calcs": ["max", "mean"] }, "tooltip": { "mode": "multi" } }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Per-pass p99 — the culprits (watch recovery-pass + new-work-pull crater as the tick goes async)",
+      "description": "The before/after view. recovery-pass (dispatch prelude) and new-work-pull (Linear hydration) are the two synchronous blockers; CTL-1331/1335 move them off-tick.",
+      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 13 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "loki", "uid": "loki" }, "expr": "quantile_over_time(0.99, {service_name=\"catalyst.execution-core\"} | json | unwrap pass_durations_recovery_pass [5m]) by (catalyst_node_name)", "legendFormat": "recovery-pass · {{catalyst_node_name}}", "queryType": "range" },
+        { "refId": "B", "datasource": { "type": "loki", "uid": "loki" }, "expr": "quantile_over_time(0.99, {service_name=\"catalyst.execution-core\"} | json | unwrap pass_durations_new_work_pull [5m]) by (catalyst_node_name)", "legendFormat": "new-work-pull · {{catalyst_node_name}}", "queryType": "range" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 8, "showPoints": "never" }
+        },
+        "overrides": []
+      },
+      "options": { "legend": { "displayMode": "table", "placement": "right", "width": 300, "calcs": ["max", "mean"] }, "tooltip": { "mode": "multi" } }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Liveness refresh outcomes — timeout = wedge alarm",
+      "description": "resolved vs timeout per 5m. A rising timeout band is the direct wedge signal (rate(outcome=timeout) > 0).",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 22 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "loki", "uid": "loki" }, "expr": "sum(count_over_time({service_name=\"catalyst.execution-core\"} |= \"liveness: refresh\" | json | outcome = \"resolved\" [5m]))", "legendFormat": "resolved", "queryType": "range" },
+        { "refId": "B", "datasource": { "type": "loki", "uid": "loki" }, "expr": "sum(count_over_time({service_name=\"catalyst.execution-core\"} |= \"liveness: refresh\" | json | outcome = \"timeout\" [5m]))", "legendFormat": "timeout", "queryType": "range" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 20, "showPoints": "never", "stacking": { "mode": "normal" } }
+        },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "timeout" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } } ] },
+          { "matcher": { "id": "byName", "options": "resolved" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } } ] }
+        ]
+      },
+      "options": { "legend": { "displayMode": "table", "placement": "right", "width": 300, "calcs": ["sum"] }, "tooltip": { "mode": "multi" } }
+    }
+  ]
+}
