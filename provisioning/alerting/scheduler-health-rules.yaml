@@ -1,0 +1,271 @@
+apiVersion: 1
+
+# OTL-31 scheduler-health tail alerts. Grafana-MANAGED, evaluated on the
+# otel-stack host against the Prometheus histograms derived from the UNSAMPLED
+# Tier-1 daemon tick-timing logs (catalyst_scheduler_*_duration_seconds, PR #59).
+#
+# These watch the p99 TAIL, not the median — the median tick is sub-second but
+# the p99 spikes 8-31s (recovery-pass Pass-0r Linear/Cloud read ~hourly;
+# phantom-sweep ~30s blowouts). The tail IS the wedge risk.
+#
+# Routing: no receiver named here -> the root notification policy (catalyst-pager)
+# catches them. catalyst-pager's webhook is a no-op placeholder until Ryan sets
+# CATALYST_ALERT_WEBHOOK_URL in /home/rozich/otel-stack/.env, so these are
+# VISIBLE-but-silent until a real pager URL is wired.
+#
+# noDataState/execErrState = OK: a pass that didn't run (no series) or a transient
+# query error must NOT raise — these are advisory tail signals, not survivability.
+groups:
+  - orgId: 1
+    name: catalyst-scheduler-health
+    folder: Catalyst Alerts
+    interval: 1m
+    rules:
+      - uid: catalyst_sched_tick_p99_high
+        title: Scheduler tick p99 > 3s (deadline breach)
+        condition: C
+        for: 5m
+        noDataState: OK
+        execErrState: OK
+        labels:
+          team: catalyst
+          signal: scheduler_tick_p99
+          severity: warning
+        annotations:
+          summary: 'Scheduler tick p99 over the 3s liveness deadline (worst node)'
+          description: >
+            p99 of full scheduler tick wall-time exceeded 3s for 5m on at least
+            one node. The synchronous control loop is breaching its liveness
+            deadline — new-work admission risks wedging. Localize the culprit
+            pass on the Fleet · Scheduler Health dashboard (recovery-pass /
+            phantom-sweep are the usual drivers).
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: prometheus
+            model:
+              datasource: { type: prometheus, uid: prometheus }
+              editorMode: code
+              instant: true
+              range: false
+              refId: A
+              expr: max(histogram_quantile(0.99, sum by (host_name, le) (rate(catalyst_scheduler_tick_duration_seconds_bucket[5m]))))
+          - refId: B
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              expression: A
+              reducer: last
+              datasource: { type: __expr__, uid: __expr__ }
+          - refId: C
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              refId: C
+              expression: B
+              datasource: { type: __expr__, uid: __expr__ }
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [3]
+
+      - uid: catalyst_sched_recovery_pass_p99_high
+        title: Scheduler recovery-pass p99 > 3s
+        condition: C
+        for: 10m
+        noDataState: OK
+        execErrState: OK
+        labels:
+          team: catalyst
+          signal: scheduler_recovery_pass_p99
+          severity: warning
+        annotations:
+          summary: 'recovery-pass (Pass 0r) p99 > 3s — the dominant tick tax'
+          description: >
+            p99 of the recovery-pass (Pass 0r Linear/Cloud read) exceeded 3s for
+            10m. Hypothesis: per-signal linearis exec stalling on Linear 429
+            rate-limit backoff (~hourly). Durable fix = Cloud-SDK local-replica
+            read repoint (CATALYST). Until then this is the primary wedge driver.
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: prometheus
+            model:
+              datasource: { type: prometheus, uid: prometheus }
+              editorMode: code
+              instant: true
+              range: false
+              refId: A
+              expr: max(histogram_quantile(0.99, sum by (host_name, le) (rate(catalyst_scheduler_pass_duration_seconds_bucket{pass="recovery-pass"}[5m]))))
+          - refId: B
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              expression: A
+              reducer: last
+              datasource: { type: __expr__, uid: __expr__ }
+          - refId: C
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              refId: C
+              expression: B
+              datasource: { type: __expr__, uid: __expr__ }
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [3]
+
+      - uid: catalyst_sched_phantom_sweep_p99_high
+        title: Scheduler phantom-sweep p99 > 5s
+        condition: C
+        for: 10m
+        noDataState: OK
+        execErrState: OK
+        labels:
+          team: catalyst
+          signal: scheduler_phantom_sweep_p99
+          severity: warning
+        annotations:
+          summary: 'phantom-sweep p99 > 5s — periodic ~30s blowouts'
+          description: >
+            p99 of phantom-sweep exceeded 5s for 10m. Observed ~30s blowouts that
+            dominate the whole tick when they hit. catalyst-owned (not SDK-gated);
+            CATALYST investigating whether it is a full-board scan or per-phantom
+            fs/git/Linear read on a cadence.
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: prometheus
+            model:
+              datasource: { type: prometheus, uid: prometheus }
+              editorMode: code
+              instant: true
+              range: false
+              refId: A
+              expr: max(histogram_quantile(0.99, sum by (host_name, le) (rate(catalyst_scheduler_pass_duration_seconds_bucket{pass="phantom-sweep"}[5m]))))
+          - refId: B
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              expression: A
+              reducer: last
+              datasource: { type: __expr__, uid: __expr__ }
+          - refId: C
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              refId: C
+              expression: B
+              datasource: { type: __expr__, uid: __expr__ }
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [5]
+
+      - uid: catalyst_sched_reclaim_p99_regression
+        title: Scheduler reclaim p99 > 1s (regression guard)
+        condition: C
+        for: 10m
+        noDataState: OK
+        execErrState: OK
+        labels:
+          team: catalyst
+          signal: scheduler_reclaim_p99
+          severity: warning
+        annotations:
+          summary: 'reclaim p99 > 1s — the CTL-1331 lap-split fix may have regressed'
+          description: >
+            The reclaim lap cratered to single-digit ms after CTL-1331. p99 > 1s
+            for 10m means the per-tick stale-Linear-read regressed back into the
+            reclaim sweep. Guard rail on the headline win.
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: prometheus
+            model:
+              datasource: { type: prometheus, uid: prometheus }
+              editorMode: code
+              instant: true
+              range: false
+              refId: A
+              expr: max(histogram_quantile(0.99, sum by (host_name, le) (rate(catalyst_scheduler_pass_duration_seconds_bucket{pass="reclaim"}[5m]))))
+          - refId: B
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              expression: A
+              reducer: last
+              datasource: { type: __expr__, uid: __expr__ }
+          - refId: C
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              refId: C
+              expression: B
+              datasource: { type: __expr__, uid: __expr__ }
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [1]
+
+      - uid: catalyst_sched_liveness_timeout
+        title: Scheduler liveness-refresh timeouts
+        condition: C
+        for: 5m
+        noDataState: OK
+        execErrState: OK
+        labels:
+          team: catalyst
+          signal: scheduler_liveness_timeout
+          severity: critical
+        annotations:
+          summary: 'Liveness-refresh timeout rate > 0 — direct wedge signal'
+          description: >
+            liveness-refresh is returning outcome=timeout. new-work admission is
+            gated on liveness freshness, so a sustained timeout rate is the most
+            direct wedge signal available.
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: prometheus
+            model:
+              datasource: { type: prometheus, uid: prometheus }
+              editorMode: code
+              instant: true
+              range: false
+              refId: A
+              expr: sum(rate(catalyst_liveness_refresh_total{liveness_outcome="timeout"}[5m]))
+          - refId: B
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              expression: A
+              reducer: last
+              datasource: { type: __expr__, uid: __expr__ }
+          - refId: C
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              refId: C
+              expression: B
+              datasource: { type: __expr__, uid: __expr__ }
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
