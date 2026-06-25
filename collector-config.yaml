@@ -180,6 +180,7 @@ processors:
           - set(attributes["pass_new_work_pull_ms"], cache["pass_durations"]["new-work-pull"]) where cache["pass_durations"] != nil
           - set(attributes["pass_terminal_sweep_ms"], cache["pass_durations"]["terminal-sweep"]) where cache["pass_durations"] != nil
           - set(attributes["pass_cooldown_gc_ms"], cache["pass_durations"]["cooldown-gc"]) where cache["pass_durations"] != nil
+          - set(attributes["pass_reclaim_ms"], cache["pass_durations"]["reclaim"]) where cache["pass_durations"] != nil
 
           - set(attributes["event_loop_p50_ms"], cache["event_loop_p50_ms"]) where cache["event_loop_p50_ms"] != nil
           - set(attributes["event_loop_p99_ms"], cache["event_loop_p99_ms"]) where cache["event_loop_p99_ms"] != nil
@@ -592,7 +593,7 @@ connectors:
           - key: host_name
             default_value: unknown
         histogram:
-          buckets: [0.05, 0.1, 0.25, 0.5, 1, 2, 3, 5, 8, 13]
+          buckets: [0.1, 0.25, 0.5, 1, 2, 3, 5, 8, 13, 21, 34, 55]
           value: 'Double(attributes["sched_tick_total_ms"]) / 1000'
 
       - name: catalyst_scheduler_pass_duration_seconds
@@ -604,7 +605,7 @@ connectors:
           - key: pass
             default_value: eligible-read
         histogram:
-          buckets: [0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2]
+          buckets: [0.001, 0.005, 0.01, 0.05, 0.25, 0.5, 1, 2, 3, 8, 21, 40]
           value: 'Double(attributes["pass_eligible_read_ms"]) / 1000'
       - name: catalyst_scheduler_pass_duration_seconds
         description: "Per-pass duration (seconds), pass=phantom-sweep"
@@ -615,7 +616,7 @@ connectors:
           - key: pass
             default_value: phantom-sweep
         histogram:
-          buckets: [0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2]
+          buckets: [0.001, 0.005, 0.01, 0.05, 0.25, 0.5, 1, 2, 3, 8, 21, 40]
           value: 'Double(attributes["pass_phantom_sweep_ms"]) / 1000'
       - name: catalyst_scheduler_pass_duration_seconds
         description: "Per-pass duration (seconds), pass=watchdog"
@@ -626,7 +627,7 @@ connectors:
           - key: pass
             default_value: watchdog
         histogram:
-          buckets: [0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2]
+          buckets: [0.001, 0.005, 0.01, 0.05, 0.25, 0.5, 1, 2, 3, 8, 21, 40]
           value: 'Double(attributes["pass_watchdog_ms"]) / 1000'
       - name: catalyst_scheduler_pass_duration_seconds
         description: "Per-pass duration (seconds), pass=cost-cap"
@@ -637,7 +638,7 @@ connectors:
           - key: pass
             default_value: cost-cap
         histogram:
-          buckets: [0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2]
+          buckets: [0.001, 0.005, 0.01, 0.05, 0.25, 0.5, 1, 2, 3, 8, 21, 40]
           value: 'Double(attributes["pass_cost_cap_ms"]) / 1000'
       - name: catalyst_scheduler_pass_duration_seconds
         description: "Per-pass duration (seconds), pass=stall-janitor"
@@ -648,7 +649,7 @@ connectors:
           - key: pass
             default_value: stall-janitor
         histogram:
-          buckets: [0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2]
+          buckets: [0.001, 0.005, 0.01, 0.05, 0.25, 0.5, 1, 2, 3, 8, 21, 40]
           value: 'Double(attributes["pass_stall_janitor_ms"]) / 1000'
       - name: catalyst_scheduler_pass_duration_seconds
         description: "Per-pass duration (seconds), pass=unstuck-sweep"
@@ -659,7 +660,7 @@ connectors:
           - key: pass
             default_value: unstuck-sweep
         histogram:
-          buckets: [0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2]
+          buckets: [0.001, 0.005, 0.01, 0.05, 0.25, 0.5, 1, 2, 3, 8, 21, 40]
           value: 'Double(attributes["pass_unstuck_sweep_ms"]) / 1000'
       - name: catalyst_scheduler_pass_duration_seconds
         description: "Per-pass duration (seconds), pass=recovery-pass"
@@ -670,7 +671,7 @@ connectors:
           - key: pass
             default_value: recovery-pass
         histogram:
-          buckets: [0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2]
+          buckets: [0.001, 0.005, 0.01, 0.05, 0.25, 0.5, 1, 2, 3, 8, 21, 40]
           value: 'Double(attributes["pass_recovery_pass_ms"]) / 1000'
       - name: catalyst_scheduler_pass_duration_seconds
         description: "Per-pass duration (seconds), pass=liveness-read"
@@ -681,7 +682,7 @@ connectors:
           - key: pass
             default_value: liveness-read
         histogram:
-          buckets: [0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2]
+          buckets: [0.001, 0.005, 0.01, 0.05, 0.25, 0.5, 1, 2, 3, 8, 21, 40]
           value: 'Double(attributes["pass_liveness_read_ms"]) / 1000'
       - name: catalyst_scheduler_pass_duration_seconds
         description: "Per-pass duration (seconds), pass=board-health"
@@ -692,7 +693,7 @@ connectors:
           - key: pass
             default_value: board-health
         histogram:
-          buckets: [0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2]
+          buckets: [0.001, 0.005, 0.01, 0.05, 0.25, 0.5, 1, 2, 3, 8, 21, 40]
           value: 'Double(attributes["pass_board_health_ms"]) / 1000'
       - name: catalyst_scheduler_pass_duration_seconds
         description: "Per-pass duration (seconds), pass=preemption-sweep"
@@ -703,7 +704,7 @@ connectors:
           - key: pass
             default_value: preemption-sweep
         histogram:
-          buckets: [0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2]
+          buckets: [0.001, 0.005, 0.01, 0.05, 0.25, 0.5, 1, 2, 3, 8, 21, 40]
           value: 'Double(attributes["pass_preemption_sweep_ms"]) / 1000'
       - name: catalyst_scheduler_pass_duration_seconds
         description: "Per-pass duration (seconds), pass=advancement"
@@ -714,7 +715,7 @@ connectors:
           - key: pass
             default_value: advancement
         histogram:
-          buckets: [0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2]
+          buckets: [0.001, 0.005, 0.01, 0.05, 0.25, 0.5, 1, 2, 3, 8, 21, 40]
           value: 'Double(attributes["pass_advancement_ms"]) / 1000'
       - name: catalyst_scheduler_pass_duration_seconds
         description: "Per-pass duration (seconds), pass=new-work-pull"
@@ -725,7 +726,7 @@ connectors:
           - key: pass
             default_value: new-work-pull
         histogram:
-          buckets: [0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2]
+          buckets: [0.001, 0.005, 0.01, 0.05, 0.25, 0.5, 1, 2, 3, 8, 21, 40]
           value: 'Double(attributes["pass_new_work_pull_ms"]) / 1000'
       - name: catalyst_scheduler_pass_duration_seconds
         description: "Per-pass duration (seconds), pass=terminal-sweep"
@@ -736,7 +737,7 @@ connectors:
           - key: pass
             default_value: terminal-sweep
         histogram:
-          buckets: [0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2]
+          buckets: [0.001, 0.005, 0.01, 0.05, 0.25, 0.5, 1, 2, 3, 8, 21, 40]
           value: 'Double(attributes["pass_terminal_sweep_ms"]) / 1000'
       - name: catalyst_scheduler_pass_duration_seconds
         description: "Per-pass duration (seconds), pass=cooldown-gc"
@@ -747,8 +748,19 @@ connectors:
           - key: pass
             default_value: cooldown-gc
         histogram:
-          buckets: [0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2]
+          buckets: [0.001, 0.005, 0.01, 0.05, 0.25, 0.5, 1, 2, 3, 8, 21, 40]
           value: 'Double(attributes["pass_cooldown_gc_ms"]) / 1000'
+      - name: catalyst_scheduler_pass_duration_seconds
+        description: "Per-pass duration (seconds), pass=reclaim (OTL-31: 15th pass; CTL-1331 lap-split)"
+        conditions: ['attributes["pass_reclaim_ms"] != nil']
+        attributes:
+          - key: host_name
+            default_value: unknown
+          - key: pass
+            default_value: reclaim
+        histogram:
+          buckets: [0.001, 0.005, 0.01, 0.05, 0.25, 0.5, 1, 2, 3, 8, 21, 40]
+          value: 'Double(attributes["pass_reclaim_ms"]) / 1000'
 
       # OTL-31 event-loop delay GAUGES (3 quantile series)
       - name: catalyst_scheduler_event_loop_delay_seconds
