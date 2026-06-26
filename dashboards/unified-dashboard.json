@@ -3651,8 +3651,8 @@
           "type": "stat",
           "title": "Host Capacity (mem / disk / CPUs)",
           "datasource": {
-            "type": "loki",
-            "uid": "loki"
+            "type": "prometheus",
+            "uid": "prometheus"
           },
           "gridPos": {
             "h": 8,
@@ -3662,37 +3662,40 @@
           },
           "targets": [
             {
-              "expr": "last_over_time({service_name=\"catalyst.agent\", hostname=~\"$hostname\"} |= \"host.metrics.sampled\" | unwrap host_mem_total_mb | __error__=\"\" [$__auto]) by (hostname)",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "editorMode": "code",
+              "expr": "max by (host_name) (catalyst_host_mem_total_mb{host_name=~\"$hostname\"})",
+              "instant": true,
+              "range": false,
               "refId": "A",
-              "datasource": {
-                "type": "loki",
-                "uid": "loki"
-              },
-              "instant": false,
-              "legendFormat": "mem - {{hostname}}",
-              "range": true
+              "legendFormat": "mem - {{host_name}}"
             },
             {
-              "expr": "last_over_time({service_name=\"catalyst.agent\", hostname=~\"$hostname\"} |= \"host.metrics.sampled\" | unwrap host_disk_total_gb | __error__=\"\" [$__auto]) by (hostname)",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "editorMode": "code",
+              "expr": "max by (host_name) (catalyst_host_disk_total_gb{host_name=~\"$hostname\"})",
+              "instant": true,
+              "range": false,
               "refId": "B",
-              "datasource": {
-                "type": "loki",
-                "uid": "loki"
-              },
-              "instant": false,
-              "legendFormat": "disk - {{hostname}}",
-              "range": true
+              "legendFormat": "disk - {{host_name}}"
             },
             {
-              "expr": "last_over_time({service_name=\"catalyst.agent\", hostname=~\"$hostname\"} |= \"host.metrics.sampled\" | unwrap host_cpu_count | __error__=\"\" [$__auto]) by (hostname)",
-              "refId": "C",
               "datasource": {
-                "type": "loki",
-                "uid": "loki"
+                "type": "prometheus",
+                "uid": "prometheus"
               },
-              "instant": false,
-              "legendFormat": "CPUs - {{hostname}}",
-              "range": true
+              "editorMode": "code",
+              "expr": "max by (host_name) (catalyst_host_cpu_count{host_name=~\"$hostname\"})",
+              "instant": true,
+              "range": false,
+              "refId": "C",
+              "legendFormat": "CPUs - {{host_name}}"
             }
           ],
           "fieldConfig": {
@@ -3726,7 +3729,7 @@
                   },
                   {
                     "id": "displayName",
-                    "value": "Memory \u2014 ${__field.labels.hostname}"
+                    "value": "Memory \u2014 ${__field.labels.host_name}"
                   }
                 ]
               },
@@ -3742,7 +3745,7 @@
                   },
                   {
                     "id": "displayName",
-                    "value": "Disk \u2014 ${__field.labels.hostname}"
+                    "value": "Disk \u2014 ${__field.labels.host_name}"
                   }
                 ]
               },
@@ -3758,7 +3761,7 @@
                   },
                   {
                     "id": "displayName",
-                    "value": "CPU cores \u2014 ${__field.labels.hostname}"
+                    "value": "CPU cores \u2014 ${__field.labels.host_name}"
                   }
                 ]
               }

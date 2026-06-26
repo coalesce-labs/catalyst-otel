@@ -1004,7 +1004,7 @@
             "fillOpacity": 12,
             "showPoints": "never",
             "spanNulls": false,
-            "lineInterpolation": "smooth",
+            "lineInterpolation": "linear",
             "stacking": {
               "mode": "none",
               "group": "A"

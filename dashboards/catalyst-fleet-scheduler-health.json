@@ -445,16 +445,17 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "resolved vs timeout per 5m. A rising timeout band is the direct wedge signal (rate(outcome=timeout) > 0).",
+      "description": "resolved vs timeout per 5m. A rising timeout band is the direct wedge signal (rate(outcome=timeout) > 0). Unstacked so the timeout series (the wedge alarm) is visible rather than a sliver under resolved.",
       "fieldConfig": {
         "defaults": {
           "custom": {
             "drawStyle": "line",
-            "fillOpacity": 20,
+            "fillOpacity": 10,
             "lineWidth": 2,
             "showPoints": "never",
             "stacking": {
-              "mode": "normal"
+              "mode": "none",
+              "group": "A"
             }
           },
           "unit": "short"
