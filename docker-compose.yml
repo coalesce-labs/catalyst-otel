@@ -45,7 +45,7 @@ services:
       - --web.console.templates=/usr/share/prometheus/consoles
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - otel-prometheus-data:/prometheus
+      - "${OTEL_PROMETHEUS_DATA:-otel-prometheus-data}:/prometheus"
     ports:
       - "9098:9090"
     restart: unless-stopped
@@ -60,7 +60,7 @@ services:
       - "3100:3100"
     command: -config.file=/etc/loki/local-config.yaml
     volumes:
-      - otel-loki-data:/loki
+      - "${OTEL_LOKI_DATA:-otel-loki-data}:/loki"
     restart: unless-stopped
     networks:
       - otel-network
@@ -82,7 +82,7 @@ services:
       # /var/tempo ownership (UID 10001), so Tempo's non-root user can write —
       # no `user:` override needed (verified empirically). A host bind mount
       # would be root-owned and crash Tempo with "permission denied".
-      - otel-tempo-data:/var/tempo
+      - "${OTEL_TEMPO_DATA:-otel-tempo-data}:/var/tempo"
     ports:
       # Publish ONLY the HTTP API / query / health port (3200). Tempo's OTLP
       # receiver (4317/4318) is reached INTERNALLY by the collector at
@@ -110,6 +110,12 @@ services:
       # /home/rozich/otel-stack/.env (paging gateway / PagerDuty / Slack hook).
       - CATALYST_ALERT_WEBHOOK_URL=${CATALYST_ALERT_WEBHOOK_URL:-http://localhost:1/catalyst-pager-unconfigured}
     volumes:
+      # Grafana's own state (grafana.db: annotations, alert state, prefs). Was
+      # previously UNMOUNTED -> ephemeral, lost on every container recreate. Now a
+      # volume (env-overridable to a host bind path for backup, like the data
+      # stores). Provisioned dashboards/datasources/alerts still reload from the
+      # read-only mounts below regardless.
+      - "${OTEL_GRAFANA_DATA:-otel-grafana-data}:/var/lib/grafana"
       - ./grafana-datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro
       - ./grafana-dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml:ro
       # Mount the DIRECTORY, not the file: git pull replaces files by rename
@@ -130,6 +136,11 @@ services:
       - otel-network
 
 volumes:
+  # Default Docker-managed named volumes — used when the OTEL_*_DATA env vars are
+  # UNSET (the portable OSS default). On the home deploy these are overridden to
+  # host bind mounts under /data/otel-stack-data via .env, so the data is visible
+  # on the host filesystem and easy to back up (restic -> Backblaze B2).
   otel-prometheus-data:
   otel-loki-data:
   otel-tempo-data:
+  otel-grafana-data:
