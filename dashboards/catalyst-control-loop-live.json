@@ -570,7 +570,7 @@
       "id": 10,
       "type": "timeseries",
       "title": "Recovery pass activity by type",
-      "description": "Per-interval count of each recovery.* event the delegate emits (would-fix / fixed / escalated, and tick/decision once enforce mode ships). This is the live 'the recovery loop is evaluating and acting' signal. Recovery events are sparse — widen the time range if empty.",
+      "description": "Recovery-pass actions by type per bucket (board-scan / decision / escalated) — the \"what is the pass doing\" signal, shown as independent (unstacked) counts. The per-tick cadence is excluded here (see the \"Recovery ticks\" stat + by-node panel). From Prometheus catalyst_event_total{event_entity=\"ticket\",event_action!=\"tick\"} (OTL-21).",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -582,7 +582,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum by (event_action) (increase(catalyst_event_total{event_entity=\"ticket\",host_name=~\"$node\",service_name=~\"$service\"}[$__interval]))",
+          "expr": "sum by (event_action) (increase(catalyst_event_total{event_entity=\"ticket\",event_action!=\"tick\",host_name=~\"$node\",service_name=~\"$service\"}[$__interval]))",
           "legendFormat": "{{event_action}}",
           "range": true,
           "refId": "A",
@@ -599,7 +599,7 @@
             "showPoints": "never",
             "spanNulls": false,
             "stacking": {
-              "mode": "normal",
+              "mode": "none",
               "group": "A"
             }
           },
