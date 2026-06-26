@@ -593,15 +593,17 @@
         "defaults": {
           "unit": "short",
           "custom": {
-            "drawStyle": "bars",
-            "lineWidth": 1,
-            "fillOpacity": 70,
-            "showPoints": "never",
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "auto",
             "spanNulls": false,
             "stacking": {
               "mode": "none",
               "group": "A"
-            }
+            },
+            "lineInterpolation": "linear",
+            "pointSize": 5
           },
           "color": {
             "mode": "palette-classic"
