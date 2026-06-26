@@ -570,7 +570,7 @@
       "id": 10,
       "type": "timeseries",
       "title": "Recovery pass activity by type",
-      "description": "Recovery-pass actions by type per bucket (board-scan / decision / escalated) — the \"what is the pass doing\" signal, shown as independent (unstacked) counts. The per-tick cadence is excluded here (see the \"Recovery ticks\" stat + by-node panel). From Prometheus catalyst_event_total{event_entity=\"ticket\",event_action!=\"tick\"} (OTL-21).",
+      "description": "Recovery-pass actions by type per bucket (board-scan / decision / escalated) as independent UNSTACKED BARS — sparse bursty counts read honestly (idle buckets = gaps, no misleading interpolation). The per-tick cadence is excluded (see the Recovery-ticks stat + by-node panel). From Prometheus catalyst_event_total{event_entity=\"ticket\",event_action!=\"tick\"} (OTL-21).",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -593,16 +593,15 @@
         "defaults": {
           "unit": "short",
           "custom": {
-            "drawStyle": "line",
+            "drawStyle": "bars",
             "lineWidth": 2,
-            "fillOpacity": 10,
-            "showPoints": "auto",
+            "fillOpacity": 70,
+            "showPoints": "never",
             "spanNulls": false,
             "stacking": {
               "mode": "none",
               "group": "A"
             },
-            "lineInterpolation": "linear",
             "pointSize": 5
           },
           "color": {
