@@ -279,15 +279,21 @@
         "y": 1
       },
       "datasource": {
-        "type": "loki",
-        "uid": "loki"
+        "type": "prometheus",
+        "uid": "prometheus"
       },
       "targets": [
         {
-          "expr": "sum(count_over_time({service_name=~\"claude-code.*\"} |= \"claude_code.tool_result\" | project=~\"$project\" | branch=~\"$branch\" | hostname=~\"$hostname\" [$__range]))",
-          "legendFormat": "Tool Calls",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum(increase(claude_code_tool_result_total[$__range]))",
           "instant": true,
-          "refId": "A"
+          "range": false,
+          "refId": "A",
+          "legendFormat": "Tool Calls"
         }
       ],
       "fieldConfig": {
@@ -342,9 +348,10 @@
       },
       "targets": [
         {
-          "expr": "sum by (display) (label_replace(label_replace(sum by (host_name, hostname) (increase(claude_code_cost_usage_USD_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"}[$__rate_interval])), \"display\", \"$1\", \"hostname\", \"(.+)\"), \"display\", \"$1\", \"host_name\", \"(.+)\"))",
+          "expr": "sum by (display) (label_replace(label_replace(sum by (host_name, hostname) (increase(claude_code_cost_usage_USD_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"}[$__interval])), \"display\", \"$1\", \"hostname\", \"(.+)\"), \"display\", \"$1\", \"host_name\", \"(.+)\"))",
           "legendFormat": "{{display}}",
-          "refId": "A"
+          "refId": "A",
+          "interval": "$bucket"
         }
       ],
       "fieldConfig": {
@@ -417,9 +424,10 @@
       },
       "targets": [
         {
-          "expr": "sum by (display) (label_replace(label_replace(sum by (host_name, hostname) (increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"}[$__rate_interval])), \"display\", \"$1\", \"hostname\", \"(.+)\"), \"display\", \"$1\", \"host_name\", \"(.+)\"))",
+          "expr": "sum by (display) (label_replace(label_replace(sum by (host_name, hostname) (increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"}[$__interval])), \"display\", \"$1\", \"hostname\", \"(.+)\"), \"display\", \"$1\", \"host_name\", \"(.+)\"))",
           "legendFormat": "{{display}}",
-          "refId": "A"
+          "refId": "A",
+          "interval": "$bucket"
         }
       ],
       "fieldConfig": {
@@ -492,9 +500,10 @@
       },
       "targets": [
         {
-          "expr": "sum by (model_family) (label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(sum by (model) (increase(claude_code_cost_usage_USD_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__rate_interval])), \"model_family\", \"$1\", \"model\", \"(.+)\"), \"model_family\", \"$1 $2.$3\", \"model\", \"claude-([a-z]+)-([0-9]+)-([0-9]+).*\"), \"model_family\", \"$1 $2\", \"model\", \"claude-([a-z]+)-([0-9]+)(\\\\[[^]]*\\\\])?$\"), \"model_family\", \"Opus $1\", \"model_family\", \"opus (.*)\"), \"model_family\", \"Haiku $1\", \"model_family\", \"haiku (.*)\"), \"model_family\", \"Sonnet $1\", \"model_family\", \"sonnet (.*)\"), \"model_family\", \"Fable $1\", \"model_family\", \"fable (.*)\"))",
+          "expr": "sum by (model_family) (label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(sum by (model) (increase(claude_code_cost_usage_USD_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__interval])), \"model_family\", \"$1\", \"model\", \"(.+)\"), \"model_family\", \"$1 $2.$3\", \"model\", \"claude-([a-z]+)-([0-9]+)-([0-9]+).*\"), \"model_family\", \"$1 $2\", \"model\", \"claude-([a-z]+)-([0-9]+)(\\\\[[^]]*\\\\])?$\"), \"model_family\", \"Opus $1\", \"model_family\", \"opus (.*)\"), \"model_family\", \"Haiku $1\", \"model_family\", \"haiku (.*)\"), \"model_family\", \"Sonnet $1\", \"model_family\", \"sonnet (.*)\"), \"model_family\", \"Fable $1\", \"model_family\", \"fable (.*)\"))",
           "legendFormat": "{{model_family}}",
-          "refId": "A"
+          "refId": "A",
+          "interval": "$bucket"
         }
       ],
       "fieldConfig": {
@@ -613,9 +622,10 @@
       },
       "targets": [
         {
-          "expr": "sum by (type) (increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__rate_interval]))",
+          "expr": "sum by (type) (increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__interval]))",
           "legendFormat": "{{type}}",
-          "refId": "A"
+          "refId": "A",
+          "interval": "$bucket"
         }
       ],
       "fieldConfig": {
@@ -1423,9 +1433,10 @@
           },
           "targets": [
             {
-              "expr": "topk(10, sum by (linear_key) (increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",linear_key!=\"\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__rate_interval])))",
+              "expr": "topk(10, sum by (linear_key) (increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",linear_key!=\"\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__interval])))",
               "legendFormat": "{{linear_key}}",
-              "refId": "A"
+              "refId": "A",
+              "interval": "$bucket"
             }
           ],
           "fieldConfig": {
@@ -1559,9 +1570,10 @@
           },
           "targets": [
             {
-              "expr": "topk(10, sum by (project) (increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",project!=\"\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__rate_interval])))",
+              "expr": "topk(10, sum by (project) (increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",project!=\"\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__interval])))",
               "legendFormat": "{{project}}",
-              "refId": "A"
+              "refId": "A",
+              "interval": "$bucket"
             }
           ],
           "fieldConfig": {
@@ -2181,9 +2193,10 @@
           },
           "targets": [
             {
-              "expr": "topk(10, sum by (session_id, project, branch, linear_key) (rate(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__rate_interval])))",
+              "expr": "topk(10, sum by (session_id, project, branch, linear_key) (rate(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__interval])))",
               "legendFormat": "{{project}}/{{branch}} ({{linear_key}})",
-              "refId": "A"
+              "refId": "A",
+              "interval": "$bucket"
             }
           ],
           "fieldConfig": {
@@ -2541,19 +2554,38 @@
             "y": 36
           },
           "datasource": {
-            "type": "loki",
-            "uid": "loki"
+            "type": "prometheus",
+            "uid": "prometheus"
           },
           "targets": [
             {
-              "expr": "avg by (model_family) (label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(avg by (model) (avg_over_time({service_name=~\"claude-code.*\"} |= \"claude_code.api_request\" | project=~\"$project\" | branch=~\"$branch\" | hostname=~\"$hostname\" | unwrap duration_ms [$__auto])), \"model_family\", \"$1\", \"model\", \"(.+)\"), \"model_family\", \"$1 $2.$3\", \"model\", \"claude-([a-z]+)-([0-9]+)-([0-9]+).*\"), \"model_family\", \"$1 $2\", \"model\", \"claude-([a-z]+)-([0-9]+)(\\\\[[^]]*\\\\])?$\"), \"model_family\", \"Opus $1\", \"model_family\", \"opus (.*)\"), \"model_family\", \"Haiku $1\", \"model_family\", \"haiku (.*)\"), \"model_family\", \"Sonnet $1\", \"model_family\", \"sonnet (.*)\"), \"model_family\", \"Fable $1\", \"model_family\", \"fable (.*)\"))",
-              "legendFormat": "{{model_family}}",
-              "refId": "A"
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "editorMode": "code",
+              "expr": "histogram_quantile(0.5, sum by (le, model) (rate(claude_code_api_request_duration_seconds_bucket[$__interval])))",
+              "legendFormat": "p50 {{model}}",
+              "range": true,
+              "refId": "A",
+              "interval": "$bucket"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "editorMode": "code",
+              "expr": "histogram_quantile(0.95, sum by (le, model) (rate(claude_code_api_request_duration_seconds_bucket[$__interval])))",
+              "legendFormat": "p95 {{model}}",
+              "range": true,
+              "refId": "B",
+              "interval": "$bucket"
             }
           ],
           "fieldConfig": {
             "defaults": {
-              "unit": "ms",
+              "unit": "s",
               "custom": {
                 "drawStyle": "line",
                 "lineWidth": 2,
@@ -2662,14 +2694,21 @@
             "y": 43
           },
           "datasource": {
-            "type": "loki",
-            "uid": "loki"
+            "type": "prometheus",
+            "uid": "prometheus"
           },
           "targets": [
             {
-              "expr": "sum by (tool_name) (count_over_time({service_name=~\"claude-code.*\"} |= \"claude_code.tool_result\" | project=~\"$project\" | branch=~\"$branch\" | hostname=~\"$hostname\" [$__auto]))",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "editorMode": "code",
+              "expr": "sum by (tool_name) (increase(claude_code_tool_result_total[$__interval]))",
               "legendFormat": "{{tool_name}}",
-              "refId": "A"
+              "range": true,
+              "refId": "A",
+              "interval": "$bucket"
             }
           ],
           "fieldConfig": {
@@ -2797,15 +2836,21 @@
             "y": 50
           },
           "datasource": {
-            "type": "loki",
-            "uid": "loki"
+            "type": "prometheus",
+            "uid": "prometheus"
           },
           "targets": [
             {
-              "expr": "sort_desc(topk(15, sum by (tool_name) (count_over_time({service_name=~\"claude-code.*\"} |= \"claude_code.tool_result\" | project=~\"$project\" | branch=~\"$branch\" | hostname=~\"$hostname\" [$__range]))))",
-              "legendFormat": "{{tool_name}}",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "editorMode": "code",
+              "expr": "sort_desc(topk(15, sum by (tool_name) (increase(claude_code_tool_result_total[$__range]))))",
               "instant": true,
-              "refId": "A"
+              "range": false,
+              "refId": "A",
+              "legendFormat": "{{tool_name}}"
             }
           ],
           "fieldConfig": {
@@ -2960,14 +3005,21 @@
             "y": 58
           },
           "datasource": {
-            "type": "loki",
-            "uid": "loki"
+            "type": "prometheus",
+            "uid": "prometheus"
           },
           "targets": [
             {
-              "expr": "100 * sum by (tool_name) (count_over_time({service_name=~\"claude-code.*\"} |= \"claude_code.tool_result\" | success = \"true\" | project=~\"$project\" | branch=~\"$branch\" | hostname=~\"$hostname\" [$__auto])) / sum by (tool_name) (count_over_time({service_name=~\"claude-code.*\"} |= \"claude_code.tool_result\" | project=~\"$project\" | branch=~\"$branch\" | hostname=~\"$hostname\" [$__auto]))",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "editorMode": "code",
+              "expr": "100 * sum by (tool_name) (increase(claude_code_tool_result_total{success=\"true\"}[$__interval])) / sum by (tool_name) (increase(claude_code_tool_result_total[$__interval]))",
               "legendFormat": "{{tool_name}}",
-              "refId": "A"
+              "range": true,
+              "refId": "A",
+              "interval": "$bucket"
             }
           ],
           "fieldConfig": {
@@ -3128,14 +3180,16 @@
           },
           "targets": [
             {
-              "expr": "sum(rate(claude_code_lines_of_code_count_total{job=\"otel-collector\",type=\"added\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__rate_interval])) * 60",
+              "expr": "sum(rate(claude_code_lines_of_code_count_total{job=\"otel-collector\",type=\"added\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__interval])) * 60",
               "legendFormat": "Lines Added",
-              "refId": "A"
+              "refId": "A",
+              "interval": "$bucket"
             },
             {
-              "expr": "-sum(rate(claude_code_lines_of_code_count_total{job=\"otel-collector\",type=\"removed\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__rate_interval])) * 60",
+              "expr": "-sum(rate(claude_code_lines_of_code_count_total{job=\"otel-collector\",type=\"removed\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__interval])) * 60",
               "legendFormat": "Lines Removed",
-              "refId": "B"
+              "refId": "B",
+              "interval": "$bucket"
             }
           ],
           "fieldConfig": {
@@ -3145,7 +3199,7 @@
                 "drawStyle": "bars",
                 "fillOpacity": 80,
                 "stacking": {
-                  "mode": "normal",
+                  "mode": "none",
                   "group": "A"
                 },
                 "barAlignment": 0,
@@ -3239,9 +3293,10 @@
           },
           "targets": [
             {
-              "expr": "sum(increase(claude_code_pull_request_count_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__rate_interval]))",
+              "expr": "sum(increase(claude_code_pull_request_count_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__interval]))",
               "legendFormat": "PRs created",
-              "refId": "A"
+              "refId": "A",
+              "interval": "$bucket"
             }
           ],
           "fieldConfig": {
@@ -3315,9 +3370,10 @@
           },
           "targets": [
             {
-              "expr": "sum(increase(claude_code_commit_count_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__rate_interval]))",
+              "expr": "sum(increase(claude_code_commit_count_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__interval]))",
               "legendFormat": "Commits created",
-              "refId": "A"
+              "refId": "A",
+              "interval": "$bucket"
             }
           ],
           "fieldConfig": {
@@ -5260,9 +5316,10 @@
           },
           "targets": [
             {
-              "expr": "sum by (catalyst_orchestrator, linear_key) (rate(claude_code_token_usage_tokens_total{job=\"otel-collector\",catalyst_role=\"worker\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__rate_interval]))",
+              "expr": "sum by (catalyst_orchestrator, linear_key) (rate(claude_code_token_usage_tokens_total{job=\"otel-collector\",catalyst_role=\"worker\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__interval]))",
               "legendFormat": "{{catalyst_orchestrator}}/{{linear_key}}",
-              "refId": "A"
+              "refId": "A",
+              "interval": "$bucket"
             }
           ],
           "fieldConfig": {
@@ -5491,6 +5548,66 @@
   ],
   "templating": {
     "list": [
+      {
+        "name": "bucket",
+        "label": "Bucket",
+        "type": "interval",
+        "description": "Bucket width for the rate/volume timeseries (floor 1m \u2248 4\u00d7 the 15s scrape; default 5m).",
+        "datasource": null,
+        "query": "1m,5m,15m,30m,1h,6h,1d",
+        "auto": true,
+        "auto_count": 30,
+        "auto_min": "1m",
+        "current": {
+          "text": "5m",
+          "value": "5m"
+        },
+        "options": [
+          {
+            "text": "auto",
+            "value": "$__auto_interval_bucket",
+            "selected": false
+          },
+          {
+            "text": "1m",
+            "value": "1m",
+            "selected": false
+          },
+          {
+            "text": "5m",
+            "value": "5m",
+            "selected": true
+          },
+          {
+            "text": "15m",
+            "value": "15m",
+            "selected": false
+          },
+          {
+            "text": "30m",
+            "value": "30m",
+            "selected": false
+          },
+          {
+            "text": "1h",
+            "value": "1h",
+            "selected": false
+          },
+          {
+            "text": "6h",
+            "value": "6h",
+            "selected": false
+          },
+          {
+            "text": "1d",
+            "value": "1d",
+            "selected": false
+          }
+        ],
+        "refresh": 2,
+        "hide": 0,
+        "skipUrlSync": false
+      },
       {
         "allValue": ".*",
         "current": {
