@@ -582,10 +582,11 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum by (event_action) (increase(catalyst_event_total{event_entity=\"ticket\",host_name=~\"$node\",service_name=~\"$service\"}[$bucket]))",
+          "expr": "sum by (event_action) (increase(catalyst_event_total{event_entity=\"ticket\",host_name=~\"$node\",service_name=~\"$service\"}[$__interval]))",
           "legendFormat": "{{event_action}}",
           "range": true,
-          "refId": "A"
+          "refId": "A",
+          "interval": "$bucket"
         }
       ],
       "fieldConfig": {
@@ -648,10 +649,11 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum by (host_name) (increase(catalyst_event_total{event_entity=\"ticket\",event_action=\"tick\",host_name=~\"$node\",service_name=~\"$service\"}[$bucket]))",
+          "expr": "sum by (host_name) (increase(catalyst_event_total{event_entity=\"ticket\",event_action=\"tick\",host_name=~\"$node\",service_name=~\"$service\"}[$__interval]))",
           "legendFormat": "{{host_name}}",
           "range": true,
-          "refId": "A"
+          "refId": "A",
+          "interval": "$bucket"
         }
       ],
       "fieldConfig": {
@@ -714,10 +716,11 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum by (host_name) (increase(catalyst_scheduler_tick_duration_seconds_count{service_name=~\"$service\",host_name=~\"$node\"}[$bucket]))",
+          "expr": "sum by (host_name) (increase(catalyst_scheduler_tick_duration_seconds_count{service_name=~\"$service\",host_name=~\"$node\"}[$__interval]))",
           "legendFormat": "{{host_name}}",
           "range": true,
-          "refId": "A"
+          "refId": "A",
+          "interval": "$bucket"
         }
       ],
       "fieldConfig": {
@@ -1008,10 +1011,11 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "topk(25, sum by (event_entity, event_action) (increase(catalyst_event_total{host_name=~\"$node\",service_name=~\"$service\"}[$bucket])))",
+          "expr": "topk(25, sum by (event_entity, event_action) (increase(catalyst_event_total{host_name=~\"$node\",service_name=~\"$service\"}[$__interval])))",
           "legendFormat": "{{event_entity}}/{{event_action}}",
           "range": true,
-          "refId": "A"
+          "refId": "A",
+          "interval": "$bucket"
         }
       ],
       "fieldConfig": {
@@ -1075,10 +1079,11 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum by (service_name) (increase(catalyst_event_total{host_name=~\"$node\",service_name=~\"$service\"}[$bucket]))",
+          "expr": "sum by (service_name) (increase(catalyst_event_total{host_name=~\"$node\",service_name=~\"$service\"}[$__interval]))",
           "legendFormat": "{{service_name}}",
           "range": true,
-          "refId": "A"
+          "refId": "A",
+          "interval": "$bucket"
         }
       ],
       "fieldConfig": {
@@ -1155,10 +1160,11 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum by (event_action) (increase(catalyst_event_total{event_entity=\"phase\",event_action=~\"requested|launched\",service_name=~\"$service\",host_name=~\"$node\"}[$bucket]))",
+          "expr": "sum by (event_action) (increase(catalyst_event_total{event_entity=\"phase\",event_action=~\"requested|launched\",service_name=~\"$service\",host_name=~\"$node\"}[$__interval]))",
           "legendFormat": "{{event_action}}",
           "range": true,
-          "refId": "A"
+          "refId": "A",
+          "interval": "$bucket"
         }
       ],
       "fieldConfig": {
@@ -1282,10 +1288,11 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum by (event_action) (increase(catalyst_event_total{service_name=~\"$service\",event_entity=\"phase\",event_action=~\"autotune-gauge|parallelism-sampled\",host_name=~\"$node\"}[$bucket]))",
+          "expr": "sum by (event_action) (increase(catalyst_event_total{service_name=~\"$service\",event_entity=\"phase\",event_action=~\"autotune-gauge|parallelism-sampled\",host_name=~\"$node\"}[$__interval]))",
           "legendFormat": "{{event_action}}",
           "range": true,
-          "refId": "A"
+          "refId": "A",
+          "interval": "$bucket"
         }
       ],
       "fieldConfig": {
@@ -1502,10 +1509,11 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum by (host_name) (increase(catalyst_event_total{event_entity=\"node\",event_action=\"heartbeat\",service_name=~\"$service\",host_name=~\"$node\"}[$bucket]))",
+          "expr": "sum by (host_name) (increase(catalyst_event_total{event_entity=\"node\",event_action=\"heartbeat\",service_name=~\"$service\",host_name=~\"$node\"}[$__interval]))",
           "legendFormat": "{{host_name}}",
           "range": true,
-          "refId": "A"
+          "refId": "A",
+          "interval": "$bucket"
         }
       ],
       "fieldConfig": {
