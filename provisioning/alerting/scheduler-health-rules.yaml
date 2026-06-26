@@ -15,6 +15,22 @@ apiVersion: 1
 #
 # noDataState/execErrState = OK: a pass that didn't run (no series) or a transient
 # query error must NOT raise — these are advisory tail signals, not survivability.
+#
+# TRACE-JUMP (OTL-30): the p99 histograms are signaltometrics-derived and carry NO
+# exemplars (the connector can't attach them), so a firing alert cannot know the
+# specific slow tick's trace_id. Instead each latency-tail rule carries trace-jump
+# ANNOTATIONS that land an operator on the slow traces in two ways:
+#   • __dashboardUid__ + __panelId__  -> Grafana renders a native "View panel"
+#     button on the alert that opens the "Slow ticks (>3s)" Loki panel (id 8) on the
+#     Fleet · Scheduler Health dashboard; each row's trace_id is a Tempo data-link.
+#   • trace_jump_url  -> a Grafana Explore deep-link that runs a Tempo TraceQL query
+#     for the exact slow span over the last hour (tick-level for the tick rule,
+#     span.catalyst.scheduler.pass="<pass>" for the per-pass rules) -> straight to
+#     the flame graph. This annotation is also delivered in the webhook payload, so
+#     a future pager/Slack handler (CATALYST_ALERT_WEBHOOK_URL) can template it in.
+# Both are PROVISIONED (no exemplar/Prometheus feature flags needed). The TraceQL is
+# host-agnostic by design — the alert maxes over host_name, so the link shows slow
+# ticks from every node and the operator picks the worst.
 groups:
   - orgId: 1
     name: catalyst-scheduler-health
@@ -39,6 +55,9 @@ groups:
             deadline — new-work admission risks wedging. Localize the culprit
             pass on the Fleet · Scheduler Health dashboard (recovery-pass /
             phantom-sweep are the usual drivers).
+          __dashboardUid__: catalyst-fleet-scheduler-health
+          __panelId__: '8'
+          trace_jump_url: 'https://otel.rozich.com/explore?schemaVersion=1&panes=%7B%22t%22%3A%7B%22datasource%22%3A%22tempo%22%2C%22queries%22%3A%5B%7B%22refId%22%3A%22A%22%2C%22datasource%22%3A%7B%22type%22%3A%22tempo%22%2C%22uid%22%3A%22tempo%22%7D%2C%22queryType%22%3A%22traceql%22%2C%22query%22%3A%22%7B+name+%3D+%5C%22scheduler.tick%5C%22+%26%26+duration+%3E+3s+%7D%22%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22now-1h%22%2C%22to%22%3A%22now%22%7D%7D%7D&orgId=1'
         data:
           - refId: A
             relativeTimeRange: { from: 600, to: 0 }
@@ -89,6 +108,9 @@ groups:
             10m. Hypothesis: per-signal linearis exec stalling on Linear 429
             rate-limit backoff (~hourly). Durable fix = Cloud-SDK local-replica
             read repoint (CATALYST). Until then this is the primary wedge driver.
+          __dashboardUid__: catalyst-fleet-scheduler-health
+          __panelId__: '8'
+          trace_jump_url: 'https://otel.rozich.com/explore?schemaVersion=1&panes=%7B%22t%22%3A%7B%22datasource%22%3A%22tempo%22%2C%22queries%22%3A%5B%7B%22refId%22%3A%22A%22%2C%22datasource%22%3A%7B%22type%22%3A%22tempo%22%2C%22uid%22%3A%22tempo%22%7D%2C%22queryType%22%3A%22traceql%22%2C%22query%22%3A%22%7B+span.catalyst.scheduler.pass+%3D+%5C%22recovery-pass%5C%22+%26%26+duration+%3E+3s+%7D%22%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22now-1h%22%2C%22to%22%3A%22now%22%7D%7D%7D&orgId=1'
         data:
           - refId: A
             relativeTimeRange: { from: 600, to: 0 }
@@ -139,6 +161,9 @@ groups:
             dominate the whole tick when they hit. catalyst-owned (not SDK-gated);
             CATALYST investigating whether it is a full-board scan or per-phantom
             fs/git/Linear read on a cadence.
+          __dashboardUid__: catalyst-fleet-scheduler-health
+          __panelId__: '8'
+          trace_jump_url: 'https://otel.rozich.com/explore?schemaVersion=1&panes=%7B%22t%22%3A%7B%22datasource%22%3A%22tempo%22%2C%22queries%22%3A%5B%7B%22refId%22%3A%22A%22%2C%22datasource%22%3A%7B%22type%22%3A%22tempo%22%2C%22uid%22%3A%22tempo%22%7D%2C%22queryType%22%3A%22traceql%22%2C%22query%22%3A%22%7B+span.catalyst.scheduler.pass+%3D+%5C%22phantom-sweep%5C%22+%26%26+duration+%3E+5s+%7D%22%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22now-1h%22%2C%22to%22%3A%22now%22%7D%7D%7D&orgId=1'
         data:
           - refId: A
             relativeTimeRange: { from: 600, to: 0 }
@@ -188,6 +213,9 @@ groups:
             The reclaim lap cratered to single-digit ms after CTL-1331. p99 > 1s
             for 10m means the per-tick stale-Linear-read regressed back into the
             reclaim sweep. Guard rail on the headline win.
+          __dashboardUid__: catalyst-fleet-scheduler-health
+          __panelId__: '8'
+          trace_jump_url: 'https://otel.rozich.com/explore?schemaVersion=1&panes=%7B%22t%22%3A%7B%22datasource%22%3A%22tempo%22%2C%22queries%22%3A%5B%7B%22refId%22%3A%22A%22%2C%22datasource%22%3A%7B%22type%22%3A%22tempo%22%2C%22uid%22%3A%22tempo%22%7D%2C%22queryType%22%3A%22traceql%22%2C%22query%22%3A%22%7B+span.catalyst.scheduler.pass+%3D+%5C%22reclaim%5C%22+%26%26+duration+%3E+1s+%7D%22%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22now-1h%22%2C%22to%22%3A%22now%22%7D%7D%7D&orgId=1'
         data:
           - refId: A
             relativeTimeRange: { from: 600, to: 0 }
@@ -237,6 +265,8 @@ groups:
             liveness-refresh is returning outcome=timeout. new-work admission is
             gated on liveness freshness, so a sustained timeout rate is the most
             direct wedge signal available.
+          __dashboardUid__: catalyst-fleet-scheduler-health
+          __panelId__: '7'
         data:
           - refId: A
             relativeTimeRange: { from: 600, to: 0 }
