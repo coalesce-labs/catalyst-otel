@@ -440,7 +440,7 @@
             "type": "loki",
             "uid": "loki"
           },
-          "expr": "topk(15, sum by (process_command) (max_over_time({service_name=\"catalyst.agent\"} |= \"host.process.sampled\" | host_name=\"$hostname\" | unwrap process_rss_mb | __error__=\"\" [$__range]) by (process_command, process_ticket, process_phase)))",
+          "expr": "topk(15, sum by (process_command) (max_over_time({service_name=\"catalyst.agent\"} |= \"host.process.sampled\" | host_name=~\"$hostname\" | unwrap process_rss_mb | __error__=\"\" [$__range]) by (process_command, process_ticket, process_phase)))",
           "queryType": "instant",
           "instant": true
         },
@@ -450,7 +450,7 @@
             "type": "loki",
             "uid": "loki"
           },
-          "expr": "sum by (process_command) (max_over_time({service_name=\"catalyst.agent\"} |= \"host.process.sampled\" | host_name=\"$hostname\" | unwrap process_cpu_pct | __error__=\"\" [$__range]) by (process_command, process_ticket, process_phase))",
+          "expr": "sum by (process_command) (max_over_time({service_name=\"catalyst.agent\"} |= \"host.process.sampled\" | host_name=~\"$hostname\" | unwrap process_cpu_pct | __error__=\"\" [$__range]) by (process_command, process_ticket, process_phase))",
           "queryType": "instant",
           "instant": true
         }

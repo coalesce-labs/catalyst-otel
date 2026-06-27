@@ -271,6 +271,7 @@
     {
       "id": 6,
       "title": "Tool Calls",
+      "description": "Fleet-wide total tool executions (claude_code_tool_result_total, OTL-21 connector). This connector metric carries only low-card resource labels (no project / branch / hostname / linear_key), so it does NOT narrow with the $project / $branch / $hostname filters — it is a fleet aggregate by design. Use the by-project / by-ticket tool panels (Loki) to slice.",
       "type": "stat",
       "gridPos": {
         "h": 4,

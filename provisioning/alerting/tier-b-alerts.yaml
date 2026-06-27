@@ -51,7 +51,13 @@ groups:
               instant: true
               range: false
               refId: A
-              expr: sum(increase(catalyst_recovery_decision_total{recovery_decision="escalate"}[1h]))
+              # The live escalation signal is the recovery.escalated event, surfaced
+              # as catalyst_event_total{event_action="escalated"} (count connector,
+              # OTL-21). recovery.decision is NOT emitted outside enforce mode
+              # (14d-verified — see the control-loop dashboard glossary), so the
+              # earlier catalyst_recovery_decision_total{recovery_decision="escalate"}
+              # expr would never fire on a real escalation burst.
+              expr: sum(increase(catalyst_event_total{event_action="escalated"}[1h]))
           - refId: B
             relativeTimeRange: { from: 3600, to: 0 }
             datasourceUid: __expr__
@@ -77,6 +83,10 @@ groups:
       # 2) Slot starvation: eligible work waiting AND zero free slots, sustained.
       #    The PromQL returns the eligible-work count ONLY when free_slots==0, so a
       #    healthy fleet (slots free) yields an empty vector -> noData -> OK.
+      #    Evaluated PER HOST (by host_name): the fleet runs >1 scheduler (mini +
+      #    mini-2), so a fleet-wide max(free_slots)==0 would only fire when EVERY
+      #    node is starved and miss a single starved scheduler while another has
+      #    spare slots. The `and on(host_name)` keeps each host's two gauges paired.
       - uid: catalyst_scheduler_slot_starvation
         title: Scheduler slot starvation (work waiting, 0 free slots)
         condition: C
@@ -107,7 +117,7 @@ groups:
               instant: true
               range: false
               refId: A
-              expr: (max(catalyst_scheduler_eligible_work) > 0) and (max(catalyst_scheduler_free_slots) == 0)
+              expr: (max by (host_name) (catalyst_scheduler_eligible_work) > 0) and on(host_name) (max by (host_name) (catalyst_scheduler_free_slots) == 0)
           - refId: B
             relativeTimeRange: { from: 900, to: 0 }
             datasourceUid: __expr__
