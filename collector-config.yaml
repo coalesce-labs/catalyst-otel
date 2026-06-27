@@ -390,6 +390,52 @@ connectors:
           - key: liveness_outcome
           - key: host_name
 
+      # ----- claude_code logs->metrics (OTL-21) -----
+      # Occurrence counters for the three claude_code events that have NO native
+      # Prometheus counter today (cost/tokens/sessions/commits/PRs/lines/decision
+      # already exist as claude_code_* — NOT duplicated here). Low-card connector
+      # labels ONLY; never session_id / error text / tool_input. event_name is the
+      # short form ("tool_result"), confirmed live.
+      #
+      # CARDINALITY (verified live, 68 series): unlike the NATIVE claude_code_*
+      # metrics (which Claude Code exports with project / branch / linear_key /
+      # session_id / host.name on their resource -> 12k+ series), the claude_code
+      # LOG/EVENT records carry only the low-card resource attrs (os_type /
+      # os_version / host_arch / service_version / environment). So
+      # resource_to_telemetry_conversion promotes ONLY those onto these connector
+      # metrics — project / branch / hostname / linear_key / session_id are NOT
+      # present. (host.name is additionally stripped on all connector-scope metrics
+      # by transform/connector_metric_fixup above.) Net: these stay genuinely
+      # low-card, but they also CANNOT be sliced by project / branch / host — the
+      # by-ticket / by-project tool breakdowns therefore stay on Loki, and the
+      # migrated PromQL tiles are fleet-wide aggregates.
+      claude_code_tool_result_total:
+        description: "Claude Code tool executions by tool and success (replaces Loki count_over_time on tool_result; uncapped). NOTE: tool_result carries NO model attribute."
+        conditions:
+          - 'attributes["event_name"] == "tool_result"'
+        attributes:
+          - key: tool_name
+          - key: success
+      claude_code_api_request_total:
+        description: "Claude Code API requests by model (occurrence count; cost/tokens stay on native claude_code_* counters)"
+        conditions:
+          - 'attributes["event_name"] == "api_request"'
+        attributes:
+          - key: model
+      claude_code_api_error_total:
+        description: "Claude Code API errors by model and HTTP status_code (e.g. 429). error text intentionally NOT a label (unbounded)"
+        conditions:
+          - 'attributes["event_name"] == "api_error"'
+        attributes:
+          - key: model
+          # status_code is "present only when applicable" (network / timeout
+          # failures carry none). The count connector DROPS any datapoint missing
+          # a no-default attribute, so without this default those provider failures
+          # would never increment the counter -> the api-error alert goes blind to
+          # a whole class of errors. Low-card sentinel keeps every api_error counted.
+          - key: status_code
+            default_value: "unknown"
+
   # Numeric gauges from event fields. Values are strings in transit -> Double() cast.
   # Do NOT set `error_mode: ignore` here — in otelcol 0.154.0 it suppresses ALL
   # gauge output. The default already handles a bad Double() cast safely: the
@@ -819,6 +865,19 @@ connectors:
             default_value: unknown
         gauge:
           value: 'Double(attributes["sched_eligible_count"])'
+      # OTL-21: claude_code API-request latency histogram. Same pattern as the
+      # OTL-31 scheduler histograms (signal_to_metrics + Double()/1000 -> seconds).
+      # duration_ms is a log-record attribute (string) on api_request -> Double cast.
+      # Name ends _seconds; no `unit:` (avoids a double _seconds_seconds suffix).
+      - name: claude_code_api_request_duration_seconds
+        description: "Claude Code API request wall time (seconds) by model"
+        conditions: ['attributes["event_name"] == "api_request"']
+        attributes:
+          - key: model
+            default_value: unknown
+        histogram:
+          buckets: [0.25, 0.5, 1, 2, 5, 10, 30, 60]
+          value: 'Double(attributes["duration_ms"]) / 1000'
 
 service:
   # PAYLOAD-PARITY INVARIANT (OTL-1): exactly ONE pipeline per signal type.

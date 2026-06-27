@@ -20,6 +20,66 @@
   "templating": {
     "list": [
       {
+        "name": "bucket",
+        "label": "Bucket",
+        "type": "interval",
+        "description": "Bucket width for the rate/volume timeseries (floor 1m ≈ 4× the 15s scrape; default 5m).",
+        "datasource": null,
+        "query": "1m,5m,15m,30m,1h,6h,1d",
+        "auto": true,
+        "auto_count": 30,
+        "auto_min": "1m",
+        "current": {
+          "text": "5m",
+          "value": "5m"
+        },
+        "options": [
+          {
+            "text": "auto",
+            "value": "$__auto_interval_bucket",
+            "selected": false
+          },
+          {
+            "text": "1m",
+            "value": "1m",
+            "selected": false
+          },
+          {
+            "text": "5m",
+            "value": "5m",
+            "selected": true
+          },
+          {
+            "text": "15m",
+            "value": "15m",
+            "selected": false
+          },
+          {
+            "text": "30m",
+            "value": "30m",
+            "selected": false
+          },
+          {
+            "text": "1h",
+            "value": "1h",
+            "selected": false
+          },
+          {
+            "text": "6h",
+            "value": "6h",
+            "selected": false
+          },
+          {
+            "text": "1d",
+            "value": "1d",
+            "selected": false
+          }
+        ],
+        "refresh": 2,
+        "hide": 0,
+        "skipUrlSync": false
+      },
+      {
         "name": "service",
         "label": "service",
         "type": "query",
@@ -128,21 +188,23 @@
       "id": 1,
       "type": "stat",
       "title": "Recovery ticks (range)",
-      "description": "Per-tick evaluation summary events (recovery.tick, CTL-1287). NOTE: this event name is not currently emitted to Loki anywhere (verified over 14d) — it lights up when the delegate recovery pass runs in enforce mode. Reads 0 until then. See glossary.",
+      "description": "Per-tick recovery evaluation events (recovery.tick, CTL-1287) → Prometheus catalyst_event_total{event_entity=\"ticket\",event_action=\"tick\"} (OTL-21). Emits in enforce-mode bursts (recently ~8.6k/24h on mini + mini-2); idle between passes. Summed over the selected range.",
       "datasource": {
-        "type": "loki",
-        "uid": "loki"
+        "type": "prometheus",
+        "uid": "prometheus"
       },
       "targets": [
         {
           "datasource": {
-            "type": "loki",
-            "uid": "loki"
+            "type": "prometheus",
+            "uid": "prometheus"
           },
-          "expr": "sum(count_over_time({service_name=~\"${service:pipe}\"} |= \"recovery.tick\" | host_name=~\"${node:pipe}\" [$__range])) or vector(0)",
-          "refId": "A",
-          "queryType": "instant",
-          "instant": true
+          "editorMode": "code",
+          "expr": "sum(increase(catalyst_event_total{event_entity=\"ticket\",event_action=\"tick\",host_name=~\"$node\",service_name=~\"$service\"}[$__range])) or vector(0)",
+          "instant": true,
+          "legendFormat": "recovery ticks",
+          "range": false,
+          "refId": "A"
         }
       ],
       "fieldConfig": {
@@ -508,21 +570,23 @@
       "id": 10,
       "type": "timeseries",
       "title": "Recovery pass activity by type",
-      "description": "Per-interval count of each recovery.* event the delegate emits (would-fix / fixed / escalated, and tick/decision once enforce mode ships). This is the live 'the recovery loop is evaluating and acting' signal. Recovery events are sparse — widen the time range if empty.",
+      "description": "Recovery-pass actions by type per bucket (board-scan / decision / escalated) as independent UNSTACKED BARS — sparse bursty counts read honestly (idle buckets = gaps, no misleading interpolation). The per-tick cadence is excluded (see the Recovery-ticks stat + by-node panel). From Prometheus catalyst_event_total{event_entity=\"ticket\",event_action!=\"tick\"} (OTL-21).",
       "datasource": {
-        "type": "loki",
-        "uid": "loki"
+        "type": "prometheus",
+        "uid": "prometheus"
       },
       "targets": [
         {
           "datasource": {
-            "type": "loki",
-            "uid": "loki"
+            "type": "prometheus",
+            "uid": "prometheus"
           },
-          "expr": "sum by (event_name) (count_over_time({service_name=~\"${service:pipe}\"} |= \"recovery.\" | host_name=~\"${node:pipe}\" [$__auto]))",
+          "editorMode": "code",
+          "expr": "sum by (event_action) (increase(catalyst_event_total{event_entity=\"ticket\",event_action!=\"tick\",host_name=~\"$node\",service_name=~\"$service\"}[$__interval]))",
+          "legendFormat": "{{event_action}}",
+          "range": true,
           "refId": "A",
-          "queryType": "range",
-          "legendFormat": "{{event_name}}"
+          "interval": "$bucket"
         }
       ],
       "fieldConfig": {
@@ -530,14 +594,15 @@
           "unit": "short",
           "custom": {
             "drawStyle": "bars",
-            "lineWidth": 1,
+            "lineWidth": 2,
             "fillOpacity": 70,
             "showPoints": "never",
             "spanNulls": false,
             "stacking": {
-              "mode": "normal",
+              "mode": "none",
               "group": "A"
-            }
+            },
+            "pointSize": 5
           },
           "color": {
             "mode": "palette-classic"
@@ -575,19 +640,21 @@
       "title": "Recovery ticks by node (enforce mode)",
       "description": "recovery.tick per node — each scheduler tick the delegate evaluated flagged work. NOT EMITTED TODAY (verified 14d): populates only when the recovery pass runs in enforce mode (rMode != off AND rItems > 0). Empty is expected until then; see glossary and CTL-1291.",
       "datasource": {
-        "type": "loki",
-        "uid": "loki"
+        "type": "prometheus",
+        "uid": "prometheus"
       },
       "targets": [
         {
           "datasource": {
-            "type": "loki",
-            "uid": "loki"
+            "type": "prometheus",
+            "uid": "prometheus"
           },
-          "expr": "sum by (host_name) (count_over_time({service_name=~\"${service:pipe}\"} |= \"recovery.tick\" | host_name=~\"${node:pipe}\" [$__auto]))",
+          "editorMode": "code",
+          "expr": "sum by (host_name) (increase(catalyst_event_total{event_entity=\"ticket\",event_action=\"tick\",host_name=~\"$node\",service_name=~\"$service\"}[$__interval]))",
+          "legendFormat": "{{host_name}}",
+          "range": true,
           "refId": "A",
-          "queryType": "range",
-          "legendFormat": "{{host_name}}"
+          "interval": "$bucket"
         }
       ],
       "fieldConfig": {
@@ -640,19 +707,21 @@
       "title": "Scheduler ticks by node — loop heartbeat",
       "description": "phase.scheduler.* sampling events per node (parallelism-sampled + autotune-gauge). Proves the control loop itself is ticking on each node even when the recovery delegate is idle. High-volume, always-on liveness.",
       "datasource": {
-        "type": "loki",
-        "uid": "loki"
+        "type": "prometheus",
+        "uid": "prometheus"
       },
       "targets": [
         {
           "datasource": {
-            "type": "loki",
-            "uid": "loki"
+            "type": "prometheus",
+            "uid": "prometheus"
           },
-          "expr": "sum by (host_name) (count_over_time({service_name=~\"${service:pipe}\"} |= \"phase.scheduler.\" | host_name=~\"${node:pipe}\" [$__auto]))",
+          "editorMode": "code",
+          "expr": "sum by (host_name) (increase(catalyst_scheduler_tick_duration_seconds_count{service_name=~\"$service\",host_name=~\"$node\"}[$__interval]))",
+          "legendFormat": "{{host_name}}",
+          "range": true,
           "refId": "A",
-          "queryType": "range",
-          "legendFormat": "{{host_name}}"
+          "interval": "$bucket"
         }
       ],
       "fieldConfig": {
@@ -930,22 +999,24 @@
     {
       "id": 24,
       "type": "timeseries",
-      "title": "Event volume by type — top 25 ($ev filters)",
-      "description": "Per-interval volume of the busiest event names. Bounded by topk(25) to keep the high-cardinality phase.<step>.<action>.<TICKET> family well under Loki's 500-series cap at the supported 6h–14d ranges (~400 distinct series at 14d; the unbounded form trips the cap there). Very wide ranges (30d+) approach the limit.",
+      "title": "Event volume by type — top 25",
+      "description": "Per-bucket volume of the busiest catalyst events, from Prometheus catalyst_event_total grouped by low-card event_entity/event_action (OTL-21) — uncapped (no Loki 500-series limit). topk(25) of ~52 distinct entity/action pairs (≈58 at 14d). $bucket sets the bucket width.",
       "datasource": {
-        "type": "loki",
-        "uid": "loki"
+        "type": "prometheus",
+        "uid": "prometheus"
       },
       "targets": [
         {
           "datasource": {
-            "type": "loki",
-            "uid": "loki"
+            "type": "prometheus",
+            "uid": "prometheus"
           },
-          "expr": "topk(25, sum by (event_name) (count_over_time({service_name=~\"${service:pipe}\"} | event_name=~\".+\" | host_name=~\"${node:pipe}\" |= \"${ev}\" [$__auto])))",
+          "editorMode": "code",
+          "expr": "topk(25, sum by (event_entity, event_action) (increase(catalyst_event_total{host_name=~\"$node\",service_name=~\"$service\"}[$__interval])))",
+          "legendFormat": "{{event_entity}}/{{event_action}}",
+          "range": true,
           "refId": "A",
-          "queryType": "range",
-          "legendFormat": "{{event_name}}"
+          "interval": "$bucket"
         }
       ],
       "fieldConfig": {
@@ -999,19 +1070,21 @@
       "title": "Event volume by service",
       "description": "Per-interval event volume per catalyst.* service (low cardinality, always safe). execution-core dominates; session/agent/github/linear follow.",
       "datasource": {
-        "type": "loki",
-        "uid": "loki"
+        "type": "prometheus",
+        "uid": "prometheus"
       },
       "targets": [
         {
           "datasource": {
-            "type": "loki",
-            "uid": "loki"
+            "type": "prometheus",
+            "uid": "prometheus"
           },
-          "expr": "sum by (service_name) (count_over_time({service_name=~\"${service:pipe}\"} | event_name=~\".+\" | host_name=~\"${node:pipe}\" |= \"${ev}\" [$__auto]))",
+          "editorMode": "code",
+          "expr": "sum by (service_name) (increase(catalyst_event_total{host_name=~\"$node\",service_name=~\"$service\"}[$__interval]))",
+          "legendFormat": "{{service_name}}",
+          "range": true,
           "refId": "A",
-          "queryType": "range",
-          "legendFormat": "{{service_name}}"
+          "interval": "$bucket"
         }
       ],
       "fieldConfig": {
@@ -1078,19 +1151,21 @@
       "title": "Dispatch throughput — requested vs launched",
       "description": "phase.dispatch.* events by action. 'requested' = the scheduler wanted to start a worker; 'launched' = it actually did. A persistent gap (requested >> launched) is back-pressure: the scheduler wants to dispatch but can't get slots. This is the live dispatch signal until CTL-1265's dispatch.held ships.",
       "datasource": {
-        "type": "loki",
-        "uid": "loki"
+        "type": "prometheus",
+        "uid": "prometheus"
       },
       "targets": [
         {
           "datasource": {
-            "type": "loki",
-            "uid": "loki"
+            "type": "prometheus",
+            "uid": "prometheus"
           },
-          "expr": "sum by (event_action) (count_over_time({service_name=~\"${service:pipe}\"} |= \"phase.dispatch.\" | host_name=~\"${node:pipe}\" [$__auto]))",
+          "editorMode": "code",
+          "expr": "sum by (event_action) (increase(catalyst_event_total{event_entity=\"phase\",event_action=~\"requested|launched\",service_name=~\"$service\",host_name=~\"$node\"}[$__interval]))",
+          "legendFormat": "{{event_action}}",
+          "range": true,
           "refId": "A",
-          "queryType": "range",
-          "legendFormat": "{{event_action}}"
+          "interval": "$bucket"
         }
       ],
       "fieldConfig": {
@@ -1204,19 +1279,21 @@
       "title": "Scheduler sampling by action",
       "description": "phase.scheduler.* events by action (parallelism-sampled, autotune-gauge). Confirms the scheduler is sampling its parallelism budget each tick. The sampled VALUES (current parallelism / slots) are not in Loki — see CTL-1291; this shows the sampling cadence.",
       "datasource": {
-        "type": "loki",
-        "uid": "loki"
+        "type": "prometheus",
+        "uid": "prometheus"
       },
       "targets": [
         {
           "datasource": {
-            "type": "loki",
-            "uid": "loki"
+            "type": "prometheus",
+            "uid": "prometheus"
           },
-          "expr": "sum by (event_action) (count_over_time({service_name=~\"${service:pipe}\"} |= \"phase.scheduler.\" | host_name=~\"${node:pipe}\" [$__auto]))",
+          "editorMode": "code",
+          "expr": "sum by (event_action) (increase(catalyst_event_total{service_name=~\"$service\",event_entity=\"phase\",event_action=~\"autotune-gauge|parallelism-sampled\",host_name=~\"$node\"}[$__interval]))",
+          "legendFormat": "{{event_action}}",
+          "range": true,
           "refId": "A",
-          "queryType": "range",
-          "legendFormat": "{{event_action}}"
+          "interval": "$bucket"
         }
       ],
       "fieldConfig": {
@@ -1423,19 +1500,21 @@
       "title": "Node heartbeats by node (liveness)",
       "description": "node.heartbeat per node — each node's daemon publishing its periodic liveness beat. A node that flatlines here has stopped ticking. The closest available proxy for 'which nodes are alive and dispatching'.",
       "datasource": {
-        "type": "loki",
-        "uid": "loki"
+        "type": "prometheus",
+        "uid": "prometheus"
       },
       "targets": [
         {
           "datasource": {
-            "type": "loki",
-            "uid": "loki"
+            "type": "prometheus",
+            "uid": "prometheus"
           },
-          "expr": "sum by (host_name) (count_over_time({service_name=~\"${service:pipe}\"} |= \"node.heartbeat\" | host_name=~\"${node:pipe}\" [$__auto]))",
+          "editorMode": "code",
+          "expr": "sum by (host_name) (increase(catalyst_event_total{event_entity=\"node\",event_action=\"heartbeat\",service_name=~\"$service\",host_name=~\"$node\"}[$__interval]))",
+          "legendFormat": "{{host_name}}",
+          "range": true,
           "refId": "A",
-          "queryType": "range",
-          "legendFormat": "{{host_name}}"
+          "interval": "$bucket"
         }
       ],
       "fieldConfig": {
@@ -1544,7 +1623,7 @@
       },
       "options": {
         "mode": "markdown",
-        "content": "## What this dashboard is\n\nThe live **watch the control loop think** view (OTL-18): the recovery delegate's evaluations and actions, the dispatch cycle, and the raw unified event stream — all from the `catalyst.*` Loki streams shipped by `otel-forward`. Sibling **OTL-17** is the higher-level health view. Filters: **$service** (which daemons), **$node** (which host), **$ev** (substring filter for the raw tail + volume panels). Default range is **6h** so the latest sparse recovery events are in view; widen for history.\n\n## The data-path reality (read this before trusting a number)\n\nThis dashboard is **Loki-only**, and the catalyst event path has hard limits — these are documented gaps, not bugs in the panels (tracked in **CTL-1291**):\n\n- **Event payloads don't reach Loki.** Each event's numeric `body.payload` (recovery tick's `queueSize`/`processed`/`actions{}`, decision's `rule`/`decision`/`reason`, the scheduler's `parallelism`/`slots-in-use`) is dropped at forward time — the Loki log line is just the event name. So every panel here charts **event occurrences / rates and promoted dimensions**, never the inner values. The only queryable dimensions are `event_name`, `event_entity`, `event_action`, `event_label` (the ticket/subject), `recovery_fix_class`, `host_name`, `host_id`, `catalyst_orchestration`. There are **no catalyst application metrics in Prometheus** either, so the numerics aren't recoverable elsewhere today.\n- **`recovery.tick` and `recovery.decision` are not emitted yet.** Over 14d, the only recovery events in Loki are `recovery.would-fix`, `recovery.fixed`, `recovery.escalated`. The tick/decision panels (and their stat cards) are wired correctly and will populate the moment the delegate runs in **enforce mode**; until then they read **0**. The live recovery signal today is the **Recovery pass activity** panel (would-fix/fixed/escalated).\n- **`dispatch.held` (CTL-1265) is not deployed** — it reads 0. The real, live dispatch signals are **requested-vs-launched** (the gap = back-pressure) and the **'holding new-work dispatch'** daemon-log line, which is currently very active.\n- **Node identity on events is non-canonical.** Events carry `host_name`, which has ~10 raw values (incl. historical FQDN aliases like `RyansMini250233.rozich`) plus a ~16% **empty** bucket; the clean `catalyst_node_name` is only on daemon **logs**. So **$node = All** uses `.*` (keeps everything, incl. empty-host and alias events). Picking a **specific** node matches the canonical short name **exactly** (Loki anchors pipeline label-matchers) — it will MISS that node's historical FQDN aliases and empty-host events, so use **All** for complete history. CTL-1291 asks to stamp a canonical node name on events to fix this. The two **(log)** signals in the back-pressure gauge and the hold-log panel filter on `catalyst_node_name` instead — that's why they split cleanly by node.\n\n## Event vs log streams\n\nThe same `catalyst.*` `service_name` carries two record kinds. **EVENT** records have an `event_name` (this dashboard's main subject) and node = `host_name`. **LOG** records have a `log_file_name` and node = `catalyst_node_name`. Event panels use `| event_name=~\".+\" | host_name=~\"$node\"`; the two daemon-log panels use `| log_file_name=~\\`.+\\` | catalyst_node_name=~\"$node\"`.\n\n## Why `topk` on the volume panel\n\n`event_name` is high-cardinality (the `phase.<step>.<action>.<TICKET>` family is 2,900+ distinct names over 14d). A bare `sum by (event_name)` over a wide range trips Loki's 500-series cap and blanks the panel, so the volume-by-type panel is bounded with `topk(25, …)` (≈400 series at 14d, safely under the cap; 30d+ approaches it). Volume-by-service is low-cardinality and unbounded.\n\n## Acceptance-criteria map (OTL-18)\n\n- **Tier 1 — watch the ticks:** Recovery pass activity + Recovery ticks by node + Scheduler ticks (loop heartbeat).\n- **Tier 2 — decisions + raw stream:** Recovery decision & outcome stream + outcomes tables + the **Unified event-log live tail** (filterable by `$ev`).\n- **Tier 3 — dispatch visibility:** requested-vs-launched throughput + scheduler sampling + back-pressure/hold gauge + node heartbeats + hold-log feed."
+        "content": "## What this dashboard is\n\nThe live **watch the control loop think** view (OTL-18): the recovery delegate's evaluations and actions, the dispatch cycle, and the raw unified event stream — all from the `catalyst.*` Loki streams shipped by `otel-forward`. Sibling **OTL-17** is the higher-level health view. Filters: **$service** (which daemons), **$node** (which host), **$ev** (substring filter for the raw event-log tail only — the Event-volume panels are now Prometheus aggregates of `catalyst_event_total` and filter by **$node**/**$service**, not `$ev`, because `event_name` is intentionally not a Prometheus label). Default range is **6h** so the latest sparse recovery events are in view; widen for history.\n\n## The data-path reality (read this before trusting a number)\n\nThis dashboard is **Loki-only**, and the catalyst event path has hard limits — these are documented gaps, not bugs in the panels (tracked in **CTL-1291**):\n\n- **Event payloads don't reach Loki.** Each event's numeric `body.payload` (recovery tick's `queueSize`/`processed`/`actions{}`, decision's `rule`/`decision`/`reason`, the scheduler's `parallelism`/`slots-in-use`) is dropped at forward time — the Loki log line is just the event name. So every panel here charts **event occurrences / rates and promoted dimensions**, never the inner values. The only queryable dimensions are `event_name`, `event_entity`, `event_action`, `event_label` (the ticket/subject), `recovery_fix_class`, `host_name`, `host_id`, `catalyst_orchestration`. There are **no catalyst application metrics in Prometheus** either, so the numerics aren't recoverable elsewhere today.\n- **`recovery.tick` and `recovery.decision` are not emitted yet.** Over 14d, the only recovery events in Loki are `recovery.would-fix`, `recovery.fixed`, `recovery.escalated`. The tick/decision panels (and their stat cards) are wired correctly and will populate the moment the delegate runs in **enforce mode**; until then they read **0**. The live recovery signal today is the **Recovery pass activity** panel (would-fix/fixed/escalated).\n- **`dispatch.held` (CTL-1265) is not deployed** — it reads 0. The real, live dispatch signals are **requested-vs-launched** (the gap = back-pressure) and the **'holding new-work dispatch'** daemon-log line, which is currently very active.\n- **Node identity on events is non-canonical.** Events carry `host_name`, which has ~10 raw values (incl. historical FQDN aliases like `RyansMini250233.rozich`) plus a ~16% **empty** bucket; the clean `catalyst_node_name` is only on daemon **logs**. So **$node = All** uses `.*` (keeps everything, incl. empty-host and alias events). Picking a **specific** node matches the canonical short name **exactly** (Loki anchors pipeline label-matchers) — it will MISS that node's historical FQDN aliases and empty-host events, so use **All** for complete history. CTL-1291 asks to stamp a canonical node name on events to fix this. The two **(log)** signals in the back-pressure gauge and the hold-log panel filter on `catalyst_node_name` instead — that's why they split cleanly by node.\n\n## Event vs log streams\n\nThe same `catalyst.*` `service_name` carries two record kinds. **EVENT** records have an `event_name` (this dashboard's main subject) and node = `host_name`. **LOG** records have a `log_file_name` and node = `catalyst_node_name`. Event panels use `| event_name=~\".+\" | host_name=~\"$node\"`; the two daemon-log panels use `| log_file_name=~\\`.+\\` | catalyst_node_name=~\"$node\"`.\n\n## Why `topk` on the volume panel\n\n`event_name` is high-cardinality (the `phase.<step>.<action>.<TICKET>` family is 2,900+ distinct names over 14d). A bare `sum by (event_name)` over a wide range trips Loki's 500-series cap and blanks the panel, so the volume-by-type panel is bounded with `topk(25, …)` (≈400 series at 14d, safely under the cap; 30d+ approaches it). Volume-by-service is low-cardinality and unbounded.\n\n## Acceptance-criteria map (OTL-18)\n\n- **Tier 1 — watch the ticks:** Recovery pass activity + Recovery ticks by node + Scheduler ticks (loop heartbeat).\n- **Tier 2 — decisions + raw stream:** Recovery decision & outcome stream + outcomes tables + the **Unified event-log live tail** (the Loki raw stream, filterable by `$ev`).\n- **Tier 3 — dispatch visibility:** requested-vs-launched throughput + scheduler sampling + back-pressure/hold gauge + node heartbeats + hold-log feed."
       },
       "transparent": false
     },
@@ -1554,49 +1633,53 @@
       "title": "Scheduler slots per node — current · target · effective · running",
       "description": "The autotuner's slot ceiling vs actual usage, per node, charted directly from the scheduler's own gauges (CTL-1291 promoted these to Loki structured metadata). target/effective come from phase.scheduler.autotune-gauge; current from phase.scheduler.parallelism-sampled; running_workers (actual concurrent workers = real slots in use) from autotune-gauge. When running approaches effective the node is saturated; when current/target diverge the autotuner is throttling.",
       "datasource": {
-        "type": "loki",
-        "uid": "loki"
+        "type": "prometheus",
+        "uid": "prometheus"
       },
       "targets": [
         {
           "datasource": {
-            "type": "loki",
-            "uid": "loki"
+            "type": "prometheus",
+            "uid": "prometheus"
           },
-          "expr": "avg_over_time({service_name=~\"${service:pipe}\"} | event_name=~`phase.scheduler.parallelism-sampled\\..+` | host_name=~\"${node:pipe}\" | unwrap scheduler_max_parallel_current [$__auto]) by (host_name)",
-          "refId": "A",
-          "queryType": "range",
-          "legendFormat": "{{host_name}} · current"
+          "editorMode": "code",
+          "expr": "max by (host_name) (catalyst_scheduler_max_parallel_current{service_name=~\"$service\",host_name=~\"$node\"})",
+          "legendFormat": "{{host_name}} · current",
+          "range": true,
+          "refId": "A"
         },
         {
           "datasource": {
-            "type": "loki",
-            "uid": "loki"
+            "type": "prometheus",
+            "uid": "prometheus"
           },
-          "expr": "avg_over_time({service_name=~\"${service:pipe}\"} | event_name=~`phase.scheduler.autotune-gauge\\..+` | host_name=~\"${node:pipe}\" | unwrap scheduler_max_parallel_target [$__auto]) by (host_name)",
-          "refId": "B",
-          "queryType": "range",
-          "legendFormat": "{{host_name}} · target"
+          "editorMode": "code",
+          "expr": "max by (host_name) (catalyst_scheduler_max_parallel_target{service_name=~\"$service\",host_name=~\"$node\"})",
+          "legendFormat": "{{host_name}} · target",
+          "range": true,
+          "refId": "B"
         },
         {
           "datasource": {
-            "type": "loki",
-            "uid": "loki"
+            "type": "prometheus",
+            "uid": "prometheus"
           },
-          "expr": "avg_over_time({service_name=~\"${service:pipe}\"} | event_name=~`phase.scheduler.autotune-gauge\\..+` | host_name=~\"${node:pipe}\" | unwrap scheduler_max_parallel_effective [$__auto]) by (host_name)",
-          "refId": "C",
-          "queryType": "range",
-          "legendFormat": "{{host_name}} · effective"
+          "editorMode": "code",
+          "expr": "max by (host_name) (catalyst_scheduler_max_parallel_effective{service_name=~\"$service\",host_name=~\"$node\"})",
+          "legendFormat": "{{host_name}} · effective",
+          "range": true,
+          "refId": "C"
         },
         {
           "datasource": {
-            "type": "loki",
-            "uid": "loki"
+            "type": "prometheus",
+            "uid": "prometheus"
           },
-          "expr": "avg_over_time({service_name=~\"${service:pipe}\"} | event_name=~`phase.scheduler.autotune-gauge\\..+` | host_name=~\"${node:pipe}\" | unwrap scheduler_running_workers [$__auto]) by (host_name)",
-          "refId": "D",
-          "queryType": "range",
-          "legendFormat": "{{host_name}} · running"
+          "editorMode": "code",
+          "expr": "max by (host_name) (catalyst_scheduler_running_workers{service_name=~\"$service\",host_name=~\"$node\"})",
+          "legendFormat": "{{host_name}} · running",
+          "range": true,
+          "refId": "D"
         }
       ],
       "fieldConfig": {
@@ -1666,31 +1749,33 @@
       "id": 36,
       "type": "timeseries",
       "title": "Node load & free memory per node",
-      "description": "Per-node scheduler load (1-min load average) and free-memory %, from phase.scheduler.parallelism-sampled structured metadata (CTL-1291). These are the headroom signals the autotuner reacts to: rising load1 / falling mem_free_pct is what pulls effective parallelism down. load1 on the left axis (short), free-memory % on the right axis (percent).",
+      "description": "Per-node scheduler load (1-min load average) and free-memory %, from Prometheus catalyst_scheduler_load1 / catalyst_scheduler_mem_free_pct (derived from the phase.scheduler.autotune-gauge event via the OTL-21 signal_to_metrics connector). These are the headroom signals the autotuner reacts to: rising load1 / falling mem_free_pct is what pulls effective parallelism down. load1 on the left axis (short), free-memory % on the right axis (percent).",
       "datasource": {
-        "type": "loki",
-        "uid": "loki"
+        "type": "prometheus",
+        "uid": "prometheus"
       },
       "targets": [
         {
           "datasource": {
-            "type": "loki",
-            "uid": "loki"
+            "type": "prometheus",
+            "uid": "prometheus"
           },
-          "expr": "avg_over_time({service_name=~\"${service:pipe}\"} | event_name=~`phase.scheduler.parallelism-sampled\\..+` | host_name=~\"${node:pipe}\" | unwrap scheduler_load1 [$__auto]) by (host_name)",
-          "refId": "A",
-          "queryType": "range",
-          "legendFormat": "{{host_name}} · load1"
+          "editorMode": "code",
+          "expr": "max by (host_name) (catalyst_scheduler_load1{service_name=~\"$service\",host_name=~\"$node\"})",
+          "legendFormat": "{{host_name}} · load1",
+          "range": true,
+          "refId": "A"
         },
         {
           "datasource": {
-            "type": "loki",
-            "uid": "loki"
+            "type": "prometheus",
+            "uid": "prometheus"
           },
-          "expr": "avg_over_time({service_name=~\"${service:pipe}\"} | event_name=~`phase.scheduler.parallelism-sampled\\..+` | host_name=~\"${node:pipe}\" | unwrap scheduler_mem_free_pct [$__auto]) by (host_name)",
-          "refId": "B",
-          "queryType": "range",
-          "legendFormat": "{{host_name}} · mem free %"
+          "editorMode": "code",
+          "expr": "max by (host_name) (catalyst_scheduler_mem_free_pct{service_name=~\"$service\",host_name=~\"$node\"})",
+          "legendFormat": "{{host_name}} · mem free %",
+          "range": true,
+          "refId": "B"
         }
       ],
       "fieldConfig": {

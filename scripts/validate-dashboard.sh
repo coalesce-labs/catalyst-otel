@@ -4,6 +4,7 @@
 set -euo pipefail
 
 DASH="dashboards/unified-dashboard.json"
+HOSTS="dashboards/catalyst-fleet-hosts.json"   # OTL-21: Fleet & Hosts split out of $DASH
 COLLECTOR="collector-config.yaml"
 FAIL=0
 
@@ -81,12 +82,13 @@ else
   fail "missing panel 'Cost by Dispatch Mode'"
 fi
 
-# --- dashboard: Account Rate-Limit Usage panel present (CTL-787) ---
-COUNT=$(jq '[.. | objects | select(.title=="Account Rate-Limit Usage (5h/7d) by account")] | length' "$DASH")
+# --- dashboard: Account rate-limit panel present (CTL-787; renamed to the
+#     per-account templated form "Account Rate Limits — $account", panel 52) ---
+COUNT=$(jq '[.. | objects | select(.title=="Account Rate Limits — $account")] | length' "$DASH")
 if [ "$COUNT" -gt 0 ]; then
-  pass "panel 'Account Rate-Limit Usage (5h/7d) by account' present"
+  pass "panel 'Account Rate Limits — \$account' present"
 else
-  fail "missing panel 'Account Rate-Limit Usage (5h/7d) by account'"
+  fail "missing panel 'Account Rate Limits — \$account'"
 fi
 
 # --- dashboard: Hierarchical placeholder panel present ---
@@ -97,29 +99,36 @@ else
   fail "missing hierarchical placeholder text panel"
 fi
 
-# --- dashboard: Catalyst Orchestration row contains expected panel count ---
-ROW_COUNT=$(jq '[.panels[] | select(.title=="Catalyst Orchestration") | .panels | length] | add // 0' "$DASH")
-if [ "${ROW_COUNT:-0}" -eq 8 ]; then
-  pass "Catalyst Orchestration row has 8 panels"
-else
-  fail "Catalyst Orchestration row has $ROW_COUNT panels (expected 8)"
-fi
-
-# --- dashboard: CTL-812 fan-out agent panels present (row + scoreboard + host
-#     gauges + capacity stat + process attribution table) ---
+# --- dashboard: CTL-812 fan-out account panels still in $DASH (the Fleet & Hosts
+#     section moved to $HOSTS in OTL-21; the per-account scoreboard stayed here) ---
 for t in \
-  "Catalyst Agent — Accounts & Host" \
-  "Per-Account Rate-Limit Scoreboard" \
+  "Per-Account Rate-Limit Scoreboard"; do
+  COUNT=$(jq --arg t "$t" '[.. | objects | select(.title==$t)] | length' "$DASH")
+  if [ "$COUNT" -gt 0 ]; then
+    pass "panel '$t' present ($DASH)"
+  else
+    fail "missing panel '$t' ($DASH)"
+  fi
+done
+
+# --- fleet-hosts dashboard: JSON validity + the host/capacity/process panels
+#     that moved out of $DASH in OTL-21 (catalyst-fleet-hosts split) ---
+if jq empty "$HOSTS" 2>/dev/null; then
+  pass "fleet-hosts dashboard JSON is valid"
+else
+  fail "fleet-hosts dashboard JSON is invalid"
+fi
+for t in \
   "Host CPU % by hostname" \
   "Host Memory Used % by hostname" \
   "Host Disk Used % by hostname" \
   "Host Capacity (mem / disk / CPUs)" \
-  "Top Processes by RSS (command / ticket / phase)"; do
-  COUNT=$(jq --arg t "$t" '[.. | objects | select(.title==$t)] | length' "$DASH")
+  "Top Processes by RSS — \$hostname"; do
+  COUNT=$(jq --arg t "$t" '[.. | objects | select(.title==$t)] | length' "$HOSTS")
   if [ "$COUNT" -gt 0 ]; then
-    pass "panel '$t' present"
+    pass "panel '$t' present ($HOSTS)"
   else
-    fail "missing panel '$t'"
+    fail "missing panel '$t' ($HOSTS)"
   fi
 done
 

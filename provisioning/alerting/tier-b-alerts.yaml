@@ -1,0 +1,198 @@
+apiVersion: 1
+
+# OTL-21 TIER-B alerts. Grafana-MANAGED, evaluated on the otel-stack host against
+# the OTL-20 catalyst_* counters/gauges and the OTL-21 claude_code_* connector
+# metrics. These are the "rare-event" signals that deliberately stayed off the
+# stat-tile dashboards (sparse counters under-count via increase() on the tiles)
+# but EARN their keep as alerts — the half of OTL-21 that is "logs for detail,
+# metrics for aggregation + alerting".
+#
+# Routing: no receiver named -> the root notification policy (catalyst-pager)
+# catches them (same as the OTL-31 scheduler-health rules). VISIBLE-but-silent
+# until a real pager URL is wired (CATALYST_ALERT_WEBHOOK_URL) — and per OTL-37
+# the delivery path will move to a Grafana webhook -> Catalyst Cloud envelope.
+#
+# noDataState/execErrState = OK: a quiet fleet (no escalations, slots free, no API
+# errors) returns empty/noData and MUST NOT fire — these are advisory, and the
+# expressions are written so "healthy" = empty vector.
+groups:
+  - orgId: 1
+    name: catalyst-tier-b
+    folder: Catalyst Alerts
+    interval: 1m
+    rules:
+      # 1) Recovery controller escalating to human repeatedly — auto-fix is failing.
+      - uid: catalyst_recovery_escalation_burst
+        title: Recovery escalations burst (>5/h)
+        condition: C
+        for: 5m
+        noDataState: OK
+        execErrState: OK
+        labels:
+          team: catalyst
+          signal: recovery_escalation
+          severity: warning
+        annotations:
+          summary: 'Recovery controller escalating to human > 5×/h — auto-fix failing'
+          description: >
+            The recovery controller escalated (could not auto-fix) more than 5
+            times in the last hour. A burst of escalations means the loop is
+            handing work to humans instead of self-healing — investigate the
+            recovery decision/outcome stream and the fix_class breakdown.
+          __dashboardUid__: catalyst-control-loop-live
+          __panelId__: '20'
+        data:
+          - refId: A
+            relativeTimeRange: { from: 3600, to: 0 }
+            datasourceUid: prometheus
+            model:
+              datasource: { type: prometheus, uid: prometheus }
+              editorMode: code
+              instant: true
+              range: false
+              refId: A
+              # The live escalation signal is the recovery.escalated event, surfaced
+              # as catalyst_event_total{event_entity="ticket",event_action="escalated"}
+              # (count connector, OTL-21). event_entity="ticket" scopes this to the
+              # recovery controller — verified the SOLE emitter of action=escalated
+              # over 30d — so a future non-recovery "escalated" event can't trip this
+              # "auto-fix failing" pager. The old
+              # catalyst_recovery_decision_total{recovery_decision="escalate"} is too
+              # sparse to be a reliable burst signal (recovery.decision is only emitted
+              # in enforce mode — ~1 sample in 14d), so this repoints to the escalation
+              # event that actually tracks human hand-offs.
+              expr: sum(increase(catalyst_event_total{event_entity="ticket",event_action="escalated"}[1h]))
+          - refId: B
+            relativeTimeRange: { from: 3600, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              expression: A
+              reducer: last
+              datasource: { type: __expr__, uid: __expr__ }
+          - refId: C
+            relativeTimeRange: { from: 3600, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              refId: C
+              expression: B
+              datasource: { type: __expr__, uid: __expr__ }
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [5]
+
+      # 2) Slot starvation: eligible work waiting AND zero free slots, sustained.
+      #    The PromQL returns the eligible-work count ONLY when free_slots==0, so a
+      #    healthy fleet (slots free) yields an empty vector -> noData -> OK.
+      #    Evaluated PER HOST (by host_name): the fleet runs >1 scheduler (mini +
+      #    mini-2), so a fleet-wide max(free_slots)==0 would only fire when EVERY
+      #    node is starved and miss a single starved scheduler while another has
+      #    spare slots. The `and on(host_name)` keeps each host's two gauges paired.
+      - uid: catalyst_scheduler_slot_starvation
+        title: Scheduler slot starvation (work waiting, 0 free slots)
+        condition: C
+        for: 15m
+        noDataState: OK
+        execErrState: OK
+        labels:
+          team: catalyst
+          signal: scheduler_starvation
+          severity: warning
+        annotations:
+          summary: 'Eligible work is waiting with 0 free dispatch slots for 15m'
+          description: >
+            There is eligible-but-undispatched work while the scheduler reports
+            zero free slots, sustained for 15m. The loop is saturated — either
+            parallelism is clamped too low or workers are stuck holding slots.
+            Check slots-per-node (current/target/effective/running) and the
+            back-pressure / hold signals.
+          __dashboardUid__: catalyst-fleet-scheduler-health
+          __panelId__: '8'
+        data:
+          - refId: A
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: prometheus
+            model:
+              datasource: { type: prometheus, uid: prometheus }
+              editorMode: code
+              instant: true
+              range: false
+              refId: A
+              expr: (max by (host_name) (catalyst_scheduler_eligible_work) > 0) and on(host_name) (max by (host_name) (catalyst_scheduler_free_slots) == 0)
+          - refId: B
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              expression: A
+              reducer: last
+              datasource: { type: __expr__, uid: __expr__ }
+          - refId: C
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              refId: C
+              expression: B
+              datasource: { type: __expr__, uid: __expr__ }
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+
+      # 3) Claude Code API errors (429/5xx) elevated — rate-limit / provider trouble.
+      - uid: claude_code_api_error_rate_high
+        title: Claude Code API error rate elevated (>0.2/s)
+        condition: C
+        for: 5m
+        noDataState: OK
+        execErrState: OK
+        labels:
+          team: catalyst
+          signal: claude_code_api_errors
+          severity: warning
+        annotations:
+          summary: 'Claude Code API errors (429/5xx) over 0.2/s for 5m'
+          description: >
+            claude_code_api_error_total is climbing > 0.2 errors/sec for 5m
+            (e.g. sustained 429 rate-limit or 5xx). Sessions are degraded /
+            backing off. Break down by model + status_code; check the account
+            rate-limit scoreboard.
+          __dashboardUid__: claude-code-unified
+          __panelId__: '33'
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              datasource: { type: prometheus, uid: prometheus }
+              editorMode: code
+              instant: true
+              range: false
+              refId: A
+              expr: sum(rate(claude_code_api_error_total[5m]))
+          - refId: B
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              expression: A
+              reducer: last
+              datasource: { type: __expr__, uid: __expr__ }
+          - refId: C
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              refId: C
+              expression: B
+              datasource: { type: __expr__, uid: __expr__ }
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0.2]

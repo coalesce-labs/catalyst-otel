@@ -48,11 +48,11 @@
               },
               {
                 "color": "yellow",
-                "value": 2.0
+                "value": 2
               },
               {
                 "color": "red",
-                "value": 3.0
+                "value": 3
               }
             ]
           },
@@ -109,11 +109,11 @@
               },
               {
                 "color": "yellow",
-                "value": 1.0
+                "value": 1
               },
               {
                 "color": "red",
-                "value": 3.0
+                "value": 3
               }
             ]
           },
@@ -227,11 +227,11 @@
               },
               {
                 "color": "yellow",
-                "value": 1.0
+                "value": 1
               },
               {
                 "color": "red",
-                "value": 3.0
+                "value": 3
               }
             ]
           },
@@ -276,7 +276,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Rolling p99 of synchronous tick time. Should fall below the red 3s line and stay as the tick goes async.",
+      "description": "Rolling p99 of synchronous tick time. Should fall below the red 3s line and stay as the tick goes async. Orange lines = deploy annotations. (Was running ~2\u201316s on the recovery-pass front during the OTL-31 baseline.)",
       "fieldConfig": {
         "defaults": {
           "custom": {
@@ -297,7 +297,7 @@
               },
               {
                 "color": "red",
-                "value": 3.0
+                "value": 3
               }
             ]
           },
@@ -333,14 +333,15 @@
             "uid": "prometheus"
           },
           "refId": "A",
-          "expr": "histogram_quantile(0.99, sum by (host_name, le) (rate(catalyst_scheduler_tick_duration_seconds_bucket[5m])))",
+          "expr": "histogram_quantile(0.99, sum by (host_name, le) (rate(catalyst_scheduler_tick_duration_seconds_bucket[$__interval])))",
           "editorMode": "code",
           "instant": false,
           "range": true,
-          "legendFormat": "{{host_name}}"
+          "legendFormat": "{{host_name}}",
+          "interval": "$bucket"
         }
       ],
-      "title": "Tick duration p99 by node \u2014 still spiky 2\u201316s (recovery-pass front); orange lines = deploys",
+      "title": "Tick duration p99 by node",
       "type": "timeseries"
     },
     {
@@ -348,7 +349,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "The before/after view. recovery-pass (dispatch prelude) and new-work-pull (Linear hydration) are the two synchronous blockers; CTL-1331/1335 move them off-tick.",
+      "description": "The before/after view. recovery-pass (dispatch prelude) and new-work-pull (Linear hydration) are the two synchronous blockers; CTL-1331/1335 move them off-tick. Breakdown by pass type. (Reclaim born ~1ms at lap-split \u2014 not a crater; recovery-pass & phantom-sweep dominate during the OTL-31 baseline.)",
       "fieldConfig": {
         "defaults": {
           "custom": {
@@ -389,11 +390,12 @@
             "uid": "prometheus"
           },
           "refId": "A",
-          "expr": "histogram_quantile(0.99, sum by (host_name, le) (rate(catalyst_scheduler_pass_duration_seconds_bucket{pass=\"recovery-pass\"}[5m])))",
+          "expr": "histogram_quantile(0.99, sum by (host_name, le) (rate(catalyst_scheduler_pass_duration_seconds_bucket{pass=\"recovery-pass\"}[$__interval])))",
           "editorMode": "code",
           "instant": false,
           "range": true,
-          "legendFormat": "recovery-pass \u00b7 {{host_name}}"
+          "legendFormat": "recovery-pass \u00b7 {{host_name}}",
+          "interval": "$bucket"
         },
         {
           "datasource": {
@@ -401,11 +403,12 @@
             "uid": "prometheus"
           },
           "refId": "B",
-          "expr": "histogram_quantile(0.99, sum by (host_name, le) (rate(catalyst_scheduler_pass_duration_seconds_bucket{pass=\"new-work-pull\"}[5m])))",
+          "expr": "histogram_quantile(0.99, sum by (host_name, le) (rate(catalyst_scheduler_pass_duration_seconds_bucket{pass=\"new-work-pull\"}[$__interval])))",
           "editorMode": "code",
           "instant": false,
           "range": true,
-          "legendFormat": "new-work-pull \u00b7 {{host_name}}"
+          "legendFormat": "new-work-pull \u00b7 {{host_name}}",
+          "interval": "$bucket"
         },
         {
           "datasource": {
@@ -413,11 +416,12 @@
             "uid": "prometheus"
           },
           "refId": "C",
-          "expr": "histogram_quantile(0.99, sum by (host_name, le) (rate(catalyst_scheduler_pass_duration_seconds_bucket{pass=\"reclaim\"}[5m])))",
+          "expr": "histogram_quantile(0.99, sum by (host_name, le) (rate(catalyst_scheduler_pass_duration_seconds_bucket{pass=\"reclaim\"}[$__interval])))",
           "editorMode": "code",
           "instant": false,
           "range": true,
-          "legendFormat": "reclaim \u00b7 {{host_name}}"
+          "legendFormat": "reclaim \u00b7 {{host_name}}",
+          "interval": "$bucket"
         },
         {
           "datasource": {
@@ -425,14 +429,15 @@
             "uid": "prometheus"
           },
           "refId": "D",
-          "expr": "histogram_quantile(0.99, sum by (host_name, le) (rate(catalyst_scheduler_pass_duration_seconds_bucket{pass=\"phantom-sweep\"}[5m])))",
+          "expr": "histogram_quantile(0.99, sum by (host_name, le) (rate(catalyst_scheduler_pass_duration_seconds_bucket{pass=\"phantom-sweep\"}[$__interval])))",
           "editorMode": "code",
           "instant": false,
           "range": true,
-          "legendFormat": "phantom-sweep \u00b7 {{host_name}}"
+          "legendFormat": "phantom-sweep \u00b7 {{host_name}}",
+          "interval": "$bucket"
         }
       ],
-      "title": "Per-pass p99 by node \u2014 reclaim flat (born ~1ms @ lap-split \u2014 NOT a crater); recovery-pass & phantom-sweep now dominate",
+      "title": "Per-pass p99 by node",
       "type": "timeseries"
     },
     {
@@ -440,16 +445,17 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "resolved vs timeout per 5m. A rising timeout band is the direct wedge signal (rate(outcome=timeout) > 0).",
+      "description": "resolved vs timeout per 5m. A rising timeout band is the direct wedge signal (rate(outcome=timeout) > 0). Unstacked so the timeout series (the wedge alarm) is visible rather than a sliver under resolved.",
       "fieldConfig": {
         "defaults": {
           "custom": {
             "drawStyle": "line",
-            "fillOpacity": 20,
+            "fillOpacity": 10,
             "lineWidth": 2,
             "showPoints": "never",
             "stacking": {
-              "mode": "normal"
+              "mode": "none",
+              "group": "A"
             }
           },
           "unit": "short"
@@ -514,11 +520,12 @@
             "uid": "prometheus"
           },
           "refId": "A",
-          "expr": "sum by (liveness_outcome) (rate(catalyst_liveness_refresh_total[5m]))",
+          "expr": "sum by (liveness_outcome) (rate(catalyst_liveness_refresh_total[$__interval]))",
           "editorMode": "code",
           "instant": false,
           "range": true,
-          "legendFormat": "{{liveness_outcome}}"
+          "legendFormat": "{{liveness_outcome}}",
+          "interval": "$bucket"
         }
       ],
       "title": "Liveness refresh outcomes \u2014 timeout = wedge alarm",
@@ -574,5 +581,69 @@
   "timezone": "browser",
   "title": "Fleet \u00b7 Scheduler Health",
   "uid": "catalyst-fleet-scheduler-health",
-  "version": 2
+  "version": 2,
+  "templating": {
+    "list": [
+      {
+        "name": "bucket",
+        "label": "Bucket",
+        "type": "interval",
+        "description": "Bucket width for the rate/histogram timeseries (floor 1m \u2248 4\u00d7 the 15s scrape; default 5m).",
+        "datasource": null,
+        "query": "1m,5m,15m,30m,1h,6h,1d",
+        "auto": true,
+        "auto_count": 30,
+        "auto_min": "1m",
+        "current": {
+          "text": "5m",
+          "value": "5m"
+        },
+        "options": [
+          {
+            "text": "auto",
+            "value": "$__auto_interval_bucket",
+            "selected": false
+          },
+          {
+            "text": "1m",
+            "value": "1m",
+            "selected": false
+          },
+          {
+            "text": "5m",
+            "value": "5m",
+            "selected": true
+          },
+          {
+            "text": "15m",
+            "value": "15m",
+            "selected": false
+          },
+          {
+            "text": "30m",
+            "value": "30m",
+            "selected": false
+          },
+          {
+            "text": "1h",
+            "value": "1h",
+            "selected": false
+          },
+          {
+            "text": "6h",
+            "value": "6h",
+            "selected": false
+          },
+          {
+            "text": "1d",
+            "value": "1d",
+            "selected": false
+          }
+        ],
+        "refresh": 2,
+        "hide": 0,
+        "skipUrlSync": false
+      }
+    ]
+  }
 }

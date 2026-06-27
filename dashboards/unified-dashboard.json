@@ -271,6 +271,7 @@
     {
       "id": 6,
       "title": "Tool Calls",
+      "description": "Fleet-wide total tool executions (claude_code_tool_result_total, OTL-21 connector). This connector metric carries only low-card resource labels (no project / branch / hostname / linear_key), so it does NOT narrow with the $project / $branch / $hostname filters — it is a fleet aggregate by design. Use the by-project / by-ticket tool panels (Loki) to slice.",
       "type": "stat",
       "gridPos": {
         "h": 4,
@@ -279,15 +280,21 @@
         "y": 1
       },
       "datasource": {
-        "type": "loki",
-        "uid": "loki"
+        "type": "prometheus",
+        "uid": "prometheus"
       },
       "targets": [
         {
-          "expr": "sum(count_over_time({service_name=~\"claude-code.*\"} |= \"claude_code.tool_result\" | project=~\"$project\" | branch=~\"$branch\" | hostname=~\"$hostname\" [$__range]))",
-          "legendFormat": "Tool Calls",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum(increase(claude_code_tool_result_total[$__range]))",
           "instant": true,
-          "refId": "A"
+          "range": false,
+          "refId": "A",
+          "legendFormat": "Tool Calls"
         }
       ],
       "fieldConfig": {
@@ -342,9 +349,10 @@
       },
       "targets": [
         {
-          "expr": "sum by (display) (label_replace(label_replace(sum by (host_name, hostname) (increase(claude_code_cost_usage_USD_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"}[$__rate_interval])), \"display\", \"$1\", \"hostname\", \"(.+)\"), \"display\", \"$1\", \"host_name\", \"(.+)\"))",
+          "expr": "sum by (display) (label_replace(label_replace(sum by (host_name, hostname) (increase(claude_code_cost_usage_USD_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"}[$__interval])), \"display\", \"$1\", \"hostname\", \"(.+)\"), \"display\", \"$1\", \"host_name\", \"(.+)\"))",
           "legendFormat": "{{display}}",
-          "refId": "A"
+          "refId": "A",
+          "interval": "$bucket"
         }
       ],
       "fieldConfig": {
@@ -417,9 +425,10 @@
       },
       "targets": [
         {
-          "expr": "sum by (display) (label_replace(label_replace(sum by (host_name, hostname) (increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"}[$__rate_interval])), \"display\", \"$1\", \"hostname\", \"(.+)\"), \"display\", \"$1\", \"host_name\", \"(.+)\"))",
+          "expr": "sum by (display) (label_replace(label_replace(sum by (host_name, hostname) (increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"}[$__interval])), \"display\", \"$1\", \"hostname\", \"(.+)\"), \"display\", \"$1\", \"host_name\", \"(.+)\"))",
           "legendFormat": "{{display}}",
-          "refId": "A"
+          "refId": "A",
+          "interval": "$bucket"
         }
       ],
       "fieldConfig": {
@@ -492,9 +501,10 @@
       },
       "targets": [
         {
-          "expr": "sum by (model_family) (label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(sum by (model) (increase(claude_code_cost_usage_USD_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__rate_interval])), \"model_family\", \"$1\", \"model\", \"(.+)\"), \"model_family\", \"$1 $2.$3\", \"model\", \"claude-([a-z]+)-([0-9]+)-([0-9]+).*\"), \"model_family\", \"$1 $2\", \"model\", \"claude-([a-z]+)-([0-9]+)(\\\\[[^]]*\\\\])?$\"), \"model_family\", \"Opus $1\", \"model_family\", \"opus (.*)\"), \"model_family\", \"Haiku $1\", \"model_family\", \"haiku (.*)\"), \"model_family\", \"Sonnet $1\", \"model_family\", \"sonnet (.*)\"), \"model_family\", \"Fable $1\", \"model_family\", \"fable (.*)\"))",
+          "expr": "sum by (model_family) (label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(sum by (model) (increase(claude_code_cost_usage_USD_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__interval])), \"model_family\", \"$1\", \"model\", \"(.+)\"), \"model_family\", \"$1 $2.$3\", \"model\", \"claude-([a-z]+)-([0-9]+)-([0-9]+).*\"), \"model_family\", \"$1 $2\", \"model\", \"claude-([a-z]+)-([0-9]+)(\\\\[[^]]*\\\\])?$\"), \"model_family\", \"Opus $1\", \"model_family\", \"opus (.*)\"), \"model_family\", \"Haiku $1\", \"model_family\", \"haiku (.*)\"), \"model_family\", \"Sonnet $1\", \"model_family\", \"sonnet (.*)\"), \"model_family\", \"Fable $1\", \"model_family\", \"fable (.*)\"))",
           "legendFormat": "{{model_family}}",
-          "refId": "A"
+          "refId": "A",
+          "interval": "$bucket"
         }
       ],
       "fieldConfig": {
@@ -613,9 +623,10 @@
       },
       "targets": [
         {
-          "expr": "sum by (type) (increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__rate_interval]))",
+          "expr": "sum by (type) (increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__interval]))",
           "legendFormat": "{{type}}",
-          "refId": "A"
+          "refId": "A",
+          "interval": "$bucket"
         }
       ],
       "fieldConfig": {
@@ -1423,9 +1434,10 @@
           },
           "targets": [
             {
-              "expr": "topk(10, sum by (linear_key) (increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",linear_key!=\"\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__rate_interval])))",
+              "expr": "topk(10, sum by (linear_key) (increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",linear_key!=\"\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__interval])))",
               "legendFormat": "{{linear_key}}",
-              "refId": "A"
+              "refId": "A",
+              "interval": "$bucket"
             }
           ],
           "fieldConfig": {
@@ -1559,9 +1571,10 @@
           },
           "targets": [
             {
-              "expr": "topk(10, sum by (project) (increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",project!=\"\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__rate_interval])))",
+              "expr": "topk(10, sum by (project) (increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",project!=\"\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__interval])))",
               "legendFormat": "{{project}}",
-              "refId": "A"
+              "refId": "A",
+              "interval": "$bucket"
             }
           ],
           "fieldConfig": {
@@ -2181,9 +2194,10 @@
           },
           "targets": [
             {
-              "expr": "topk(10, sum by (session_id, project, branch, linear_key) (rate(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__rate_interval])))",
+              "expr": "topk(10, sum by (session_id, project, branch, linear_key) (rate(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__interval])))",
               "legendFormat": "{{project}}/{{branch}} ({{linear_key}})",
-              "refId": "A"
+              "refId": "A",
+              "interval": "$bucket"
             }
           ],
           "fieldConfig": {
@@ -2541,19 +2555,38 @@
             "y": 36
           },
           "datasource": {
-            "type": "loki",
-            "uid": "loki"
+            "type": "prometheus",
+            "uid": "prometheus"
           },
           "targets": [
             {
-              "expr": "avg by (model_family) (label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(avg by (model) (avg_over_time({service_name=~\"claude-code.*\"} |= \"claude_code.api_request\" | project=~\"$project\" | branch=~\"$branch\" | hostname=~\"$hostname\" | unwrap duration_ms [$__auto])), \"model_family\", \"$1\", \"model\", \"(.+)\"), \"model_family\", \"$1 $2.$3\", \"model\", \"claude-([a-z]+)-([0-9]+)-([0-9]+).*\"), \"model_family\", \"$1 $2\", \"model\", \"claude-([a-z]+)-([0-9]+)(\\\\[[^]]*\\\\])?$\"), \"model_family\", \"Opus $1\", \"model_family\", \"opus (.*)\"), \"model_family\", \"Haiku $1\", \"model_family\", \"haiku (.*)\"), \"model_family\", \"Sonnet $1\", \"model_family\", \"sonnet (.*)\"), \"model_family\", \"Fable $1\", \"model_family\", \"fable (.*)\"))",
-              "legendFormat": "{{model_family}}",
-              "refId": "A"
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "editorMode": "code",
+              "expr": "histogram_quantile(0.5, sum by (le, model) (rate(claude_code_api_request_duration_seconds_bucket[$__interval])))",
+              "legendFormat": "p50 {{model}}",
+              "range": true,
+              "refId": "A",
+              "interval": "$bucket"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "editorMode": "code",
+              "expr": "histogram_quantile(0.95, sum by (le, model) (rate(claude_code_api_request_duration_seconds_bucket[$__interval])))",
+              "legendFormat": "p95 {{model}}",
+              "range": true,
+              "refId": "B",
+              "interval": "$bucket"
             }
           ],
           "fieldConfig": {
             "defaults": {
-              "unit": "ms",
+              "unit": "s",
               "custom": {
                 "drawStyle": "line",
                 "lineWidth": 2,
@@ -2662,14 +2695,21 @@
             "y": 43
           },
           "datasource": {
-            "type": "loki",
-            "uid": "loki"
+            "type": "prometheus",
+            "uid": "prometheus"
           },
           "targets": [
             {
-              "expr": "sum by (tool_name) (count_over_time({service_name=~\"claude-code.*\"} |= \"claude_code.tool_result\" | project=~\"$project\" | branch=~\"$branch\" | hostname=~\"$hostname\" [$__auto]))",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "editorMode": "code",
+              "expr": "sum by (tool_name) (increase(claude_code_tool_result_total[$__interval]))",
               "legendFormat": "{{tool_name}}",
-              "refId": "A"
+              "range": true,
+              "refId": "A",
+              "interval": "$bucket"
             }
           ],
           "fieldConfig": {
@@ -2797,15 +2837,21 @@
             "y": 50
           },
           "datasource": {
-            "type": "loki",
-            "uid": "loki"
+            "type": "prometheus",
+            "uid": "prometheus"
           },
           "targets": [
             {
-              "expr": "sort_desc(topk(15, sum by (tool_name) (count_over_time({service_name=~\"claude-code.*\"} |= \"claude_code.tool_result\" | project=~\"$project\" | branch=~\"$branch\" | hostname=~\"$hostname\" [$__range]))))",
-              "legendFormat": "{{tool_name}}",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "editorMode": "code",
+              "expr": "sort_desc(topk(15, sum by (tool_name) (increase(claude_code_tool_result_total[$__range]))))",
               "instant": true,
-              "refId": "A"
+              "range": false,
+              "refId": "A",
+              "legendFormat": "{{tool_name}}"
             }
           ],
           "fieldConfig": {
@@ -2960,14 +3006,21 @@
             "y": 58
           },
           "datasource": {
-            "type": "loki",
-            "uid": "loki"
+            "type": "prometheus",
+            "uid": "prometheus"
           },
           "targets": [
             {
-              "expr": "100 * sum by (tool_name) (count_over_time({service_name=~\"claude-code.*\"} |= \"claude_code.tool_result\" | success = \"true\" | project=~\"$project\" | branch=~\"$branch\" | hostname=~\"$hostname\" [$__auto])) / sum by (tool_name) (count_over_time({service_name=~\"claude-code.*\"} |= \"claude_code.tool_result\" | project=~\"$project\" | branch=~\"$branch\" | hostname=~\"$hostname\" [$__auto]))",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "editorMode": "code",
+              "expr": "100 * sum by (tool_name) (increase(claude_code_tool_result_total{success=\"true\"}[$__interval])) / sum by (tool_name) (increase(claude_code_tool_result_total[$__interval]))",
               "legendFormat": "{{tool_name}}",
-              "refId": "A"
+              "range": true,
+              "refId": "A",
+              "interval": "$bucket"
             }
           ],
           "fieldConfig": {
@@ -3128,14 +3181,16 @@
           },
           "targets": [
             {
-              "expr": "sum(rate(claude_code_lines_of_code_count_total{job=\"otel-collector\",type=\"added\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__rate_interval])) * 60",
+              "expr": "sum(rate(claude_code_lines_of_code_count_total{job=\"otel-collector\",type=\"added\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__interval])) * 60",
               "legendFormat": "Lines Added",
-              "refId": "A"
+              "refId": "A",
+              "interval": "$bucket"
             },
             {
-              "expr": "-sum(rate(claude_code_lines_of_code_count_total{job=\"otel-collector\",type=\"removed\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__rate_interval])) * 60",
+              "expr": "-sum(rate(claude_code_lines_of_code_count_total{job=\"otel-collector\",type=\"removed\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__interval])) * 60",
               "legendFormat": "Lines Removed",
-              "refId": "B"
+              "refId": "B",
+              "interval": "$bucket"
             }
           ],
           "fieldConfig": {
@@ -3145,7 +3200,7 @@
                 "drawStyle": "bars",
                 "fillOpacity": 80,
                 "stacking": {
-                  "mode": "normal",
+                  "mode": "none",
                   "group": "A"
                 },
                 "barAlignment": 0,
@@ -3239,9 +3294,10 @@
           },
           "targets": [
             {
-              "expr": "sum(increase(claude_code_pull_request_count_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__rate_interval]))",
+              "expr": "sum(increase(claude_code_pull_request_count_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__interval]))",
               "legendFormat": "PRs created",
-              "refId": "A"
+              "refId": "A",
+              "interval": "$bucket"
             }
           ],
           "fieldConfig": {
@@ -3315,9 +3371,10 @@
           },
           "targets": [
             {
-              "expr": "sum(increase(claude_code_commit_count_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__rate_interval]))",
+              "expr": "sum(increase(claude_code_commit_count_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__interval]))",
               "legendFormat": "Commits created",
-              "refId": "A"
+              "refId": "A",
+              "interval": "$bucket"
             }
           ],
           "fieldConfig": {
@@ -3374,1088 +3431,6 @@
               "sort": "none"
             }
           }
-        }
-      ]
-    },
-    {
-      "type": "row",
-      "title": "\u2464 Fleet & Hosts",
-      "collapsed": true,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 37
-      },
-      "id": 205,
-      "panels": [
-        {
-          "id": 62,
-          "type": "gauge",
-          "title": "Host CPU % by hostname",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "gridPos": {
-            "h": 8,
-            "w": 6,
-            "x": 0,
-            "y": 38
-          },
-          "targets": [
-            {
-              "expr": "avg by (host_name) (system_cpu_utilization_ratio{job=\"otel-collector\"}) * 100",
-              "refId": "A",
-              "datasource": {
-                "type": "prometheus",
-                "uid": "prometheus"
-              },
-              "instant": false,
-              "legendFormat": "{{host_name}}",
-              "range": true
-            }
-          ],
-          "fieldConfig": {
-            "defaults": {
-              "unit": "percent",
-              "min": 0,
-              "max": 100,
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "green",
-                    "value": null
-                  },
-                  {
-                    "color": "yellow",
-                    "value": 70
-                  },
-                  {
-                    "color": "red",
-                    "value": 90
-                  }
-                ]
-              },
-              "mappings": [],
-              "displayName": "${__field.labels.host_name}"
-            },
-            "overrides": []
-          },
-          "options": {
-            "reduceOptions": {
-              "values": false,
-              "calcs": [
-                "lastNotNull"
-              ],
-              "fields": ""
-            },
-            "orientation": "auto",
-            "showThresholdLabels": false,
-            "showThresholdMarkers": true
-          }
-        },
-        {
-          "id": 63,
-          "type": "gauge",
-          "title": "Host Memory Used % by hostname",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "gridPos": {
-            "h": 8,
-            "w": 6,
-            "x": 6,
-            "y": 38
-          },
-          "targets": [
-            {
-              "expr": "avg by (host_name) (system_memory_utilization_ratio{job=\"otel-collector\"}) * 100",
-              "refId": "A",
-              "datasource": {
-                "type": "prometheus",
-                "uid": "prometheus"
-              },
-              "instant": false,
-              "legendFormat": "{{host_name}}",
-              "range": true
-            }
-          ],
-          "fieldConfig": {
-            "defaults": {
-              "unit": "percent",
-              "min": 0,
-              "max": 100,
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "green",
-                    "value": null
-                  },
-                  {
-                    "color": "yellow",
-                    "value": 70
-                  },
-                  {
-                    "color": "red",
-                    "value": 90
-                  }
-                ]
-              },
-              "mappings": [],
-              "displayName": "${__field.labels.host_name}"
-            },
-            "overrides": []
-          },
-          "options": {
-            "reduceOptions": {
-              "values": false,
-              "calcs": [
-                "lastNotNull"
-              ],
-              "fields": ""
-            },
-            "orientation": "auto",
-            "showThresholdLabels": false,
-            "showThresholdMarkers": true
-          }
-        },
-        {
-          "id": 64,
-          "type": "gauge",
-          "title": "Host Disk Used % by hostname",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "gridPos": {
-            "h": 8,
-            "w": 6,
-            "x": 12,
-            "y": 38
-          },
-          "targets": [
-            {
-              "expr": "avg by (host_name) (system_filesystem_utilization_ratio{job=\"otel-collector\"}) * 100",
-              "refId": "A",
-              "datasource": {
-                "type": "prometheus",
-                "uid": "prometheus"
-              },
-              "instant": false,
-              "legendFormat": "{{host_name}}",
-              "range": true
-            }
-          ],
-          "fieldConfig": {
-            "defaults": {
-              "unit": "percent",
-              "min": 0,
-              "max": 100,
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "green",
-                    "value": null
-                  },
-                  {
-                    "color": "yellow",
-                    "value": 70
-                  },
-                  {
-                    "color": "red",
-                    "value": 90
-                  }
-                ]
-              },
-              "mappings": [],
-              "displayName": "${__field.labels.host_name}"
-            },
-            "overrides": []
-          },
-          "options": {
-            "reduceOptions": {
-              "values": false,
-              "calcs": [
-                "lastNotNull"
-              ],
-              "fields": ""
-            },
-            "orientation": "auto",
-            "showThresholdLabels": false,
-            "showThresholdMarkers": true
-          }
-        },
-        {
-          "id": 65,
-          "type": "stat",
-          "title": "Host Capacity (mem / disk / CPUs)",
-          "datasource": {
-            "type": "loki",
-            "uid": "loki"
-          },
-          "gridPos": {
-            "h": 8,
-            "w": 6,
-            "x": 18,
-            "y": 38
-          },
-          "targets": [
-            {
-              "expr": "last_over_time({service_name=\"catalyst.agent\", hostname=~\"$hostname\"} |= \"host.metrics.sampled\" | unwrap host_mem_total_mb | __error__=\"\" [$__auto]) by (hostname)",
-              "refId": "A",
-              "datasource": {
-                "type": "loki",
-                "uid": "loki"
-              },
-              "instant": false,
-              "legendFormat": "mem - {{hostname}}",
-              "range": true
-            },
-            {
-              "expr": "last_over_time({service_name=\"catalyst.agent\", hostname=~\"$hostname\"} |= \"host.metrics.sampled\" | unwrap host_disk_total_gb | __error__=\"\" [$__auto]) by (hostname)",
-              "refId": "B",
-              "datasource": {
-                "type": "loki",
-                "uid": "loki"
-              },
-              "instant": false,
-              "legendFormat": "disk - {{hostname}}",
-              "range": true
-            },
-            {
-              "expr": "last_over_time({service_name=\"catalyst.agent\", hostname=~\"$hostname\"} |= \"host.metrics.sampled\" | unwrap host_cpu_count | __error__=\"\" [$__auto]) by (hostname)",
-              "refId": "C",
-              "datasource": {
-                "type": "loki",
-                "uid": "loki"
-              },
-              "instant": false,
-              "legendFormat": "CPUs - {{hostname}}",
-              "range": true
-            }
-          ],
-          "fieldConfig": {
-            "defaults": {
-              "unit": "short",
-              "color": {
-                "mode": "fixed",
-                "fixedColor": "text"
-              },
-              "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "blue",
-                    "value": null
-                  }
-                ]
-              }
-            },
-            "overrides": [
-              {
-                "matcher": {
-                  "id": "byFrameRefID",
-                  "options": "A"
-                },
-                "properties": [
-                  {
-                    "id": "unit",
-                    "value": "decmbytes"
-                  },
-                  {
-                    "id": "displayName",
-                    "value": "Memory \u2014 ${__field.labels.hostname}"
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byFrameRefID",
-                  "options": "B"
-                },
-                "properties": [
-                  {
-                    "id": "unit",
-                    "value": "decgbytes"
-                  },
-                  {
-                    "id": "displayName",
-                    "value": "Disk \u2014 ${__field.labels.hostname}"
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byFrameRefID",
-                  "options": "C"
-                },
-                "properties": [
-                  {
-                    "id": "unit",
-                    "value": "short"
-                  },
-                  {
-                    "id": "displayName",
-                    "value": "CPU cores \u2014 ${__field.labels.hostname}"
-                  }
-                ]
-              }
-            ]
-          },
-          "options": {
-            "reduceOptions": {
-              "values": false,
-              "calcs": [
-                "lastNotNull"
-              ],
-              "fields": ""
-            },
-            "orientation": "auto",
-            "textMode": "value_and_name",
-            "colorMode": "none",
-            "graphMode": "none",
-            "justifyMode": "auto"
-          }
-        },
-        {
-          "id": 66,
-          "type": "table",
-          "title": "Top Processes by RSS (command / ticket / phase)",
-          "datasource": {
-            "type": "loki",
-            "uid": "loki"
-          },
-          "gridPos": {
-            "h": 9,
-            "w": 24,
-            "x": 0,
-            "y": 46
-          },
-          "targets": [
-            {
-              "expr": "topk(20, max_over_time({service_name=\"catalyst.agent\", hostname=~\"$hostname\"} |= \"host.process.sampled\" | label_format proc=\"{{.hostname}} / {{.process_command}} / {{.process_ticket}} / {{.process_phase}}\" | unwrap process_rss_mb | __error__=\"\" [$__range]) by (proc, hostname, process_command, process_ticket, process_phase))",
-              "refId": "A",
-              "datasource": {
-                "type": "loki",
-                "uid": "loki"
-              },
-              "instant": true
-            },
-            {
-              "expr": "max_over_time({service_name=\"catalyst.agent\", hostname=~\"$hostname\"} |= \"host.process.sampled\" | label_format proc=\"{{.hostname}} / {{.process_command}} / {{.process_ticket}} / {{.process_phase}}\" | unwrap process_cpu_pct | __error__=\"\" [$__range]) by (proc, hostname, process_command, process_ticket, process_phase)",
-              "refId": "B",
-              "datasource": {
-                "type": "loki",
-                "uid": "loki"
-              },
-              "instant": true
-            }
-          ],
-          "transformations": [
-            {
-              "id": "joinByField",
-              "options": {
-                "byField": "proc",
-                "mode": "outer"
-              }
-            },
-            {
-              "id": "organize",
-              "options": {
-                "excludeByName": {
-                  "Time": true,
-                  "Time 1": true,
-                  "Time 2": true,
-                  "proc": true,
-                  "process_command 2": true,
-                  "process_ticket 2": true,
-                  "process_phase 2": true,
-                  "hostname 2": true
-                },
-                "renameByName": {
-                  "process_command 1": "Command",
-                  "process_command": "Command",
-                  "Value #A": "RSS MB",
-                  "Value #B": "CPU %",
-                  "process_ticket 1": "Ticket",
-                  "process_phase 1": "Phase",
-                  "process_ticket": "Ticket",
-                  "process_phase": "Phase",
-                  "hostname 1": "Host"
-                },
-                "indexByName": {
-                  "process_command 1": 0,
-                  "Value #A": 2,
-                  "Value #B": 3,
-                  "process_ticket 1": 4,
-                  "process_phase 1": 5,
-                  "hostname 1": 1
-                }
-              }
-            },
-            {
-              "id": "sortBy",
-              "options": {
-                "fields": "",
-                "sort": [
-                  {
-                    "field": "RSS MB",
-                    "desc": true
-                  }
-                ]
-              }
-            }
-          ],
-          "fieldConfig": {
-            "defaults": {
-              "custom": {
-                "align": "auto",
-                "cellOptions": {
-                  "type": "auto"
-                },
-                "filterable": true
-              },
-              "mappings": []
-            },
-            "overrides": [
-              {
-                "matcher": {
-                  "id": "byName",
-                  "options": "RSS MB"
-                },
-                "properties": [
-                  {
-                    "id": "unit",
-                    "value": "decmbytes"
-                  },
-                  {
-                    "id": "custom.cellOptions",
-                    "value": {
-                      "type": "gauge",
-                      "mode": "gradient"
-                    }
-                  },
-                  {
-                    "id": "thresholds",
-                    "value": {
-                      "mode": "absolute",
-                      "steps": [
-                        {
-                          "color": "green",
-                          "value": null
-                        },
-                        {
-                          "color": "yellow",
-                          "value": 1024
-                        },
-                        {
-                          "color": "red",
-                          "value": 4096
-                        }
-                      ]
-                    }
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byName",
-                  "options": "CPU %"
-                },
-                "properties": [
-                  {
-                    "id": "unit",
-                    "value": "percent"
-                  },
-                  {
-                    "id": "custom.cellOptions",
-                    "value": {
-                      "type": "color-text"
-                    }
-                  },
-                  {
-                    "id": "thresholds",
-                    "value": {
-                      "mode": "absolute",
-                      "steps": [
-                        {
-                          "color": "green",
-                          "value": null
-                        },
-                        {
-                          "color": "yellow",
-                          "value": 50
-                        },
-                        {
-                          "color": "red",
-                          "value": 90
-                        }
-                      ]
-                    }
-                  }
-                ]
-              }
-            ]
-          },
-          "options": {
-            "showHeader": true,
-            "cellHeight": "sm",
-            "footer": {
-              "show": false,
-              "reducer": [
-                "sum"
-              ],
-              "countRows": false,
-              "fields": ""
-            }
-          }
-        },
-        {
-          "id": 70,
-          "type": "timeseries",
-          "title": "CPU",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "gridPos": {
-            "y": 55,
-            "h": 8,
-            "w": 24,
-            "x": 0
-          },
-          "targets": [
-            {
-              "expr": "avg by (host_name) (system_cpu_utilization_ratio{host_name=~\"$hostname\", job=\"otel-collector\"}) * 100",
-              "refId": "A",
-              "datasource": {
-                "type": "prometheus",
-                "uid": "prometheus"
-              },
-              "instant": false,
-              "legendFormat": "{{host_name}}",
-              "range": true
-            }
-          ],
-          "fieldConfig": {
-            "defaults": {
-              "unit": "percent",
-              "min": 0,
-              "max": 100,
-              "custom": {
-                "drawStyle": "line",
-                "lineWidth": 2,
-                "fillOpacity": 10,
-                "spanNulls": true,
-                "showPoints": "never",
-                "lineInterpolation": "smooth"
-              },
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "green",
-                    "value": null
-                  },
-                  {
-                    "color": "yellow",
-                    "value": 70
-                  },
-                  {
-                    "color": "red",
-                    "value": 90
-                  }
-                ]
-              },
-              "mappings": []
-            },
-            "overrides": []
-          },
-          "options": {
-            "legend": {
-              "displayMode": "table",
-              "placement": "right",
-              "calcs": [
-                "mean",
-                "max"
-              ],
-              "showLegend": true,
-              "width": 240,
-              "sortBy": "Mean",
-              "sortDesc": true
-            },
-            "tooltip": {
-              "mode": "multi",
-              "sort": "desc"
-            }
-          }
-        },
-        {
-          "id": 71,
-          "type": "timeseries",
-          "title": "Memory",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "gridPos": {
-            "y": 63,
-            "h": 8,
-            "w": 24,
-            "x": 0
-          },
-          "targets": [
-            {
-              "expr": "avg by (host_name) (system_memory_utilization_ratio{host_name=~\"$hostname\", job=\"otel-collector\"}) * 100",
-              "refId": "A",
-              "datasource": {
-                "type": "prometheus",
-                "uid": "prometheus"
-              },
-              "instant": false,
-              "legendFormat": "{{host_name}}",
-              "range": true
-            }
-          ],
-          "fieldConfig": {
-            "defaults": {
-              "unit": "percent",
-              "min": 0,
-              "max": 100,
-              "custom": {
-                "drawStyle": "line",
-                "lineWidth": 2,
-                "fillOpacity": 10,
-                "spanNulls": true,
-                "showPoints": "never",
-                "lineInterpolation": "smooth"
-              },
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "green",
-                    "value": null
-                  },
-                  {
-                    "color": "yellow",
-                    "value": 70
-                  },
-                  {
-                    "color": "red",
-                    "value": 90
-                  }
-                ]
-              },
-              "mappings": []
-            },
-            "overrides": []
-          },
-          "options": {
-            "legend": {
-              "displayMode": "table",
-              "placement": "right",
-              "calcs": [
-                "mean",
-                "max"
-              ],
-              "showLegend": true,
-              "width": 240,
-              "sortBy": "Mean",
-              "sortDesc": true
-            },
-            "tooltip": {
-              "mode": "multi",
-              "sort": "desc"
-            }
-          }
-        },
-        {
-          "id": 72,
-          "type": "timeseries",
-          "title": "Filesystem",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "gridPos": {
-            "y": 71,
-            "h": 8,
-            "w": 24,
-            "x": 0
-          },
-          "targets": [
-            {
-              "expr": "avg by (host_name) (system_filesystem_utilization_ratio{host_name=~\"$hostname\", job=\"otel-collector\"}) * 100",
-              "refId": "A",
-              "datasource": {
-                "type": "prometheus",
-                "uid": "prometheus"
-              },
-              "instant": false,
-              "legendFormat": "{{host_name}}",
-              "range": true
-            }
-          ],
-          "fieldConfig": {
-            "defaults": {
-              "unit": "percent",
-              "min": 0,
-              "max": 100,
-              "custom": {
-                "drawStyle": "line",
-                "lineWidth": 2,
-                "fillOpacity": 10,
-                "spanNulls": true,
-                "showPoints": "never",
-                "lineInterpolation": "smooth"
-              },
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "green",
-                    "value": null
-                  },
-                  {
-                    "color": "yellow",
-                    "value": 70
-                  },
-                  {
-                    "color": "red",
-                    "value": 90
-                  }
-                ]
-              },
-              "mappings": []
-            },
-            "overrides": []
-          },
-          "options": {
-            "legend": {
-              "displayMode": "table",
-              "placement": "right",
-              "calcs": [
-                "mean",
-                "max"
-              ],
-              "showLegend": true,
-              "width": 240,
-              "sortBy": "Mean",
-              "sortDesc": true
-            },
-            "tooltip": {
-              "mode": "multi",
-              "sort": "desc"
-            }
-          }
-        },
-        {
-          "id": 74,
-          "type": "timeseries",
-          "title": "Worktrees",
-          "description": "Worktree count per host (logical disk usage shown in APFS clone-inflated units \u2014 not physical disk, bun uses clonefile)",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "gridPos": {
-            "y": 79,
-            "h": 8,
-            "w": 24,
-            "x": 0
-          },
-          "targets": [
-            {
-              "expr": "max by (host_name) (catalyst_worktree_count{host_name=~\"$hostname\", job=\"otel-collector\"})",
-              "refId": "A",
-              "datasource": {
-                "type": "prometheus",
-                "uid": "prometheus"
-              },
-              "instant": false,
-              "legendFormat": "count {{host_name}}"
-            }
-          ],
-          "fieldConfig": {
-            "defaults": {
-              "unit": "short",
-              "custom": {
-                "drawStyle": "bars",
-                "lineWidth": 2,
-                "fillOpacity": 80,
-                "spanNulls": false,
-                "showPoints": "never",
-                "lineInterpolation": "linear"
-              },
-              "color": {
-                "mode": "palette-classic"
-              },
-              "mappings": []
-            },
-            "overrides": []
-          },
-          "options": {
-            "legend": {
-              "displayMode": "table",
-              "placement": "right",
-              "calcs": [
-                "lastNotNull"
-              ],
-              "showLegend": true,
-              "width": 240,
-              "sortBy": "Last *",
-              "sortDesc": true
-            },
-            "tooltip": {
-              "mode": "multi",
-              "sort": "desc"
-            }
-          }
-        },
-        {
-          "id": 81,
-          "title": "Running Version & Commit by Host",
-          "type": "table",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "gridPos": {
-            "h": 8,
-            "w": 10,
-            "x": 0,
-            "y": 87
-          },
-          "targets": [
-            {
-              "expr": "catalyst_build_info",
-              "format": "table",
-              "instant": true,
-              "refId": "A",
-              "datasource": {
-                "type": "prometheus",
-                "uid": "prometheus"
-              }
-            }
-          ],
-          "transformations": [
-            {
-              "id": "organize",
-              "options": {
-                "excludeByName": {
-                  "Time": true,
-                  "__name__": true,
-                  "environment": true,
-                  "exported_job": true,
-                  "host_id": true,
-                  "hostname": true,
-                  "instance": true,
-                  "job": true,
-                  "otel_scope_name": true,
-                  "service_name": true,
-                  "service_namespace": true,
-                  "Value": true
-                },
-                "indexByName": {
-                  "host_name": 0,
-                  "service_version": 1,
-                  "vcs_ref_head_revision": 2
-                },
-                "renameByName": {
-                  "host_name": "Host",
-                  "service_version": "Version",
-                  "vcs_ref_head_revision": "Commit"
-                }
-              }
-            }
-          ],
-          "fieldConfig": {
-            "defaults": {
-              "custom": {
-                "align": "left",
-                "filterable": true,
-                "cellOptions": {
-                  "type": "auto"
-                }
-              }
-            },
-            "overrides": []
-          },
-          "options": {
-            "showHeader": true,
-            "sortBy": [
-              {
-                "displayName": "Host",
-                "desc": false
-              }
-            ],
-            "cellHeight": "sm"
-          },
-          "description": "Current catalyst-agent version and HEAD commit running on each host (catalyst_build_info). A host may briefly show two commit rows right after a deploy until the prior series expires."
-        },
-        {
-          "id": 82,
-          "title": "Commits Behind main Over Time",
-          "type": "timeseries",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "gridPos": {
-            "h": 8,
-            "w": 14,
-            "x": 10,
-            "y": 87
-          },
-          "targets": [
-            {
-              "expr": "max by (host_name) (catalyst_vcs_commits_behind)",
-              "legendFormat": "{{host_name}}",
-              "refId": "A",
-              "datasource": {
-                "type": "prometheus",
-                "uid": "prometheus"
-              }
-            }
-          ],
-          "fieldConfig": {
-            "defaults": {
-              "unit": "short",
-              "decimals": 0,
-              "custom": {
-                "drawStyle": "line",
-                "lineWidth": 2,
-                "fillOpacity": 10,
-                "gradientMode": "none",
-                "showPoints": "auto",
-                "pointSize": 5,
-                "lineInterpolation": "stepAfter",
-                "spanNulls": true,
-                "stacking": {
-                  "mode": "none",
-                  "group": "A"
-                },
-                "scaleDistribution": {
-                  "type": "linear"
-                },
-                "thresholdsStyle": {
-                  "mode": "off"
-                }
-              },
-              "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "green",
-                    "value": null
-                  },
-                  {
-                    "color": "yellow",
-                    "value": 1
-                  },
-                  {
-                    "color": "red",
-                    "value": 10
-                  }
-                ]
-              },
-              "color": {
-                "mode": "thresholds"
-              }
-            },
-            "overrides": []
-          },
-          "options": {
-            "legend": {
-              "displayMode": "table",
-              "placement": "right",
-              "width": 240,
-              "calcs": [
-                "lastNotNull",
-                "max"
-              ],
-              "showLegend": true,
-              "sortBy": "Last *",
-              "sortDesc": true
-            },
-            "tooltip": {
-              "mode": "multi",
-              "sort": "desc"
-            }
-          },
-          "description": "Commits each host is behind origin/main over time. 0 = current (green); climbs and turns yellow/red as a host falls behind. Doubles as a 'did this host stop pulling?' signal."
-        },
-        {
-          "id": 83,
-          "title": "Version Running Over Time",
-          "type": "state-timeline",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "gridPos": {
-            "h": 7,
-            "w": 24,
-            "x": 0,
-            "y": 95
-          },
-          "targets": [
-            {
-              "expr": "max by (host_name, service_version, vcs_ref_head_revision) (catalyst_build_info)",
-              "legendFormat": "{{host_name}} \u00b7 {{service_version}} \u00b7 {{vcs_ref_head_revision}}",
-              "refId": "A",
-              "datasource": {
-                "type": "prometheus",
-                "uid": "prometheus"
-              }
-            }
-          ],
-          "fieldConfig": {
-            "defaults": {
-              "custom": {
-                "lineWidth": 0,
-                "fillOpacity": 85
-              },
-              "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "green",
-                    "value": null
-                  }
-                ]
-              },
-              "color": {
-                "mode": "palette-classic"
-              }
-            },
-            "overrides": []
-          },
-          "options": {
-            "mergeValues": true,
-            "showValue": "never",
-            "alignValue": "left",
-            "rowHeight": 0.9,
-            "legend": {
-              "displayMode": "list",
-              "placement": "bottom",
-              "showLegend": true
-            },
-            "tooltip": {
-              "mode": "single",
-              "sort": "none"
-            }
-          },
-          "description": "Which catalyst-agent version each host ran over time. A new band starts when a host upgrades; commit-level detail is in the table."
         }
       ]
     },
@@ -5260,9 +4235,10 @@
           },
           "targets": [
             {
-              "expr": "sum by (catalyst_orchestrator, linear_key) (rate(claude_code_token_usage_tokens_total{job=\"otel-collector\",catalyst_role=\"worker\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__rate_interval]))",
+              "expr": "sum by (catalyst_orchestrator, linear_key) (rate(claude_code_token_usage_tokens_total{job=\"otel-collector\",catalyst_role=\"worker\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__interval]))",
               "legendFormat": "{{catalyst_orchestrator}}/{{linear_key}}",
-              "refId": "A"
+              "refId": "A",
+              "interval": "$bucket"
             }
           ],
           "fieldConfig": {
@@ -5491,6 +4467,66 @@
   ],
   "templating": {
     "list": [
+      {
+        "name": "bucket",
+        "label": "Bucket",
+        "type": "interval",
+        "description": "Bucket width for the rate/volume timeseries (floor 1m \u2248 4\u00d7 the 15s scrape; default 5m).",
+        "datasource": null,
+        "query": "1m,5m,15m,30m,1h,6h,1d",
+        "auto": true,
+        "auto_count": 30,
+        "auto_min": "1m",
+        "current": {
+          "text": "5m",
+          "value": "5m"
+        },
+        "options": [
+          {
+            "text": "auto",
+            "value": "$__auto_interval_bucket",
+            "selected": false
+          },
+          {
+            "text": "1m",
+            "value": "1m",
+            "selected": false
+          },
+          {
+            "text": "5m",
+            "value": "5m",
+            "selected": true
+          },
+          {
+            "text": "15m",
+            "value": "15m",
+            "selected": false
+          },
+          {
+            "text": "30m",
+            "value": "30m",
+            "selected": false
+          },
+          {
+            "text": "1h",
+            "value": "1h",
+            "selected": false
+          },
+          {
+            "text": "6h",
+            "value": "6h",
+            "selected": false
+          },
+          {
+            "text": "1d",
+            "value": "1d",
+            "selected": false
+          }
+        ],
+        "refresh": 2,
+        "hide": 0,
+        "skipUrlSync": false
+      },
       {
         "allValue": ".*",
         "current": {
