@@ -1,0 +1,37 @@
+project_name: "catalyst-otel"
+languages:
+  - bash
+  - yaml
+encoding: "utf-8"
+ignore_all_files_in_gitignore: true
+read_only: true
+ignored_paths:
+  - ".claude/worktrees"
+  - ".serena/cache"
+  - "thoughts"
+  - "node_modules"
+  - "**/dist"
+  - "**/data"
+  - ".trunk"
+  - "prometheus_data"
+  - "grafana_data"
+  - "loki_data"
+  - "tempo_data"
+initial_prompt: |
+  catalyst-otel: OpenTelemetry observability stack (collector, Loki, Prometheus,
+  Grafana, Gatus) for Catalyst. Mostly YAML configs + shell. Read README/docs
+  first. Serena is read_only — navigation only; call read_memory('codebase_map').
+default_modes:
+  - interactive
+  - editing
+added_modes: []
+excluded_tools: []
+included_optional_tools: []
+fixed_tools: []
+symbol_info_budget: 200
+language_backend: null
+line_ending: "lf"
+read_only_memory_patterns: []
+ignored_memory_patterns: []
+ls_specific_settings: {}
+additional_workspace_folders: []
