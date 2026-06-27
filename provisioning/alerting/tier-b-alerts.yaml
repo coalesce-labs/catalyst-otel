@@ -52,12 +52,16 @@ groups:
               range: false
               refId: A
               # The live escalation signal is the recovery.escalated event, surfaced
-              # as catalyst_event_total{event_action="escalated"} (count connector,
-              # OTL-21). recovery.decision is NOT emitted outside enforce mode
-              # (14d-verified — see the control-loop dashboard glossary), so the
-              # earlier catalyst_recovery_decision_total{recovery_decision="escalate"}
-              # expr would never fire on a real escalation burst.
-              expr: sum(increase(catalyst_event_total{event_action="escalated"}[1h]))
+              # as catalyst_event_total{event_entity="ticket",event_action="escalated"}
+              # (count connector, OTL-21). event_entity="ticket" scopes this to the
+              # recovery controller — verified the SOLE emitter of action=escalated
+              # over 30d — so a future non-recovery "escalated" event can't trip this
+              # "auto-fix failing" pager. The old
+              # catalyst_recovery_decision_total{recovery_decision="escalate"} is too
+              # sparse to be a reliable burst signal (recovery.decision is only emitted
+              # in enforce mode — ~1 sample in 14d), so this repoints to the escalation
+              # event that actually tracks human hand-offs.
+              expr: sum(increase(catalyst_event_total{event_entity="ticket",event_action="escalated"}[1h]))
           - refId: B
             relativeTimeRange: { from: 3600, to: 0 }
             datasourceUid: __expr__
