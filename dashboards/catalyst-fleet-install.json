@@ -441,11 +441,11 @@
             "uid": "prometheus"
           },
           "refId": "A",
-          "expr": "histogram_quantile(0.95, sum by (phase, le) (rate(catalyst_install_duration_seconds_bucket[$__interval])))",
+          "expr": "histogram_quantile(0.95, sum by (operation, phase, le) (rate(catalyst_install_duration_seconds_bucket[$__interval])))",
           "editorMode": "code",
           "instant": false,
           "range": true,
-          "legendFormat": "{{phase}}",
+          "legendFormat": "{{operation}} · {{phase}}",
           "interval": "$bucket"
         }
       ],
