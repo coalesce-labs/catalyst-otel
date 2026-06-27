@@ -146,6 +146,13 @@ processors:
           # host gauges not already renamed by transform/logs (underscore-native suspected)
           - set(attributes["host_disk_avail_gb"], attributes["host.disk_avail_gb"]) where attributes["host.disk_avail_gb"] != nil
           - set(attributes["host_disk_free_pct"], attributes["host.disk_free_pct"]) where attributes["host.disk_free_pct"] != nil
+          # catalyst.install lifecycle enums (CTL-1369): the install envelope carries
+          # operation/phase/outcome as dotted top-level attributes -> underscore form
+          # for the catalyst_install_* connectors. node_class rides the resource
+          # (catalyst.node.class -> catalyst_node_class label) like every catalyst event.
+          - set(attributes["operation"], attributes["catalyst.install.operation"]) where attributes["catalyst.install.operation"] != nil
+          - set(attributes["outcome"], attributes["catalyst.install.outcome"]) where attributes["catalyst.install.outcome"] != nil
+          - set(attributes["phase"], attributes["catalyst.install.phase"]) where attributes["catalyst.install.phase"] != nil
 
   # OTL-31: Tier-1 daemon scheduler-health logs (service_name=catalyst.execution-core,
   # CTL-1330/1332 full-pino-body) carry their fields ONLY in the JSON body string.
@@ -189,6 +196,33 @@ processors:
 
           - set(attributes["liveness_outcome"], cache["outcome"]) where cache["outcome"] != nil
           - set(attributes["sched_is_liveness"], "1") where cache["outcome"] != nil
+
+  # OTL-38: the catalyst.updater plugin-pull daemon emits its refresh "metrics" as
+  # fields inside ONE pino log line ("updater: refresh (CTL-1350)") on
+  # service_name=catalyst.updater. That line reaches THIS collector (Alloy 5th
+  # stream -> otelcol.exporter.otlphttp -> logs pipeline, NOT Loki-only), but the
+  # fields are trapped in the JSON body — so promote them to log attributes the
+  # same way transform/scheduler_health_promote does for execution-core.
+  # host_name is already set from resource.attributes["host.name"] (short) by
+  # transform/metrics_normalize above. node_class: Alloy stamps only host.name +
+  # catalyst.node.name on this stream's resource, so lift catalyst.node.class from
+  # the body onto the resource -> resource_to_telemetry promotes it to the
+  # catalyst_node_class label (consistent with every catalyst event metric).
+  transform/updater_promote:
+    error_mode: ignore
+    log_statements:
+      - context: log
+        conditions:
+          - 'resource.attributes["service.name"] == "catalyst.updater" and IsMatch(body, "updater: refresh")'
+        statements:
+          - merge_maps(cache, ParseJSON(body), "upsert")
+          - set(attributes["reason"], cache["reason"]) where cache["reason"] != nil
+          - set(attributes["upd_pulled"], cache["pulled"]) where cache["pulled"] != nil
+          - set(attributes["upd_changed"], cache["changed"]) where cache["changed"] != nil
+          - set(attributes["upd_failed"], cache["failed"]) where cache["failed"] != nil
+          - set(attributes["refresh_duration_ms"], cache["refresh_duration_ms"]) where cache["refresh_duration_ms"] != nil
+          - set(resource.attributes["catalyst.node.class"], cache["catalyst.node.class"]) where cache["catalyst.node.class"] != nil
+          - set(attributes["upd_is_refresh"], "1") where cache["refresh_duration_ms"] != nil
 
   # OTL-20: the count connector emits Delta-temporality sums; Prometheus needs
   # Cumulative. Passes already-cumulative metrics (claude_code_* OTLP) through
@@ -435,6 +469,34 @@ connectors:
           # a whole class of errors. Low-card sentinel keeps every api_error counted.
           - key: status_code
             default_value: "unknown"
+
+      # ----- catalyst.updater plugin-pull refreshes (OTL-38) -----
+      # Occurrence count of refreshes by reason (+ host_name + the resource-promoted
+      # catalyst_node_class). Keyed on the upd_is_refresh marker that
+      # transform/updater_promote stamps when it parses a "updater: refresh" line.
+      catalyst_updater_refresh_total:
+        description: "Updater plugin-pull refreshes by reason (occurrence; service_name=catalyst.updater)"
+        conditions:
+          - 'attributes["upd_is_refresh"] == "1"'
+        attributes:
+          - key: reason
+            default_value: unknown
+          - key: host_name
+
+      # ----- catalyst.install lifecycle terminal outcomes (CTL-1369) -----
+      # Bare install occurrences already land in catalyst_event_total{event_entity=
+      # "install"} for free; this adds the operation x outcome faceting Ryan wants.
+      # Service-name-agnostic (the install envelope presets event.entity/action).
+      catalyst_install_total:
+        description: "Install/uninstall/reinstall terminal outcomes by operation and outcome"
+        conditions:
+          - 'IsMatch(attributes["event_name"], "^catalyst.install.(completed|failed|rolled_back)$")'
+        attributes:
+          - key: operation
+            default_value: install
+          - key: outcome
+            default_value: unknown
+          - key: host_name
 
   # Numeric gauges from event fields. Values are strings in transit -> Double() cast.
   # Do NOT set `error_mode: ignore` here — in otelcol 0.154.0 it suppresses ALL
@@ -879,6 +941,74 @@ connectors:
           buckets: [0.25, 0.5, 1, 2, 5, 10, 30, 60]
           value: 'Double(attributes["duration_ms"]) / 1000'
 
+      # ----- catalyst.updater refresh duration + throughput (OTL-38) -----
+      # refresh_duration_ms / pulled / changed / failed are promoted out of the pino
+      # body by transform/updater_promote. Duration -> histogram (ms/1000 -> seconds,
+      # same pattern as the claude_code + scheduler histograms). pulled/changed/failed
+      # are the per-refresh field VALUES summed (NOT occurrence counts) -> sum metrics;
+      # deltatocumulative converts the delta sums to cumulative for increase().
+      - name: catalyst_updater_refresh_duration_seconds
+        description: "Updater plugin-pull refresh wall time (seconds) by reason"
+        conditions: ['attributes["upd_is_refresh"] == "1"']
+        attributes:
+          - key: reason
+            default_value: unknown
+          - key: host_name
+            default_value: unknown
+        histogram:
+          buckets: [0.1, 0.25, 0.5, 1, 2, 5, 10, 30, 60]
+          value: 'Double(attributes["refresh_duration_ms"]) / 1000'
+      - name: catalyst_updater_refresh_pulled_total
+        description: "Total plugin checkouts pulled across refreshes (sum of refresh.pulled)"
+        conditions: ['attributes["upd_is_refresh"] == "1"']
+        attributes:
+          - key: reason
+            default_value: unknown
+          - key: host_name
+            default_value: unknown
+        sum:
+          value: 'Double(attributes["upd_pulled"])'
+      - name: catalyst_updater_refresh_changed_total
+        description: "Total plugin checkouts changed across refreshes (sum of refresh.changed)"
+        conditions: ['attributes["upd_is_refresh"] == "1"']
+        attributes:
+          - key: reason
+            default_value: unknown
+          - key: host_name
+            default_value: unknown
+        sum:
+          value: 'Double(attributes["upd_changed"])'
+      - name: catalyst_updater_refresh_failed_total
+        description: "Total plugin-checkout failures across refreshes (sum of refresh.failed; >0 = pull trouble)"
+        conditions: ['attributes["upd_is_refresh"] == "1"']
+        attributes:
+          - key: reason
+            default_value: unknown
+          - key: host_name
+            default_value: unknown
+        sum:
+          value: 'Double(attributes["upd_failed"])'
+
+      # ----- catalyst.install per-phase duration (CTL-1369) — GATED, ships EMPTY -----
+      # The per-phase duration is emitted in body.payload, which otel-forward strips
+      # at the node BEFORE the network hop, so it never reaches the collector today.
+      # Asked the updater (channel turn 11) to promote it to a top-level attribute
+      # catalyst.install.phase_duration_ms. Built now so it lights up the instant that
+      # attribute lands — no redeploy. Until then Double(nil) drops the datapoint.
+      - name: catalyst_install_duration_seconds
+        description: "Install phase wall time (seconds) by phase + operation (GATED on phase_duration_ms attr)"
+        conditions: ['attributes["event_name"] == "catalyst.install.phase"']
+        attributes:
+          - key: phase
+            default_value: unknown
+          - key: operation
+            default_value: install
+          - key: host_name
+            default_value: unknown
+        histogram:
+          buckets: [0.25, 0.5, 1, 2, 5, 10, 30, 60, 120]
+          value: 'Double(attributes["catalyst.install.phase_duration_ms"]) / 1000'
+
 service:
   # PAYLOAD-PARITY INVARIANT (OTL-1): exactly ONE pipeline per signal type.
   # Fan out by appending exporters to the existing pipeline (after the shared
@@ -927,7 +1057,7 @@ service:
       receivers: [otlp]
       # OTL-20: transform/metrics_normalize runs AFTER transform/logs so the
       # logs->metrics connectors (exporters below) see underscore-form keys.
-      processors: [resource, transform/logs, transform/metrics_normalize, transform/scheduler_health_promote]
+      processors: [resource, transform/logs, transform/metrics_normalize, transform/scheduler_health_promote, transform/updater_promote]
       # otlp_http = Loki (OTL-8 rename). To turn on the CTL-812 fan-out:
       # (1) uncomment the matching exporter block above, (2) set the env vars in
       # docker-compose.yml, and (3) replace the line below with the "enable
