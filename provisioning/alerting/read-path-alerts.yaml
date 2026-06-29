@@ -1,0 +1,815 @@
+apiVersion: 1
+
+# OTL-40 read-path + workflow-blocker alerts. Grafana-MANAGED, evaluated on the
+# otel-stack host against the catalyst.* fleet signals (Loki events + Prometheus
+# gauges). These are the "a ticket can't make forward progress" pages: the Linear
+# read path latching open, rate-limit pressure building toward a breaker trip, a
+# triage dispatch held on an unreadable delegate, the telemetry forward path going
+# blind, an SDK executor silently degrading to bg, a node running stale code, plus
+# the workflow blockers surfaced by the critic pass (phase turn-cap exhaustion,
+# dispatch runaways, account rate-limit saturation, host disk exhaustion, recovery
+# invariant breaks, post-merge cleanup pile-ups). Routing falls through to the
+# default notification policy — NO contactPoints/policies are declared here (the
+# root catalyst-pager policy from the alerting baseline owns delivery; VISIBLE but
+# silent until a real pager URL is wired, per OTL-37).
+#
+# !!! CRASH-LOOP DANGER — VALIDATE BEFORE DEPLOY !!!
+# A malformed provisioned alert rule (dangling receiver, unknown datasource uid,
+# empty contact-point URL, bad YAML) is FATAL at Grafana startup and will
+# crash-loop the SHARED live Grafana. NEVER edit-and-deploy this file straight to
+# the live stack. ALWAYS validate first against a THROWAWAY grafana-oss container
+# (mount this file read-only, boot it, confirm it comes up healthy and the rules
+# load) — only then roll it onto home. See the OTL-15 / Codex P2 (#74) survivable-
+# alerting notes.
+#
+# DESIGN — presence over absence. Every rule fires on the PRESENCE of a bad signal
+# (a failure-line surge, a high gauge value, a re-emitted hold). True "the node
+# went silent / daemon died" liveness is fundamentally an absence problem (a silent
+# host emits no series, and the prometheus exporter expires stale series after
+# metric_expiration: 15m — the trap that killed the updater-liveness rule, Codex P2
+# #74) and is owned by the GATUS active probe + the catalyst-survivability
+# system_down rule, NOT a count==0 Grafana rule.
+#
+# noDataState/execErrState = OK on every rule: a quiet / idle fleet (no reads
+# attempted, no installs, poller paused) returns empty/noData and MUST NOT fire.
+# COUNT-BASED CAVEAT: the Loki count rules clear when the bad lines STOP, which
+# cannot by itself distinguish "recovered" from "fleet went idle / stopped
+# attempting" — a resolve means "no longer actively failing", not "confirmed
+# healthy". Each rule's annotation calls this out.
+groups:
+  # =====================================================================
+  # Read path — Linear reads are the top OTL-40 fleet-wide work blocker.
+  # =====================================================================
+  - orgId: 1
+    name: catalyst-readpath
+    folder: Catalyst Alerts
+    interval: 1m
+    rules:
+      # 1) ★ CRITICAL — linearBreaker latched OPEN: reconcile polls fail-fast
+      #    fleet-wide, ALL new-work reads held. Fleet-summed (a shared 429 trips
+      #    every node together); baseline [30m] tops at ~32, a real block is
+      #    ~90-180, so gt 60 is the midpoint. LogQL.
+      - uid: catalyst_linear_read_blocked
+        title: Linear read path blocked (linearBreaker open, holding work)
+        condition: C
+        for: 10m
+        noDataState: OK
+        execErrState: OK
+        labels:
+          team: catalyst-readpath
+          signal: linear_read_blocked
+          severity: critical
+        annotations:
+          summary: 'Linear read path BLOCKED fleet-wide — linearBreaker circuit open, reconcile polls failing fast (>60 "issues list failed" in 30m)'
+          description: >
+            catalyst.execution-core logged more than 60 "linearis issues list failed"
+            lines in the last 30 minutes — far above the live baseline (median ~19,
+            max ~32 per 30m during normal breaker flapping). At this rate the
+            linearBreaker is latched OPEN (err=circuit-open) and every per-team
+            reconcile poll is failing fast, so ALL new-work reads are held fleet-wide
+            (the top OTL-40 blocker). Check Linear 429/rate-limit pressure
+            (api.anthropic.com / linearis), the linearBreaker state on each
+            execution-core node (mini, mini-2), and whether the breaker is recovering.
+            NOTE: this count-based rule fires on active failure; once reads recover (or
+            the fleet goes idle) no new failure lines are emitted and it auto-resolves
+            as the 30m window decays — it cannot by itself confirm reads are healthy,
+            only that they are no longer failing.
+        data:
+          - refId: A
+            relativeTimeRange: { from: 1800, to: 0 }
+            datasourceUid: loki
+            model:
+              datasource: { type: loki, uid: loki }
+              editorMode: code
+              queryType: instant
+              refId: A
+              expr: sum(count_over_time({service_name="catalyst.execution-core"} |= "issues list failed" [30m]))
+          - refId: B
+            relativeTimeRange: { from: 1800, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              expression: A
+              reducer: last
+              datasource: { type: __expr__, uid: __expr__ }
+          - refId: C
+            relativeTimeRange: { from: 1800, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              refId: C
+              expression: B
+              datasource: { type: __expr__, uid: __expr__ }
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [60]
+
+      # 2) ★ WARNING (leading indicator) — Linear's shared 5000 req/hr account
+      #    limit being hit; sustained elevation precedes the breaker trip. Fleet
+      #    sum (account-shared limit). Active-period 30m buckets peak ~7, so gt 12
+      #    has 1.7x headroom. LogQL.
+      - uid: catalyst_readpath_rate_limit_pressure
+        title: Read-path rate-limit pressure rising (pre-breaker)
+        condition: C
+        for: 10m
+        noDataState: OK
+        execErrState: OK
+        labels:
+          team: catalyst-readpath
+          signal: rate_limit_pressure
+          severity: warning
+        annotations:
+          summary: 'Linear API "Rate limit exceeded" lines surged (>12 fleet-wide over 30m) — leading indicator before the read-path breaker trips'
+          description: >
+            The fleet emitted more than 12 "Rate limit exceeded" log lines in the
+            last 30 minutes (catalyst.* services hitting Linear's shared 5000 req/hr
+            API limit). This is the EARLY-WARNING regime: rate-limit pressure is
+            building well above the steady background (~8-9/hr; active-period 30m
+            buckets peak ~7) but BEFORE the read-path breaker trips and reads start
+            blocking. Back off Linear read volume / check the poller cadence now so
+            reads do not block. NOTE: count-based — it clears when the surge of
+            rate-limit lines stops, which cannot distinguish "pressure relieved" from
+            "fleet went idle / stopped attempting reads".
+        data:
+          - refId: A
+            relativeTimeRange: { from: 1800, to: 0 }
+            datasourceUid: loki
+            model:
+              datasource: { type: loki, uid: loki }
+              editorMode: code
+              queryType: instant
+              refId: A
+              expr: sum(count_over_time({service_name=~"catalyst.+"} |= "Rate limit exceeded" [30m]))
+          - refId: B
+            relativeTimeRange: { from: 1800, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              expression: A
+              reducer: last
+              datasource: { type: __expr__, uid: __expr__ }
+          - refId: C
+            relativeTimeRange: { from: 1800, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              refId: C
+              expression: B
+              datasource: { type: __expr__, uid: __expr__ }
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [12]
+
+      # 3) ★ WARNING — triage dispatch held because a ticket's delegate is
+      #    unreadable (CTL-1174). The monitor re-emits per pass while the read
+      #    keeps failing, so gt 1 (per host) isolates a genuine recurring hold from
+      #    a one-off transient that self-recovered. LogQL.
+      - uid: catalyst_delegate_unreadable
+        title: Triage dispatch held — delegate unreadable
+        condition: C
+        for: 5m
+        noDataState: OK
+        execErrState: OK
+        labels:
+          team: catalyst-readpath
+          signal: delegate_unreadable
+          severity: warning
+        annotations:
+          summary: 'Triage dispatch held — a ticket''s delegate is unreadable (>1 hold event in 30m on a host) (CTL-1174)'
+          description: >
+            The catalyst.execution-core monitor emitted more than one
+            "triage dispatch held — delegate unreadable (CTL-1174)" line for host
+            {{ $labels.host_name }} in the last 30m. The monitor re-emits this on
+            every pass while a ticket's delegate stays unreadable, so a recurring
+            count (>1) means a ticket is genuinely stuck in triage — not a one-off
+            transient that self-recovered. Find the held ticket via the `identifier`
+            field in the catalyst.execution-core logs and unblock its delegate read.
+            NOTE (recovered vs idle): this count-based rule clears when the held lines
+            STOP, which can mean the read recovered OR the orchestrator stopped
+            monitoring that ticket (idle) — on resolve, confirm the ticket actually
+            dispatched rather than was abandoned.
+        data:
+          - refId: A
+            relativeTimeRange: { from: 1800, to: 0 }
+            datasourceUid: loki
+            model:
+              datasource: { type: loki, uid: loki }
+              editorMode: code
+              queryType: instant
+              refId: A
+              expr: sum by (host_name) (count_over_time({service_name=~"catalyst.+"} |= "delegate unreadable" [30m]))
+          - refId: B
+            relativeTimeRange: { from: 1800, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              expression: A
+              reducer: last
+              datasource: { type: __expr__, uid: __expr__ }
+          - refId: C
+            relativeTimeRange: { from: 1800, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              refId: C
+              expression: B
+              datasource: { type: __expr__, uid: __expr__ }
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [1]
+
+  # =====================================================================
+  # Observability self-health — the meta-guard. If telemetry stops landing,
+  # every OTHER alert silently stops firing (silence masquerading as health).
+  # =====================================================================
+  - orgId: 1
+    name: catalyst-observability-selfhealth
+    folder: Catalyst Alerts
+    interval: 1m
+    rules:
+      # 4) ★ WARNING — otel-forward dropping events. SHORT 5m window + LONGER 10m
+      #    `for`: a lone transient blip (window drains in ~5m) can never satisfy a
+      #    10m `for`; only a SUSTAINED drop (failures keep arriving with no empty 5m
+      #    gap) fires. Per host_name. LogQL (event_name filter). Total silence
+      #    (count==0, host fully dark) is owned by Gatus + daemon-liveness, not here.
+      - uid: catalyst_telemetry_forward_stalled
+        title: Telemetry forward stalled (otel-forward dropping events)
+        condition: C
+        for: 10m
+        noDataState: OK
+        execErrState: OK
+        labels:
+          team: catalyst-readpath
+          signal: telemetry_forward_stalled
+          severity: warning
+        annotations:
+          summary: 'otel-forward is dropping events (catalyst.observability.forward_failed sustained > 0 per host for 10m) — the observability stack is going blind'
+          description: >
+            One or more catalyst nodes emitted catalyst.observability.forward_failed
+            continuously over a 5-minute sliding window for 10 minutes straight: the
+            otel-forward path is failing to forward events, so telemetry is being
+            DROPPED before it reaches Loki/Prometheus. This is the meta-guard — while
+            this is firing, every other alert may silently stop evaluating because its
+            source data never lands (silence masquerading as health). A single
+            transient blip self-heals and will NOT trip this (the 5m window drains in
+            ~5m, below the 10m for). Identify the failing host_name (the rule is
+            per-host), then inspect that node's otel-forward / collector egress, the
+            Cloudflare-tunnel / Loki-ingest endpoint, and disk/network. NOTE: this
+            catches the FORMING blind spot (path still self-reports). Total silence
+            (host fully dark, count==0) is owned by the Gatus active probe + daemon
+            liveness, not this count rule.
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: loki
+            model:
+              datasource: { type: loki, uid: loki }
+              editorMode: code
+              queryType: instant
+              refId: A
+              expr: sum by (host_name) (count_over_time({service_name=~"catalyst.+"} | event_name="catalyst.observability.forward_failed" [5m]))
+          - refId: B
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              expression: A
+              reducer: last
+              datasource: { type: __expr__, uid: __expr__ }
+          - refId: C
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              refId: C
+              expression: B
+              datasource: { type: __expr__, uid: __expr__ }
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+
+  # =====================================================================
+  # Executor health — the bg->SDK flip (BG-SDK workstream, load-bearing for
+  # the Workstream-A fleet-reinstall rollout).
+  # =====================================================================
+  - orgId: 1
+    name: catalyst-executor
+    folder: Catalyst Alerts
+    interval: 1m
+    rules:
+      # 5) ★ WARNING — a node meant to run the SDK in-process keeps silently
+      #    falling back to bg. Isolated single fallbacks are normal background
+      #    noise (~2/24h), so gt 2 (>=3 on ONE host in 30m) isolates a genuine
+      #    per-host stuck-in-bg condition. INFO-level event => warning. LogQL.
+      - uid: catalyst_executor_bg_fallback
+        title: SDK executor degraded to bg
+        condition: C
+        for: 5m
+        noDataState: OK
+        execErrState: OK
+        labels:
+          team: catalyst-readpath
+          signal: executor_bg_fallback
+          severity: warning
+        annotations:
+          summary: 'A node''s SDK executor degraded to bg fallback >=3x in 30m (host {{ $labels.host_name }})'
+          description: >
+            execution-core.executor.bg-fallback fired 3 or more times on a single
+            host (host_name) within 30 minutes: a node meant to run the SDK
+            in-process keeps silently falling back to the bg path — the #1 failure
+            mode of the bg->SDK flip (BG-SDK workstream), freshly relevant for the
+            fleet-reinstall rollout (Workstream A). The node still runs work via bg,
+            so this is a degradation (warning), not an outage. Inspect that host's
+            execution-core log and the bg-fallback events; confirm the SDK in-process
+            executor can initialize on that node. Baseline is ~2 isolated events/24h
+            fleet-wide (worst benign 30m cluster = 2 on one host), so >=3/host/30m is
+            a real per-host block, not transient churn.
+        data:
+          - refId: A
+            relativeTimeRange: { from: 1800, to: 0 }
+            datasourceUid: loki
+            model:
+              datasource: { type: loki, uid: loki }
+              editorMode: code
+              queryType: instant
+              refId: A
+              expr: sum by (host_name) (count_over_time({service_name=~"catalyst.+"} |= "execution-core.executor.bg-fallback" [30m]))
+          - refId: B
+            relativeTimeRange: { from: 1800, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              expression: A
+              reducer: last
+              datasource: { type: __expr__, uid: __expr__ }
+          - refId: C
+            relativeTimeRange: { from: 1800, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              refId: C
+              expression: B
+              datasource: { type: __expr__, uid: __expr__ }
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [2]
+
+  # =====================================================================
+  # Fleet freshness — nodes running stale code (updater not keeping them fresh).
+  # =====================================================================
+  - orgId: 1
+    name: catalyst-fleet-freshness
+    folder: Catalyst Alerts
+    interval: 1m
+    rules:
+      # 6) ★ WARNING — node >20 commits behind origin/main. Live GAUGE (instant
+      #    read, NOT a count window): the fleet 7-day peak is 1 commit behind, so
+      #    gt 20 is a ~20x margin. for: 15m rides out a deploy/merge-train spike
+      #    (pulled back by the next updater poll). Prometheus.
+      - uid: catalyst_node_stale_commits_behind
+        title: Node running stale code (>20 commits behind main)
+        condition: C
+        for: 15m
+        noDataState: OK
+        execErrState: OK
+        labels:
+          team: catalyst-readpath
+          signal: node_stale_commits_behind
+          severity: warning
+        annotations:
+          summary: 'A node is >20 commits behind origin/main for 15m — the updater is not keeping it fresh'
+          description: >
+            max by (host_name) (catalyst_vcs_commits_behind) exceeded 20 for a host,
+            sustained 15m. The node is running STALE plugin/agent code: the updater is
+            supposed to keep every node within ~1 commit of origin/main (live baseline:
+            0, 7-day fleet peak: 1), so >20 means the updater has failed to pull across
+            many merges and this node's work is suspect. Check that node's
+            catalyst.updater liveness, its git remote / auth / disk, and the last
+            successful plugin.checkout.updated event.
+          __dashboardUid__: catalyst-fleet-hosts
+          __panelId__: '82'
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: prometheus
+            model:
+              datasource: { type: prometheus, uid: prometheus }
+              editorMode: code
+              instant: true
+              range: false
+              refId: A
+              expr: max by (host_name) (catalyst_vcs_commits_behind)
+          - refId: B
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              expression: A
+              reducer: last
+              datasource: { type: __expr__, uid: __expr__ }
+          - refId: C
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              refId: C
+              expression: B
+              datasource: { type: __expr__, uid: __expr__ }
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [20]
+
+  # =====================================================================
+  # Workflow blockers (critic pass) — Loki event signals where a ticket can't
+  # advance. Rare events => gt 0 over 30m (pile-up rule for cleanup-failed).
+  # =====================================================================
+  - orgId: 1
+    name: catalyst-workflow-blockers
+    folder: Catalyst Alerts
+    interval: 1m
+    rules:
+      # 7) ★ WARNING — a phase agent burned its conversation turn budget mid-phase
+      #    and bailed WITHOUT emitting .complete, leaving the ticket stuck. Cleanest
+      #    "a ticket got stuck" signal (fires at the moment of stall, before the
+      #    recovery controller gives up). Substring (any phase). LogQL.
+      - uid: catalyst_phase_turn_cap_exhausted
+        title: Phase agent turn-cap exhausted (ticket stalled)
+        condition: C
+        for: 0m
+        noDataState: OK
+        execErrState: OK
+        labels:
+          team: catalyst
+          signal: phase_turn_cap_exhausted
+          severity: warning
+        annotations:
+          summary: 'A phase agent exhausted its turn cap and stalled a ticket'
+          description: >
+            One or more phase agents emitted turn-cap-exhausted in the last 30m — the
+            agent hit its conversation turn budget mid-phase and bailed without a
+            .complete, leaving that ticket stuck. Substring (not event_name=) so it
+            catches any phase, not just triage. Inspect the worker dir and
+            re-dispatch/escalate. NOTE: count-based — clears when no new exhaustion
+            lines arrive, which cannot distinguish "re-dispatched / recovered" from
+            "fleet went idle".
+        data:
+          - refId: A
+            relativeTimeRange: { from: 1800, to: 0 }
+            datasourceUid: loki
+            model:
+              datasource: { type: loki, uid: loki }
+              editorMode: code
+              queryType: instant
+              refId: A
+              expr: sum by (host_name) (count_over_time({service_name=~"catalyst.+"} |= "turn-cap-exhausted" [30m]))
+          - refId: B
+            relativeTimeRange: { from: 1800, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              expression: A
+              reducer: last
+              datasource: { type: __expr__, uid: __expr__ }
+          - refId: C
+            relativeTimeRange: { from: 1800, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              refId: C
+              expression: B
+              datasource: { type: __expr__, uid: __expr__ }
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+
+      # 8) ★ WARNING — dispatcher detected it is re-launching the same phase agent
+      #    in a loop. The ticket can't advance AND the loop burns worker slots,
+      #    starving other work. Rare event => gt 0 over 30m. LogQL.
+      - uid: catalyst_phase_dispatch_runaway
+        title: Phase dispatch runaway (re-dispatch loop)
+        condition: C
+        for: 0m
+        noDataState: OK
+        execErrState: OK
+        labels:
+          team: catalyst
+          signal: phase_dispatch_runaway
+          severity: warning
+        annotations:
+          summary: 'Dispatcher detected a phase-agent re-dispatch loop (runaway)'
+          description: >
+            phase.dispatch.runaway fired in the last 30m — the scheduler is re-launching
+            the same phase agent in a loop. The affected ticket cannot advance and the
+            loop consumes worker slots, starving other work. Inspect the dispatch log for
+            the ticket and clear the stuck phase. NOTE: count-based — clears when the
+            runaway lines stop.
+        data:
+          - refId: A
+            relativeTimeRange: { from: 1800, to: 0 }
+            datasourceUid: loki
+            model:
+              datasource: { type: loki, uid: loki }
+              editorMode: code
+              queryType: instant
+              refId: A
+              expr: sum by (host_name) (count_over_time({service_name=~"catalyst.+"} |= "phase.dispatch.runaway" [30m]))
+          - refId: B
+            relativeTimeRange: { from: 1800, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              expression: A
+              reducer: last
+              datasource: { type: __expr__, uid: __expr__ }
+          - refId: C
+            relativeTimeRange: { from: 1800, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              refId: C
+              expression: B
+              datasource: { type: __expr__, uid: __expr__ }
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+
+      # 9) WARNING (lower confidence — accumulation) — post-merge worktree/runtime
+      #    teardown failing. Individually benign; piling up it leaks worktrees+disk
+      #    and stale worktrees can block re-dispatch. Pile-up threshold gt 3 over
+      #    1h (not gt 0) to ride out single transient misses. LogQL.
+      - uid: catalyst_pr_merged_cleanup_failed
+        title: Post-merge cleanup failing (pile-up)
+        condition: C
+        for: 5m
+        noDataState: OK
+        execErrState: OK
+        labels:
+          team: catalyst
+          signal: pr_merged_cleanup_failed
+          severity: warning
+        annotations:
+          summary: 'pr.merged.cleanup-failed > 3 in the last hour — worktree/disk leak risk'
+          description: >
+            More than 3 post-merge cleanups failed in the last hour. Each is a merged PR
+            whose worktree/runtime teardown did not complete; accumulating, they leak
+            worktrees + disk and stale worktrees can block re-dispatch on the node.
+            Threshold is a pile-up count, not gt 0, to ride out single transient misses.
+        data:
+          - refId: A
+            relativeTimeRange: { from: 3600, to: 0 }
+            datasourceUid: loki
+            model:
+              datasource: { type: loki, uid: loki }
+              editorMode: code
+              queryType: instant
+              refId: A
+              expr: sum(count_over_time({service_name=~"catalyst.+"} |= "pr.merged.cleanup-failed" [1h]))
+          - refId: B
+            relativeTimeRange: { from: 3600, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              expression: A
+              reducer: last
+              datasource: { type: __expr__, uid: __expr__ }
+          - refId: C
+            relativeTimeRange: { from: 3600, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              refId: C
+              expression: B
+              datasource: { type: __expr__, uid: __expr__ }
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [3]
+
+  # =====================================================================
+  # Fleet resources & wedge self-detection (critic pass) — Prometheus gauges.
+  # =====================================================================
+  - orgId: 1
+    name: catalyst-fleet-resources
+    folder: Catalyst Alerts
+    interval: 1m
+    rules:
+      # 10) ★ CRITICAL — the shared Anthropic account 5h rate-limit window near
+      #     exhaustion. At 100% EVERY agent's LLM call fails fleet-wide until reset
+      #     — the ROOT cause behind any 429 burst the api-error alert sees as a
+      #     downstream symptom. Prometheus gauge. CAVEAT: the CTL-787 poller is
+      #     currently idle, so the gauge expires (15m) and reads NoData/OK today
+      #     (won't false-fire); it lights up the moment the poller resumes.
+      - uid: catalyst_account_ratelimit_saturated
+        title: Account 5h rate-limit window near exhaustion (LLM halt)
+        condition: C
+        for: 5m
+        noDataState: OK
+        execErrState: OK
+        labels:
+          team: catalyst
+          signal: account_ratelimit_saturated
+          severity: critical
+        annotations:
+          summary: 'Anthropic account 5h rate-limit window > 95% — all LLM calls about to halt fleet-wide'
+          description: >
+            The shared account 5-hour rate-limit window is over 95% consumed. At 100%
+            every agent's LLM call fails until the window resets — a fleet-wide work
+            stoppage and the ROOT cause behind any 429 burst on the api-error alert.
+            NOTE the gauge expires 15m after the CTL-787 poller stops sampling, so this
+            reads NoData/OK (won't false-fire) while the poller is idle. Companion 7d
+            window = catalyst_account_ratelimit_seven_day_pct.
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: prometheus
+            model:
+              datasource: { type: prometheus, uid: prometheus }
+              editorMode: code
+              instant: true
+              range: false
+              refId: A
+              expr: max(catalyst_account_ratelimit_five_hour_pct)
+          - refId: B
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              expression: A
+              reducer: last
+              datasource: { type: __expr__, uid: __expr__ }
+          - refId: C
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              refId: C
+              expression: B
+              datasource: { type: __expr__, uid: __expr__ }
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [95]
+
+      # 11) ★ WARNING — a node's disk >90%. When disk fills, per-ticket git
+      #     worktree creation fails and the scheduler can't dispatch new work on
+      #     that node (hard, node-local blocker). Use host_disk_used_pct (real fs
+      #     pressure), NOT the APFS-inflated worktree logical-bytes gauge.
+      #     Prometheus gauge, per host_name.
+      - uid: catalyst_host_disk_exhaustion
+        title: Host disk > 90% (worktree/dispatch block risk)
+        condition: C
+        for: 10m
+        noDataState: OK
+        execErrState: OK
+        labels:
+          team: catalyst
+          signal: host_disk_exhaustion
+          severity: warning
+        annotations:
+          summary: 'A node''s disk is over 90% full — worktree creation / dispatch at risk'
+          description: >
+            catalyst_host_disk_used_pct exceeded 90% on a node for 10m. When disk fills,
+            per-ticket git worktree creation fails and the scheduler cannot dispatch new
+            work on that node. Use host_disk_used_pct (real fs pressure), NOT the
+            APFS-inflated worktree logical-bytes gauge. macOS disk = /System/Volumes/Data.
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: prometheus
+            model:
+              datasource: { type: prometheus, uid: prometheus }
+              editorMode: code
+              instant: true
+              range: false
+              refId: A
+              expr: max by (host_name) (catalyst_host_disk_used_pct)
+          - refId: B
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              expression: A
+              reducer: last
+              datasource: { type: __expr__, uid: __expr__ }
+          - refId: C
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              refId: C
+              expression: B
+              datasource: { type: __expr__, uid: __expr__ }
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [90]
+
+      # 12) WARNING — the recovery board-scan's OWN fleet-health check reports >0
+      #     failed invariants (dispatchLiveness / strandedNode / blockedTree / ...)
+      #     for 15m: the orchestrator says work is wedged. Recovery is shadow-mode
+      #     and the rollup can include flappier invariants, hence 15m `for` +
+      #     warning. Only the rollup is a metric (per-invariant booleans are Loki
+      #     structured metadata). Prometheus gauge, per host_name.
+      - uid: catalyst_recovery_invariants_failed
+        title: Recovery invariants failing (fleet wedge self-detected)
+        condition: C
+        for: 15m
+        noDataState: OK
+        execErrState: OK
+        labels:
+          team: catalyst
+          signal: recovery_invariants_failed
+          severity: warning
+        annotations:
+          summary: 'Recovery board-scan reports >0 failed fleet invariants for 15m'
+          description: >
+            catalyst_recovery_invariants_failed (0..7) has been nonzero for 15m — the
+            recovery pass's own fleet-health check (dispatchLiveness / strandedNode /
+            blockedTree / projectSilence / rateLimitHeadroom / cacheCoherence / workerAge)
+            says something is wedged. Only the rollup is a metric; drill the per-invariant
+            recovery_inv_*_failed booleans on the recovery.board-scan event to see which.
+            Recovery is shadow-mode today, so treat as advisory wedge detection.
+        data:
+          - refId: A
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: prometheus
+            model:
+              datasource: { type: prometheus, uid: prometheus }
+              editorMode: code
+              instant: true
+              range: false
+              refId: A
+              expr: max by (host_name) (catalyst_recovery_invariants_failed)
+          - refId: B
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              expression: A
+              reducer: last
+              datasource: { type: __expr__, uid: __expr__ }
+          - refId: C
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              refId: C
+              expression: B
+              datasource: { type: __expr__, uid: __expr__ }
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+
+# =====================================================================
+# WATCH-ONLY / DELIBERATELY-NOT-PROVISIONED (overlaps & no-signature signals).
+# Documented here so a future author does not re-add a noisy or unfireable rule.
+#
+#   - Daemon heartbeat absence (node.heartbeat / monitor.heartbeat /
+#     broker.daemon.heartbeat): do NOT add a Grafana count==0 silence rule. A
+#     fully-dead daemon = a MISSING Loki series (Loki can't assert absent), and the
+#     metric path hits the metric_expiration:15m trap that killed the
+#     updater-liveness rule (Codex P2 #74). Owned by Gatus active probes + the
+#     catalyst-survivability system_down rule.
+#   - catalyst.ingestion.stale / .recovered: overlaps telemetry-forward-stalled
+#     (forward_failed). Self-healing (paired .recovered) and noisy; the
+#     forward_failed rule already guards "the stack goes blind".
+#   - fleet.health.degraded: ~87/3h live and mini runs chronically hot on mem/swap
+#     => would page constantly. Its work-blocking content is rolled up by
+#     catalyst_recovery_invariants_failed — alert on that instead.
+#   - monitor.reconcile.failing / .recovered: self-heal pair on the secondary
+#     (monitor/webhook) loop, not the ticket-progression path; not a hard blocker.
+#   - monitor.ui.build_failed: the dashboard UI build, not orchestration workflow;
+#     does not stall ticket progress.
+#   - GitHub read/API failures: NO live log signature exists yet (0 hits). Keep
+#     watch-only; do not provision until a real error line appears.
+#   - Metric "work stalled" (catalyst_scheduler_eligible_work>0 AND
+#     catalyst_scheduler_running_workers==0): confounded by the SDK in-process
+#     executor (runs work with running_workers==0) => false-positives. The
+#     log-based read-failure rules above are the reliable substitute.
+#   - Claude 429/5xx API error rate: already alerted (claude_code_api_error_rate_high,
+#     tier-b). The account-ratelimit-pct rule above is the distinct ROOT/leading
+#     signal, not a duplicate of the downstream-error alert.
+#   - Host MEMORY pressure (catalyst_host_mem_used_pct): mini sits ~82% steady
+#     state => chronic noise. Disk is the genuinely work-blocking host resource.
+# =====================================================================
