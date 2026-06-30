@@ -85,13 +85,13 @@
       "id": 3,
       "type": "stat",
       "title": "Time since last cloud ingest (per source)",
-      "description": "Latest receivedAt epoch-ms per source, rendered as age via the dateTimeFromNow unit. NOTE: LogQL has no now()/time() in metric queries, so threshold COLORING operates on raw epoch-ms (not age) and will not light meaningfully — pair this with the node-staleness stat (panel 6) for true age coloring. Verified: github age ~13m, linear age ~2.7m.",
+      "description": "Latest receivedAt epoch-ms per source, rendered as age via the dateTimeFromNow unit. The AGE TEXT is correct; coloring is intentionally NEUTRAL (blue) — LogQL has no now()/time() in metric queries, so a threshold on the raw epoch-ms value can't express age (it would pin red regardless of freshness). For age-based health use the staleness headline (Panel 8). Verified: ages render correctly.",
       "datasource": { "type": "loki", "uid": "loki" },
       "gridPos": { "h": 6, "w": 6, "x": 12, "y": 5 },
       "fieldConfig": {
         "defaults": {
           "unit": "dateTimeFromNow",
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 300000 }, { "color": "red", "value": 900000 }] }
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] }
         },
         "overrides": []
       },
@@ -143,7 +143,7 @@
       "id": 5,
       "type": "timeseries",
       "title": "Silent-drop rate (deduped=true) by source",
-      "description": "CTC-139-class signal: ingest.committed with deduped:true = a silently-dropped delivery. Verified currently 0 for all sources (committed total 81 = deduped:false github 54 + linear 27). Any non-zero here is a real drop.",
+      "description": "CTC-139-class signal: ingest.committed with deduped:true = a silently-dropped delivery at CLOUD COMMIT. Occurs at a LOW baseline (~1 per 24h observed), so treat ANY reading as signal, not noise. NOTE: this is the cloud-commit dedup drop — it is SEPARATE from the node-side apply-failure incident (those drops are at the apply stage; that hop is CTL-1402, the gap panel below).",
       "datasource": { "type": "loki", "uid": "loki" },
       "gridPos": { "h": 6, "w": 12, "x": 0, "y": 11 },
       "fieldConfig": {
@@ -229,21 +229,21 @@
     {
       "id": 8,
       "type": "stat",
-      "title": "Cloud-vs-node Linear lag (head behind) — HEADLINE",
-      "description": "Lag = cloud headSeq(linear) − node cursor(linear), per node. NO single LogQL subtracts across two stream selectors — built as a Grafana math expression $B − $A (A = per-node cursor, B = scalar cloud head). Verified inputs: head=327132, cursor mini/mini-2=327134 → ~0 now (caught up). Brief negatives are expected when the cloud head window trails the per-node last cursor.",
+      "title": "Local Linear replica staleness — HEADLINE",
+      "description": "Authoritative per-node freshness: catalyst.linear.replica.staleness (age in ms) — how stale each node's local Linear replica is. It is an age, so it cannot go falsely negative. This REPLACED the cloud-vs-node seq-delta that was the headline: cloud headSeq is a GLOBAL interleaved commit position, not a per-source Linear watermark, so it can't be cleanly differenced against the node's Linear cursor — the delta ran chronically negative and could show green while a node was behind. Seq semantics pending CTC/READ-SDK; true per-update latency = CTL-1402 (panel below). Linear only; mini/mini-2 only.",
       "datasource": { "type": "loki", "uid": "loki" },
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 25 },
       "fieldConfig": {
         "defaults": {
-          "unit": "none",
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 50 }, { "color": "red", "value": 200 }] }
+          "unit": "ms",
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 30000 }, { "color": "red", "value": 120000 }] }
         },
         "overrides": []
       },
       "options": {
         "colorMode": "background",
         "graphMode": "none",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "/^Lag$/" }
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "" }
       },
       "targets": [
         {
@@ -251,28 +251,15 @@
           "refId": "A",
           "queryType": "instant",
           "legendFormat": "{{host_name}}",
-          "expr": "last_over_time({service_name=\"catalyst.cloud-sync\"} |= \"cloud-sync: freshness\" | host_name=~\"$node\" | regexp `\"catalyst.linear.replica.cursor\":(?P<c>[0-9]+)` | unwrap c [10m]) by (host_name)"
-        },
-        {
-          "datasource": { "type": "loki", "uid": "loki" },
-          "refId": "B",
-          "queryType": "instant",
-          "hide": true,
-          "expr": "max(max_over_time({service_namespace=\"catalyst-cloud\"} |= \"ingest.committed\" | regexp `\"source\":\"(?P<src>[a-z_]+)\"` | src=\"linear\" | regexp `\"headSeq\":(?P<hs>[0-9]+)` | unwrap hs [30m]))"
-        },
-        {
-          "refId": "Lag",
-          "datasource": { "type": "__expr__", "uid": "__expr__" },
-          "type": "math",
-          "expression": "$B - $A"
+          "expr": "max by (host_name)(max_over_time({service_name=\"catalyst.cloud-sync\"} |= \"cloud-sync: freshness\" | host_name=~\"$node\" | regexp `\"catalyst.linear.replica.staleness\":(?P<s>[0-9]+)` | unwrap s [5m]))"
         }
       ]
     },
     {
       "id": 9,
       "type": "timeseries",
-      "title": "Cloud-vs-node Linear lag over time",
-      "description": "Range variant of the headline: B (scalar cloud head, [5m] window) − A (per-node cursor) plotted per node. Verified range inputs: cursor returns mini+mini-2, head scalar=327132.",
+      "title": "Cloud-vs-node seq delta over time (EXPERIMENTAL — not a true lag)",
+      "description": "EXPERIMENTAL / directional only. Plots cloud headSeq(linear) − node Linear cursor over time. These are NOT a clean shared seq space — headSeq is a GLOBAL interleaved commit position, the node cursor is Linear-specific — so the delta is biased (runs negative) and must NOT be read as a true lag. Authoritative freshness = the staleness headline (Panel 8) + Panel 6. Kept as a raw diagnostic pending CTC/READ-SDK clarification of the seq semantics; true per-update latency = CTL-1402.",
       "datasource": { "type": "loki", "uid": "loki" },
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 25 },
       "fieldConfig": {
@@ -314,7 +301,7 @@
       "id": 10,
       "type": "stat",
       "title": "⚠ GAP — Per-update cloud→node apply latency (CTL-1402)",
-      "description": "GAP: lights up when CTL-1402 emits catalyst.replica.apply carrying applied_at + received_at + delivery_id. Latency = applied_at − received_at. Verified empty today (count_over_time replica.apply [24h] = 0). Confirm field names against the emitted body before trusting the unwrap; the self-contained inline received_at shape is preferred over a cross-stream delivery_id join.",
+      "description": "GAP: lights up when CTL-1402 emits catalyst.replica.apply carrying applied_at + received_at. Latency = applied_at − received_at, computed via label_format(sub) then unwrap (LogQL unwrap cannot take an arithmetic expression directly — `unwrap (aa - ra)` is a parse error). Verified empty today (replica.apply ships nothing yet) and the query parses clean. When CTL-1402 lands, confirm applied_at/received_at field NAMES and UNITS (epoch-ms assumed; `[0-9]+` will mis-extract seconds/ISO) against a live body.",
       "datasource": { "type": "loki", "uid": "loki" },
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 33 },
       "fieldConfig": {
@@ -336,7 +323,7 @@
           "refId": "A",
           "queryType": "instant",
           "legendFormat": "{{host_name}}",
-          "expr": "quantile_over_time(0.95, {service_name=\"catalyst.cloud-sync\"} |= \"replica.apply\" | host_name=~\"$node\" | regexp `\"applied_at\":(?P<aa>[0-9]+)` | regexp `\"received_at\":(?P<ra>[0-9]+)` | unwrap (aa - ra) [$__range]) by (host_name)"
+          "expr": "quantile_over_time(0.95, {service_name=\"catalyst.cloud-sync\"} |= \"replica.apply\" | host_name=~\"$node\" | regexp `\"applied_at\":(?P<aa>[0-9]+)` | regexp `\"received_at\":(?P<ra>[0-9]+)` | label_format lat=`{{ sub (.aa | int) (.ra | int) }}` | unwrap lat [$__range]) by (host_name)"
         }
       ]
     },
