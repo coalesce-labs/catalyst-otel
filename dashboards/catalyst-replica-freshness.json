@@ -27,10 +27,10 @@
       {
         "name": "node",
         "label": "node",
-        "type": "query",
+        "type": "custom",
         "datasource": { "type": "loki", "uid": "loki" },
-        "query": "label_values({service_name=\"catalyst.cloud-sync\"}, host_name)",
-        "definition": "label_values({service_name=\"catalyst.cloud-sync\"}, host_name)",
+        "query": "mini, mini-2",
+        "definition": "mini, mini-2",
         "regex": "",
         "includeAll": true,
         "multi": true,
@@ -193,7 +193,7 @@
           "refId": "A",
           "queryType": "range",
           "legendFormat": "{{host_name}}",
-          "expr": "avg_over_time({service_name=\"catalyst.cloud-sync\", host_name=~\"$node\"} |= \"cloud-sync: freshness\" | regexp `\"catalyst.linear.replica.staleness\":(?P<s>[0-9]+)` | unwrap s [1m]) by (host_name)"
+          "expr": "avg_over_time({service_name=\"catalyst.cloud-sync\"} |= \"cloud-sync: freshness\" | host_name=~\"$node\" | regexp `\"catalyst.linear.replica.staleness\":(?P<s>[0-9]+)` | unwrap s [1m]) by (host_name)"
         }
       ]
     },
@@ -222,7 +222,7 @@
           "refId": "A",
           "queryType": "range",
           "legendFormat": "{{host_name}}",
-          "expr": "last_over_time({service_name=\"catalyst.cloud-sync\", host_name=~\"$node\"} |= \"cloud-sync: freshness\" | regexp `\"catalyst.linear.replica.cursor\":(?P<c>[0-9]+)` | unwrap c [2m]) by (host_name)"
+          "expr": "last_over_time({service_name=\"catalyst.cloud-sync\"} |= \"cloud-sync: freshness\" | host_name=~\"$node\" | regexp `\"catalyst.linear.replica.cursor\":(?P<c>[0-9]+)` | unwrap c [2m]) by (host_name)"
         }
       ]
     },
@@ -251,7 +251,7 @@
           "refId": "A",
           "queryType": "instant",
           "legendFormat": "{{host_name}}",
-          "expr": "last_over_time({service_name=\"catalyst.cloud-sync\", host_name=~\"$node\"} |= \"cloud-sync: freshness\" | regexp `\"catalyst.linear.replica.cursor\":(?P<c>[0-9]+)` | unwrap c [10m]) by (host_name)"
+          "expr": "last_over_time({service_name=\"catalyst.cloud-sync\"} |= \"cloud-sync: freshness\" | host_name=~\"$node\" | regexp `\"catalyst.linear.replica.cursor\":(?P<c>[0-9]+)` | unwrap c [10m]) by (host_name)"
         },
         {
           "datasource": { "type": "loki", "uid": "loki" },
@@ -293,7 +293,7 @@
           "refId": "A",
           "queryType": "range",
           "legendFormat": "{{host_name}}",
-          "expr": "last_over_time({service_name=\"catalyst.cloud-sync\", host_name=~\"$node\"} |= \"cloud-sync: freshness\" | regexp `\"catalyst.linear.replica.cursor\":(?P<c>[0-9]+)` | unwrap c [2m]) by (host_name)"
+          "expr": "last_over_time({service_name=\"catalyst.cloud-sync\"} |= \"cloud-sync: freshness\" | host_name=~\"$node\" | regexp `\"catalyst.linear.replica.cursor\":(?P<c>[0-9]+)` | unwrap c [2m]) by (host_name)"
         },
         {
           "datasource": { "type": "loki", "uid": "loki" },
@@ -336,7 +336,7 @@
           "refId": "A",
           "queryType": "instant",
           "legendFormat": "{{host_name}}",
-          "expr": "quantile_over_time(0.95, {service_name=\"catalyst.cloud-sync\", host_name=~\"$node\"} |= \"replica.apply\" | regexp `\"applied_at\":(?P<aa>[0-9]+)` | regexp `\"received_at\":(?P<ra>[0-9]+)` | unwrap (aa - ra) [$__range]) by (host_name)"
+          "expr": "quantile_over_time(0.95, {service_name=\"catalyst.cloud-sync\"} |= \"replica.apply\" | host_name=~\"$node\" | regexp `\"applied_at\":(?P<aa>[0-9]+)` | regexp `\"received_at\":(?P<ra>[0-9]+)` | unwrap (aa - ra) [$__range]) by (host_name)"
         }
       ]
     },
@@ -366,7 +366,7 @@
           "refId": "A",
           "queryType": "instant",
           "legendFormat": "{{host_name}}",
-          "expr": "max by (host_name)(max_over_time({service_name=\"catalyst.cloud-sync\", host_name=~\"$node\"} |= \"cloud-sync: freshness\" | regexp `\"catalyst.github.replica.staleness\":(?P<s>[0-9]+)` | unwrap s [10m]))"
+          "expr": "max by (host_name)(max_over_time({service_name=\"catalyst.cloud-sync\"} |= \"cloud-sync: freshness\" | host_name=~\"$node\" | regexp `\"catalyst.github.replica.staleness\":(?P<s>[0-9]+)` | unwrap s [10m]))"
         }
       ]
     }
