@@ -50,3 +50,7 @@ thoughts/
 # Catalyst runtime artifacts (config.json IS tracked)
 .catalyst/.session-id
 .catalyst/.workflow-context.json
+
+# catalyst-otel-private overlay (symlinks wired by deploy.sh; do not commit)
+docker-compose.override.yml
+/private

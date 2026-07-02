@@ -1,0 +1,416 @@
+apiVersion: 1
+
+# OTL-38 + CTL-1369 alerts. Grafana-MANAGED, evaluated on the otel-stack host
+# against the catalyst.updater (plugin-pull) + catalyst.install (lifecycle)
+# signals. Like the OTL-21 TIER-B rules these are the "rare-event" pages that earn
+# their keep as alerts; routing falls through to the root catalyst-pager policy
+# (VISIBLE-but-silent until a real pager URL is wired, per OTL-37).
+#
+# DESIGN — presence over absence. Every rule fires on the PRESENCE of a bad signal
+# (a failed/slow refresh, a drift/lag event, a failed/rolled-back install), which
+# is robust. True "the updater went silent" liveness is fundamentally an absence
+# problem (a silent host emits no series), so it is owned by Gatus (active probe)
+# + the daemon-liveness check, NOT a count==0 Grafana rule. The one liveness rule
+# here is best-effort (catches a recently-alive-then-stopped updater within the
+# 15m metric_expiration window) — Gatus is the source of truth.
+#
+# noDataState/execErrState = OK: a quiet fleet (no refreshes, no installs, updater
+# not yet adopted) returns empty/noData and MUST NOT fire. Several metrics are
+# INERT until the updater is adopted / install PR2 lands; these rules read empty
+# and stay green until then.
+groups:
+  - orgId: 1
+    name: catalyst-updater
+    folder: Catalyst Alerts
+    interval: 1m
+    rules:
+      # 1) ★ Failed plugin-checkout(s) during a refresh — the updater couldn't pull.
+      - uid: catalyst_updater_refresh_failed
+        title: Updater refresh had failed checkouts
+        condition: C
+        for: 5m
+        noDataState: OK
+        execErrState: OK
+        labels:
+          team: catalyst
+          signal: updater_refresh_failed
+          severity: warning
+        annotations:
+          summary: 'catalyst.updater had failed plugin checkouts (sum of refresh.failed > 0 over 15m)'
+          description: >
+            One or more plugin-pull refreshes reported failed checkouts in the last
+            15 minutes (catalyst_updater_refresh_failed_total is the sum of the
+            per-refresh `failed` field). The node's plugin checkout is not advancing
+            cleanly — inspect the catalyst.updater log / the plugin.checkout.refresh_failed
+            events and the failing root.
+          __dashboardUid__: catalyst-fleet-updater
+          __panelId__: '2'
+        data:
+          - refId: A
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: prometheus
+            model:
+              datasource: { type: prometheus, uid: prometheus }
+              editorMode: code
+              instant: true
+              range: false
+              refId: A
+              expr: sum by (host_name) (increase(catalyst_updater_refresh_failed_total[15m]))
+          - refId: B
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              expression: A
+              reducer: last
+              datasource: { type: __expr__, uid: __expr__ }
+          - refId: C
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              refId: C
+              expression: B
+              datasource: { type: __expr__, uid: __expr__ }
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+
+      # 2) ★ Refresh latency p95 elevated — pulls are getting slow.
+      - uid: catalyst_updater_refresh_slow
+        title: Updater refresh p95 slow (>30s)
+        condition: C
+        for: 15m
+        noDataState: OK
+        execErrState: OK
+        labels:
+          team: catalyst
+          signal: updater_refresh_slow
+          severity: warning
+        annotations:
+          summary: 'catalyst.updater refresh p95 wall time over 30s for 15m'
+          description: >
+            The 95th-percentile plugin-pull refresh wall time exceeded 30s over the
+            last 30m, sustained for 15m. Pulls are slow — check git/network on the
+            node, repo size, or a degraded host. Break down by reason × host.
+          __dashboardUid__: catalyst-fleet-updater
+          __panelId__: '4'
+        data:
+          - refId: A
+            relativeTimeRange: { from: 1800, to: 0 }
+            datasourceUid: prometheus
+            model:
+              datasource: { type: prometheus, uid: prometheus }
+              editorMode: code
+              instant: true
+              range: false
+              refId: A
+              expr: histogram_quantile(0.95, sum by (host_name, le) (rate(catalyst_updater_refresh_duration_seconds_bucket[30m])))
+          - refId: B
+            relativeTimeRange: { from: 1800, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              expression: A
+              reducer: last
+              datasource: { type: __expr__, uid: __expr__ }
+          - refId: C
+            relativeTimeRange: { from: 1800, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              refId: C
+              expression: B
+              datasource: { type: __expr__, uid: __expr__ }
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [30]
+
+      # 3) ★ Drift — the BROKER's detect-only pass found a node whose updater fell
+      #    behind/died. This is the robust staleness signal (presence of a drift
+      #    event), used in place of a count==0 staleness rule. LogQL (event-only).
+      - uid: catalyst_updater_drift
+        title: Plugin checkout drift detected (node fell behind)
+        condition: C
+        for: 5m
+        noDataState: OK
+        execErrState: OK
+        labels:
+          team: catalyst
+          signal: updater_drift
+          severity: warning
+        annotations:
+          summary: 'plugin.checkout.drift — a node''s plugin checkout fell behind origin/main'
+          description: >
+            The broker's detect-only pass emitted plugin.checkout.drift in the last
+            30m: a node (owner=updater) whose plugin checkout is behind origin/main —
+            its updater fell behind or died. Check that node's updater liveness + the
+            last successful plugin.checkout.updated.
+          __dashboardUid__: catalyst-fleet-updater
+          __panelId__: '7'
+        data:
+          - refId: A
+            relativeTimeRange: { from: 1800, to: 0 }
+            datasourceUid: loki
+            model:
+              datasource: { type: loki, uid: loki }
+              editorMode: code
+              queryType: instant
+              refId: A
+              expr: sum by (host_name) (count_over_time({service_name=~"catalyst.(broker|updater)"} |= "plugin.checkout.drift" [30m]))
+          - refId: B
+            relativeTimeRange: { from: 1800, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              expression: A
+              reducer: last
+              datasource: { type: __expr__, uid: __expr__ }
+          - refId: C
+            relativeTimeRange: { from: 1800, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              refId: C
+              expression: B
+              datasource: { type: __expr__, uid: __expr__ }
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+
+      # 4) ★ Lag — consecutive pull failures crossed the updater's threshold (ERROR
+      #    event). Occurrence-only: the consecutive_failures COUNT is in body.payload
+      #    (dropped by otel-forward) so we alert on the lag event itself. LogQL.
+      - uid: catalyst_updater_lag
+        title: Updater pull lag (consecutive failures)
+        condition: C
+        for: 5m
+        noDataState: OK
+        execErrState: OK
+        labels:
+          team: catalyst
+          signal: updater_lag
+          severity: warning
+        annotations:
+          summary: 'plugin.checkout.lag — the updater has failed to pull repeatedly'
+          description: >
+            A plugin.checkout.lag (ERROR) event fired in the last 30m: the updater
+            crossed its consecutive-failure threshold and can't pull. Investigate the
+            node's git remote / auth / disk and the catalyst.updater log. (The exact
+            consecutive_failures count is not yet a metric — see updater channel turn 11.)
+          __dashboardUid__: catalyst-fleet-updater
+          __panelId__: '9'
+        data:
+          - refId: A
+            relativeTimeRange: { from: 1800, to: 0 }
+            datasourceUid: loki
+            model:
+              datasource: { type: loki, uid: loki }
+              editorMode: code
+              queryType: instant
+              refId: A
+              expr: sum by (host_name) (count_over_time({service_name=~"catalyst.(broker|updater)"} |= "plugin.checkout.lag" [30m]))
+          - refId: B
+            relativeTimeRange: { from: 1800, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              expression: A
+              reducer: last
+              datasource: { type: __expr__, uid: __expr__ }
+          - refId: C
+            relativeTimeRange: { from: 1800, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              refId: C
+              expression: B
+              datasource: { type: __expr__, uid: __expr__ }
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+
+      # Updater liveness (silence detection) is intentionally NOT a Grafana rule.
+      # A Prometheus increase(...) == 0 absence check can't fire reliably here: the
+      # prometheus exporter expires stale series after metric_expiration: 15m, which
+      # is SHORTER than the range + `for` needed to confirm silence — so when an
+      # updater actually dies the series goes NoData/OK before the rule could fire
+      # (Codex P2 on PR #74 — correct; the earlier best-effort rule was effectively
+      # dead). Updater silence is owned by the GATUS active probe (it queries Loki
+      # for the "daemon heartbeat" line over a window and goes RED on silence, with
+      # no metric-expiration trap). A robust Grafana-native version would need the
+      # last-seen-timestamp gauge asked for on the updater channel (turn 11 Q6).
+      # The dashboard liveness table (panel 6) still shows per-host heartbeat
+      # presence for at-a-glance during normal operation.
+
+  - orgId: 1
+    name: catalyst-install
+    folder: Catalyst Alerts
+    interval: 1m
+    rules:
+      # 6) ★ Install failed.
+      - uid: catalyst_install_failed
+        title: Install run failed
+        condition: C
+        for: 0m
+        noDataState: OK
+        execErrState: OK
+        labels:
+          team: catalyst
+          signal: install_failed
+          severity: warning
+        annotations:
+          summary: 'A catalyst install/uninstall/reinstall run failed'
+          description: >
+            A catalyst.install run reported outcome=failed in the last hour. The
+            install command did not complete on a node — inspect the install-run
+            trace (root span catalyst.install) and the failed phase.
+          __dashboardUid__: catalyst-fleet-install
+          __panelId__: '2'
+        data:
+          - refId: A
+            relativeTimeRange: { from: 3600, to: 0 }
+            datasourceUid: prometheus
+            model:
+              datasource: { type: prometheus, uid: prometheus }
+              editorMode: code
+              instant: true
+              range: false
+              refId: A
+              expr: sum (increase(catalyst_install_total{outcome="failed"}[1h]))
+          - refId: B
+            relativeTimeRange: { from: 3600, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              expression: A
+              reducer: last
+              datasource: { type: __expr__, uid: __expr__ }
+          - refId: C
+            relativeTimeRange: { from: 3600, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              refId: C
+              expression: B
+              datasource: { type: __expr__, uid: __expr__ }
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+
+      # 7) ★ Install rolled back — a failed install triggered rollback.
+      - uid: catalyst_install_rolled_back
+        title: Install run rolled back
+        condition: C
+        for: 0m
+        noDataState: OK
+        execErrState: OK
+        labels:
+          team: catalyst
+          signal: install_rolled_back
+          severity: warning
+        annotations:
+          summary: 'A catalyst install run rolled back'
+          description: >
+            A catalyst.install run reported outcome=rolled_back in the last hour —
+            an install failed and reverted. Check the install-run trace and which
+            phase triggered the rollback.
+          __dashboardUid__: catalyst-fleet-install
+          __panelId__: '2'
+        data:
+          - refId: A
+            relativeTimeRange: { from: 3600, to: 0 }
+            datasourceUid: prometheus
+            model:
+              datasource: { type: prometheus, uid: prometheus }
+              editorMode: code
+              instant: true
+              range: false
+              refId: A
+              expr: sum (increase(catalyst_install_total{outcome="rolled_back"}[1h]))
+          - refId: B
+            relativeTimeRange: { from: 3600, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              expression: A
+              reducer: last
+              datasource: { type: __expr__, uid: __expr__ }
+          - refId: C
+            relativeTimeRange: { from: 3600, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              refId: C
+              expression: B
+              datasource: { type: __expr__, uid: __expr__ }
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+
+      # 8) Slow install phase (GATED). Empty until the install lib promotes
+      #    phase_duration_ms to an attribute (updater channel turn 11) — ships now so
+      #    it lights up with no redeploy. p95 of any phase over 120s.
+      - uid: catalyst_install_phase_slow
+        title: Install phase p95 slow (>120s, gated)
+        condition: C
+        for: 5m
+        noDataState: OK
+        execErrState: OK
+        labels:
+          team: catalyst
+          signal: install_phase_slow
+          severity: warning
+        annotations:
+          summary: 'A catalyst.install phase p95 exceeded 120s'
+          description: >
+            The 95th-percentile wall time of an install phase exceeded 120s in the
+            last hour. Identify the slow phase (acquire/backup/write-config/
+            install-agents/start-daemons/healthcheck). NOTE: gated — populates once
+            the install lib promotes phase_duration_ms (see updater channel turn 11).
+          __dashboardUid__: catalyst-fleet-install
+          __panelId__: '4'
+        data:
+          - refId: A
+            relativeTimeRange: { from: 3600, to: 0 }
+            datasourceUid: prometheus
+            model:
+              datasource: { type: prometheus, uid: prometheus }
+              editorMode: code
+              instant: true
+              range: false
+              refId: A
+              expr: histogram_quantile(0.95, sum by (phase, le) (rate(catalyst_install_duration_seconds_bucket[1h])))
+          - refId: B
+            relativeTimeRange: { from: 3600, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              expression: A
+              reducer: last
+              datasource: { type: __expr__, uid: __expr__ }
+          - refId: C
+            relativeTimeRange: { from: 3600, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              refId: C
+              expression: B
+              datasource: { type: __expr__, uid: __expr__ }
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [120]

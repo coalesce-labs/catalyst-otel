@@ -1,0 +1,953 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      },
+      {
+        "datasource": {
+          "type": "loki",
+          "uid": "loki"
+        },
+        "enable": true,
+        "iconColor": "semi-dark-orange",
+        "name": "Catalyst deploys (PR merged)",
+        "target": {
+          "expr": "{service_name=\"catalyst.github\"} |= `merged`",
+          "queryType": "range",
+          "refId": "deploys"
+        }
+      }
+    ]
+  },
+  "id": null,
+  "panels": [
+    {
+      "id": 1,
+      "type": "text",
+      "gridPos": {
+        "h": 4,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "## Catalyst \u00b7 Fleet \u00b7 Updater \u2014 plugin-pull freshness\n\nMonitors the **catalyst.updater** git plugin-pull daemon (OTL-38 / CTL-1350). Each refresh emits one pino line (`updater: refresh`) on `service_name=catalyst.updater`; the collector promotes its fields into `catalyst_updater_refresh_*` metrics, and `plugin.checkout.*` / `node.updater.heartbeat` events flow to Loki.\n\n**Ships ready-to-receive.** The updater metrics and install signals are **inert until adoption** (and the install PR2). Until the first refresh + first heartbeat land, panels read **empty / `No data yet` / `0`** \u2014 that is expected, not a fault. The version Gantt is **interim** (state-timeline off `catalyst_build_info`); an event-sourced version timeline off `plugin.checkout.updated` is a follow-up."
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "p95 plugin-pull refresh wall time over the last 1h, across all reasons/hosts. Lights up on first adoption.",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "noValue": "No data yet",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 5
+              },
+              {
+                "color": "red",
+                "value": 15
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 4
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(catalyst_updater_refresh_duration_seconds_bucket[1h])))",
+          "editorMode": "code",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "title": "Refresh p95 (1h)"
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Plugin-checkout failures summed across all refreshes in the last 1h. Any value > 0 means a pull is in trouble.",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "0",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 4
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "A",
+          "expr": "sum(increase(catalyst_updater_refresh_failed_total[1h])) or vector(0)",
+          "editorMode": "code",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "title": "Failed checkouts (1h)"
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Plugin checkouts pulled (fetched) summed across all refreshes in the last 1h \u2014 the work the updater actually did.",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "0",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 4
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "A",
+          "expr": "sum(increase(catalyst_updater_refresh_pulled_total[1h])) or vector(0)",
+          "editorMode": "code",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "title": "Checkouts pulled (1h)"
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Distinct hosts that have reported at least one updater refresh. 0 = the updater is not adopted anywhere yet.",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "0",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 4
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "A",
+          "expr": "count(count by (host_name) (catalyst_updater_refresh_total))",
+          "editorMode": "code",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "title": "Hosts reporting"
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Refresh occurrences per $bucket, broken down by reason (scheduled / on-demand / signal / unknown). Filtered by node class.",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 15,
+            "lineWidth": 2,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            }
+          },
+          "unit": "short",
+          "noValue": "No data yet"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "sum"
+          ],
+          "displayMode": "table",
+          "placement": "right"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "A",
+          "expr": "sum by (reason) (increase(catalyst_updater_refresh_total{catalyst_node_class=~\"$node_class\", host_name=~\"$node\"}[$__interval]))",
+          "editorMode": "code",
+          "instant": false,
+          "range": true,
+          "legendFormat": "{{reason}}",
+          "interval": "$bucket"
+        }
+      ],
+      "title": "Refresh rate by reason"
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "p50 (dashed) and p95 (solid) refresh wall time per host, from the duration histogram. Watch for a host whose p95 drifts up \u2014 slow or contended pulls.",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "lineWidth": 2,
+            "showPoints": "never"
+          },
+          "unit": "s",
+          "noValue": "No data yet"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/^p50/"
+            },
+            "properties": [
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "dash": [
+                    6,
+                    6
+                  ],
+                  "fill": "dash"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "A",
+          "expr": "histogram_quantile(0.50, sum by (host_name, le) (rate(catalyst_updater_refresh_duration_seconds_bucket{catalyst_node_class=~\"$node_class\", host_name=~\"$node\"}[$__interval])))",
+          "editorMode": "code",
+          "instant": false,
+          "range": true,
+          "legendFormat": "p50 \u00b7 {{host_name}}",
+          "interval": "$bucket"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "B",
+          "expr": "histogram_quantile(0.95, sum by (host_name, le) (rate(catalyst_updater_refresh_duration_seconds_bucket{catalyst_node_class=~\"$node_class\", host_name=~\"$node\"}[$__interval])))",
+          "editorMode": "code",
+          "instant": false,
+          "range": true,
+          "legendFormat": "p95 \u00b7 {{host_name}}",
+          "interval": "$bucket"
+        }
+      ],
+      "title": "Refresh duration p50 / p95 by host"
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Plugin-checkout throughput per $bucket: pulled (fetched), changed (actually updated), and failed. failed > 0 (red) is the trouble signal.",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 12,
+            "lineWidth": 2,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          },
+          "unit": "short",
+          "noValue": "No data yet"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "failed"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "pulled"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "blue",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "changed"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "green",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 16
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "sum"
+          ],
+          "displayMode": "table",
+          "placement": "right"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "A",
+          "expr": "sum(increase(catalyst_updater_refresh_pulled_total{catalyst_node_class=~\"$node_class\", host_name=~\"$node\"}[$__interval]))",
+          "editorMode": "code",
+          "instant": false,
+          "range": true,
+          "legendFormat": "pulled",
+          "interval": "$bucket"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "B",
+          "expr": "sum(increase(catalyst_updater_refresh_changed_total{catalyst_node_class=~\"$node_class\", host_name=~\"$node\"}[$__interval]))",
+          "editorMode": "code",
+          "instant": false,
+          "range": true,
+          "legendFormat": "changed",
+          "interval": "$bucket"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "C",
+          "expr": "sum(increase(catalyst_updater_refresh_failed_total{catalyst_node_class=~\"$node_class\", host_name=~\"$node\"}[$__interval]))",
+          "editorMode": "code",
+          "instant": false,
+          "range": true,
+          "legendFormat": "failed",
+          "interval": "$bucket"
+        }
+      ],
+      "title": "Checkouts pulled / changed / failed"
+    },
+    {
+      "id": 9,
+      "type": "table",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "description": "Updater liveness: heartbeats (node.updater.heartbeat) per host in the last 10m, filtered to service_name=catalyst.updater (this event collides with execution-core node.heartbeat \u2014 the service filter is mandatory). 0 / empty rows = that updater is down.",
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "down",
+          "custom": {
+            "align": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 16
+      },
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "refId": "A",
+          "queryType": "instant",
+          "instant": true,
+          "range": false,
+          "expr": "sum by (host_name) (count_over_time({service_name=\"catalyst.updater\"} |= \"node.updater.heartbeat\" [10m]))",
+          "legendFormat": ""
+        }
+      ],
+      "transformations": [
+        {
+          "id": "labelsToFields",
+          "options": {
+            "mode": "columns"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "renameByName": {
+              "host_name": "host",
+              "Value": "heartbeats (10m)"
+            }
+          }
+        }
+      ],
+      "title": "Updater liveness \u2014 heartbeats by host (10m; empty = down)"
+    },
+    {
+      "id": 10,
+      "type": "table",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "description": "INTERIM staleness proxy: per host, count of plugin.checkout.updated (the plugin actually advanced) and plugin.checkout.drift events over the selected range, unioned across the broker + updater services. updated = 0 over a long range = that host's plugins are stale. drift > 0 = local state diverged from the remote. Replaced later by an event-sourced version timeline.",
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "0",
+          "custom": {
+            "align": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 24
+      },
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "refId": "A",
+          "queryType": "instant",
+          "instant": true,
+          "range": false,
+          "expr": "sum by (host_name) (count_over_time({service_name=~\"catalyst.(broker|updater)\"} | host_name=~\"${node:pipe}\" |= \"plugin.checkout.updated\" [$__range]))",
+          "legendFormat": ""
+        },
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "refId": "B",
+          "queryType": "instant",
+          "instant": true,
+          "range": false,
+          "expr": "sum by (host_name) (count_over_time({service_name=~\"catalyst.(broker|updater)\"} | host_name=~\"${node:pipe}\" |= \"plugin.checkout.drift\" [$__range]))",
+          "legendFormat": ""
+        }
+      ],
+      "transformations": [
+        {
+          "id": "labelsToFields",
+          "options": {
+            "mode": "columns"
+          }
+        },
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "renameByName": {
+              "host_name": "host",
+              "Value #A": "updated (range)",
+              "Value #B": "drift (range)"
+            }
+          }
+        }
+      ],
+      "title": "Plugin freshness \u2014 updated / drift by host (INTERIM; 0 updated = stale)"
+    },
+    {
+      "id": 11,
+      "type": "state-timeline",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "INTERIM version state: the catalyst plugin/build version reported per host via catalyst_build_info. A band changes color when a host adopts a new version. Note: an event-sourced version Gantt off plugin.checkout.updated is the follow-up that supersedes this.",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "fillOpacity": 70,
+            "lineWidth": 0
+          },
+          "noValue": "No data yet"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 24
+      },
+      "options": {
+        "mergeValues": true,
+        "showValue": "auto",
+        "alignValue": "left",
+        "rowHeight": 0.9,
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "A",
+          "expr": "max by (host_name, service_version) (catalyst_build_info{catalyst_node_class=~\"$node_class\", host_name=~\"$node\"})",
+          "editorMode": "code",
+          "instant": false,
+          "range": true,
+          "legendFormat": "{{host_name}} {{service_version}}"
+        }
+      ],
+      "title": "Build version by host (INTERIM state-timeline)"
+    },
+    {
+      "id": 12,
+      "type": "logs",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "description": "Updater failure feed: refresh_failed / lag / drift lines. Expand a row \u2192 the trace_id field carries a 'View Trace in Tempo' derived-field link (OTL-30 trace-jump). Scoped by $service (the keyword filter keeps it updater-specific even at All).",
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 32
+      },
+      "options": {
+        "showTime": true,
+        "showLabels": false,
+        "wrapLogMessage": true,
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "sortOrder": "Descending"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "refId": "A",
+          "queryType": "range",
+          "expr": "{service_name=~\"${service:pipe}\"} | host_name=~\"${node:pipe}\" |~ \"refresh_failed|lag|drift\""
+        }
+      ],
+      "title": "Updater failure feed \u2014 refresh_failed / lag / drift (trace_id \u2192 Tempo)"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": [
+    "catalyst",
+    "updater",
+    "freshness"
+  ],
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timezone": "browser",
+  "title": "Catalyst \u00b7 Fleet \u00b7 Updater (plugin-pull freshness)",
+  "uid": "catalyst-fleet-updater",
+  "version": 1,
+  "templating": {
+    "list": [
+      {
+        "name": "service",
+        "label": "service",
+        "type": "query",
+        "datasource": {
+          "type": "loki",
+          "uid": "loki"
+        },
+        "query": "label_values(service_name)",
+        "definition": "label_values(service_name)",
+        "regex": "/^catalyst\\..+/",
+        "includeAll": true,
+        "multi": true,
+        "allValue": ".*",
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "refresh": 2,
+        "sort": 1
+      },
+      {
+        "name": "node",
+        "label": "node",
+        "type": "custom",
+        "description": "Filters EVENT/metric panels on host_name and the Loki panels on the host_name structured-metadata field. 'All' = .* (keeps every sample, incl. empty/aliased hosts). A specific node matches the canonical short name.",
+        "query": "mini,mini-2,laptop",
+        "options": [
+          {
+            "text": "mini",
+            "value": "mini",
+            "selected": false
+          },
+          {
+            "text": "mini-2",
+            "value": "mini-2",
+            "selected": false
+          },
+          {
+            "text": "laptop",
+            "value": "laptop",
+            "selected": false
+          }
+        ],
+        "includeAll": true,
+        "multi": true,
+        "allValue": ".*",
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        }
+      },
+      {
+        "name": "node_class",
+        "label": "node class",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "query": "label_values(catalyst_event_total, catalyst_node_class)",
+        "definition": "label_values(catalyst_event_total, catalyst_node_class)",
+        "includeAll": true,
+        "multi": true,
+        "allValue": ".*",
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "refresh": 2,
+        "sort": 1
+      },
+      {
+        "name": "bucket",
+        "label": "Bucket",
+        "type": "interval",
+        "description": "Bucket width for the rate/histogram timeseries (floor 1m \u2248 4\u00d7 the 15s scrape; default 5m).",
+        "datasource": null,
+        "query": "1m,5m,10m,30m,1h,6h,1d",
+        "auto": true,
+        "auto_count": 30,
+        "auto_min": "1m",
+        "current": {
+          "text": "5m",
+          "value": "5m"
+        },
+        "options": [
+          {
+            "text": "auto",
+            "value": "$__auto_interval_bucket",
+            "selected": false
+          },
+          {
+            "text": "1m",
+            "value": "1m",
+            "selected": false
+          },
+          {
+            "text": "5m",
+            "value": "5m",
+            "selected": true
+          },
+          {
+            "text": "10m",
+            "value": "10m",
+            "selected": false
+          },
+          {
+            "text": "30m",
+            "value": "30m",
+            "selected": false
+          },
+          {
+            "text": "1h",
+            "value": "1h",
+            "selected": false
+          },
+          {
+            "text": "6h",
+            "value": "6h",
+            "selected": false
+          },
+          {
+            "text": "1d",
+            "value": "1d",
+            "selected": false
+          }
+        ],
+        "refresh": 2,
+        "hide": 0,
+        "skipUrlSync": false
+      }
+    ]
+  }
+}
