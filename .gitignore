@@ -54,3 +54,6 @@ thoughts/
 # catalyst-otel-private overlay (symlinks wired by deploy.sh; do not commit)
 docker-compose.override.yml
 /private
+
+# Machine-local direnv wiring (profiles/creds) — untracked per OTL session 2026-06-26
+.envrc
