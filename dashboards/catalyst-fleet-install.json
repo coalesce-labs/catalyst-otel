@@ -45,7 +45,7 @@
       "id": 1,
       "options": {
         "mode": "markdown",
-        "content": "## Catalyst \u00b7 Fleet \u00b7 Install lifecycle\nTerminal outcomes and per-phase timing for the **catalyst.install / uninstall / reinstall** lifecycle (CTL-1369). Metrics come from the `catalyst_install_*` log\u2192metrics connectors in `collector-config.yaml`; the run feed is Loki `{service_name=\"catalyst.install\"}` with a per-run `trace_id` for the root-span Tempo jump.\n\n> **Ships ready-to-receive.** The install/updater install signals are **inert until adoption / install PR2** \u2014 until the first real install lands, every panel reads empty / `No data yet`. The **per-phase duration** panel is additionally **gated** on the `catalyst.install.phase_duration_ms` attribute (updater channel turn 11) and will stay empty until the install lib promotes it.\n\nUse **$node_class** to scope by node class, **$service** to scope the run feed, and **$bucket** to set the rate/histogram step."
+        "content": "## Catalyst · Fleet · Install lifecycle\nTerminal outcomes and per-phase timing for the **catalyst.install / uninstall / reinstall** lifecycle (CTL-1369). Metrics come from the `catalyst_install_*` log→metrics connectors in `collector-config.yaml`; the run feed is Loki `{service_name=\"catalyst.install\"}` with a per-run `trace_id` for the root-span Tempo jump.\n\n> **Ships ready-to-receive.** The install/updater install signals are **inert until adoption / install PR2** — until the first real install lands, every panel reads empty / `No data yet`. The **per-phase duration** panel is additionally **gated** on the `catalyst.install.phase_duration_ms` attribute (updater channel turn 11) and will stay empty until the install lib promotes it.\n\nUse **$node_class** to scope by node class, **$service** to scope the run feed, and **$bucket** to set the rate/histogram step."
       },
       "title": "",
       "transparent": true,
@@ -53,8 +53,8 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
+        "type": "loki",
+        "uid": "loki"
       },
       "description": "Total install/uninstall/reinstall terminal outcomes recorded in the selected range.",
       "fieldConfig": {
@@ -92,15 +92,13 @@
       "targets": [
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
+            "type": "loki",
+            "uid": "loki"
           },
           "refId": "A",
-          "expr": "sum(increase(catalyst_install_total{catalyst_node_class=~\"$node_class\"}[$__range])) or vector(0)",
+          "expr": "sum(count_over_time({service_name=\"catalyst.install\"} | event_name=~\"catalyst.install.(completed|failed|rolled_back)\" | catalyst_node_class=~\"$node_class\" [$__range]))",
           "editorMode": "code",
-          "instant": true,
-          "range": false,
-          "format": "table"
+          "queryType": "instant"
         }
       ],
       "title": "Install runs (range)",
@@ -108,8 +106,8 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
+        "type": "loki",
+        "uid": "loki"
       },
       "description": "Share of runs ending in outcome=completed. Yellow < 95%, red < 80%.",
       "fieldConfig": {
@@ -132,7 +130,7 @@
             ]
           },
           "unit": "percent",
-          "noValue": "No data yet"
+          "noValue": "—"
         },
         "overrides": []
       },
@@ -155,15 +153,13 @@
       "targets": [
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
+            "type": "loki",
+            "uid": "loki"
           },
           "refId": "A",
-          "expr": "100 * sum(increase(catalyst_install_total{outcome=\"completed\",catalyst_node_class=~\"$node_class\"}[$__range])) / clamp_min(sum(increase(catalyst_install_total{catalyst_node_class=~\"$node_class\"}[$__range])), 1)",
+          "expr": "100 * sum(count_over_time({service_name=\"catalyst.install\"} | event_name=\"catalyst.install.completed\" | catalyst_node_class=~\"$node_class\" [$__range])) / sum(count_over_time({service_name=\"catalyst.install\"} | event_name=~\"catalyst.install.(completed|failed|rolled_back)\" | catalyst_node_class=~\"$node_class\" [$__range]))",
           "editorMode": "code",
-          "instant": true,
-          "range": false,
-          "format": "table"
+          "queryType": "instant"
         }
       ],
       "title": "Success rate (range)",
@@ -171,8 +167,8 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
+        "type": "loki",
+        "uid": "loki"
       },
       "description": "Runs ending in outcome=failed. Any > 0 warrants a look at the run feed below.",
       "fieldConfig": {
@@ -214,15 +210,13 @@
       "targets": [
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
+            "type": "loki",
+            "uid": "loki"
           },
           "refId": "A",
-          "expr": "sum(increase(catalyst_install_total{outcome=\"failed\",catalyst_node_class=~\"$node_class\"}[$__range])) or vector(0)",
+          "expr": "sum(count_over_time({service_name=\"catalyst.install\"} | event_name=\"catalyst.install.failed\" | catalyst_node_class=~\"$node_class\" [$__range]))",
           "editorMode": "code",
-          "instant": true,
-          "range": false,
-          "format": "table"
+          "queryType": "instant"
         }
       ],
       "title": "Failed runs (range)",
@@ -230,10 +224,10 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
+        "type": "loki",
+        "uid": "loki"
       },
-      "description": "Runs ending in outcome=rolled_back \u2014 the install aborted and reverted. Red at \u2265 1.",
+      "description": "Runs ending in outcome=rolled_back — the install aborted and reverted. Red at ≥ 1.",
       "fieldConfig": {
         "defaults": {
           "thresholds": {
@@ -273,15 +267,13 @@
       "targets": [
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
+            "type": "loki",
+            "uid": "loki"
           },
           "refId": "A",
-          "expr": "sum(increase(catalyst_install_total{outcome=\"rolled_back\",catalyst_node_class=~\"$node_class\"}[$__range])) or vector(0)",
+          "expr": "sum(count_over_time({service_name=\"catalyst.install\"} | event_name=\"catalyst.install.rolled_back\" | catalyst_node_class=~\"$node_class\" [$__range]))",
           "editorMode": "code",
-          "instant": true,
-          "range": false,
-          "format": "table"
+          "queryType": "instant"
         }
       ],
       "title": "Rolled-back runs (range)",
@@ -289,8 +281,8 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
+        "type": "loki",
+        "uid": "loki"
       },
       "description": "Install terminal outcomes per $bucket, faceted by outcome. completed=green, failed=red, rolled_back=orange. Empty until the first real install lands (adoption / PR2).",
       "fieldConfig": {
@@ -379,16 +371,15 @@
       "targets": [
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
+            "type": "loki",
+            "uid": "loki"
           },
           "refId": "A",
-          "expr": "sum by (outcome) (increase(catalyst_install_total{catalyst_node_class=~\"$node_class\"}[$__interval]))",
+          "expr": "sum by (outcome) (count_over_time({service_name=\"catalyst.install\"} | event_name=~\"catalyst.install.(completed|failed|rolled_back)\" | catalyst_node_class=~\"$node_class\" [$__interval]))",
           "editorMode": "code",
-          "instant": false,
-          "range": true,
           "legendFormat": "{{outcome}}",
-          "interval": "$bucket"
+          "interval": "$bucket",
+          "queryType": "range"
         }
       ],
       "title": "Install outcomes over time",
@@ -396,10 +387,10 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
+        "type": "loki",
+        "uid": "loki"
       },
-      "description": "p95 install phase wall time by phase (acquire, backup, write-config, install-agents, start-daemons, healthcheck \u2014 plus any uninstall/reinstall phases that appear). GATED: empty until the `catalyst.install.phase_duration_ms` attribute lands (see updater channel turn 11); built now so it lights up with no redeploy.",
+      "description": "p95 install phase wall time by phase (acquire, backup, write-config, install-agents, start-daemons, healthcheck — plus any uninstall/reinstall phases that appear). GATED: empty until the `catalyst.install.phase_duration_ms` attribute lands (see updater channel turn 11); built now so it lights up with no redeploy.",
       "fieldConfig": {
         "defaults": {
           "custom": {
@@ -408,7 +399,7 @@
             "lineWidth": 2,
             "showPoints": "auto"
           },
-          "unit": "s",
+          "unit": "ms",
           "noValue": "No data yet (gated on phase_duration_ms)"
         },
         "overrides": []
@@ -437,25 +428,24 @@
       "targets": [
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
+            "type": "loki",
+            "uid": "loki"
           },
           "refId": "A",
-          "expr": "histogram_quantile(0.95, sum by (operation, phase, le) (rate(catalyst_install_duration_seconds_bucket[$__interval])))",
+          "expr": "quantile_over_time(0.95, {service_name=\"catalyst.install\"} | event_name=\"catalyst.install.phase\" | catalyst_node_class=~\"$node_class\" | unwrap catalyst_install_phase_duration_ms [$__interval]) by (operation, phase)",
           "editorMode": "code",
-          "instant": false,
-          "range": true,
           "legendFormat": "{{operation}} · {{phase}}",
-          "interval": "$bucket"
+          "interval": "$bucket",
+          "queryType": "range"
         }
       ],
-      "title": "Install phase duration p95 \u2014 GATED (empty until phase_duration_ms lands)",
+      "title": "Install phase duration p95 — per phase (ms)",
       "type": "timeseries"
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
+        "type": "loki",
+        "uid": "loki"
       },
       "description": "Run count by operation (install / uninstall / reinstall) over the selected range.",
       "fieldConfig": {
@@ -491,16 +481,14 @@
       "targets": [
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
+            "type": "loki",
+            "uid": "loki"
           },
           "refId": "A",
-          "expr": "sum by (operation) (increase(catalyst_install_total{catalyst_node_class=~\"$node_class\"}[$__range]))",
+          "expr": "sum by (operation) (count_over_time({service_name=\"catalyst.install\"} | event_name=~\"catalyst.install.(completed|failed|rolled_back)\" | catalyst_node_class=~\"$node_class\" [$__range]))",
           "editorMode": "code",
-          "instant": true,
-          "range": false,
           "legendFormat": "{{operation}}",
-          "format": "table"
+          "queryType": "instant"
         }
       ],
       "title": "Runs by operation (range)",
@@ -508,8 +496,8 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
+        "type": "loki",
+        "uid": "loki"
       },
       "description": "Where installs break: bare install occurrences by event_action (started / phase / completed / failed / rolled_back) and host. Sourced from catalyst_event_total{event_entity=\"install\"}, which is always present once installs run (independent of the gated duration histogram).",
       "fieldConfig": {
@@ -550,37 +538,16 @@
       "targets": [
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
+            "type": "loki",
+            "uid": "loki"
           },
           "refId": "A",
-          "expr": "sum by (event_action, operation, host_name) (increase(catalyst_event_total{event_entity=\"install\",catalyst_node_class=~\"$node_class\"}[$__range]))",
+          "expr": "sum by (event_name, operation, host_name) (count_over_time({service_name=\"catalyst.install\"} | catalyst_node_class=~\"$node_class\" [$__range]))",
           "editorMode": "code",
-          "instant": true,
-          "range": false,
-          "format": "table"
+          "queryType": "instant"
         }
       ],
-      "transformations": [
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": {
-              "Time": true,
-              "__name__": true,
-              "job": true,
-              "instance": true
-            },
-            "renameByName": {
-              "event_action": "Action",
-              "operation": "Operation",
-              "host_name": "Host",
-              "Value": "Count"
-            }
-          }
-        }
-      ],
-      "title": "Install stages \u2014 occurrences by action (where installs break)",
+      "title": "Install stages — occurrences by action (where installs break)",
       "type": "table"
     },
     {
@@ -588,7 +555,7 @@
         "type": "loki",
         "uid": "loki"
       },
-      "description": "Live catalyst.install lifecycle events. Expand a row \u2192 the trace_id field carries a 'View Trace in Tempo' link (Loki derivedField) \u2192 opens that run's root-span flame graph. Empty until the first real install emits (adoption / PR2).",
+      "description": "Live catalyst.install lifecycle events. Expand a row → the trace_id field carries a 'View Trace in Tempo' link (Loki derivedField) → opens that run's root-span flame graph. Empty until the first real install emits (adoption / PR2).",
       "gridPos": {
         "h": 9,
         "w": 24,
@@ -612,10 +579,10 @@
           },
           "refId": "A",
           "queryType": "range",
-          "expr": "{service_name=~\"${service:pipe}\"} |= `catalyst.install`"
+          "expr": "{service_name=\"catalyst.install\"} | catalyst_node_class=~\"$node_class\""
         }
       ],
-      "title": "Install run feed \u2014 expand a row, click trace_id \u2192 root-span flame graph (Tempo)",
+      "title": "Install run feed — expand a row, click trace_id → root-span flame graph (Tempo)",
       "type": "logs"
     }
   ],
@@ -631,7 +598,7 @@
     "to": "now"
   },
   "timezone": "",
-  "title": "Catalyst \u00b7 Fleet \u00b7 Install lifecycle",
+  "title": "Catalyst · Fleet · Install lifecycle",
   "uid": "catalyst-fleet-install",
   "version": 1,
   "templating": {
@@ -694,7 +661,7 @@
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "description": "Prometheus label catalyst_node_class \u2014 filters the install metric panels.",
+        "description": "Prometheus label catalyst_node_class — filters the install metric panels.",
         "definition": "label_values(catalyst_event_total, catalyst_node_class)",
         "query": "label_values(catalyst_event_total, catalyst_node_class)",
         "refresh": 2,
@@ -715,7 +682,7 @@
         "name": "bucket",
         "label": "Bucket",
         "type": "interval",
-        "description": "Bucket width for the rate/histogram timeseries (floor 1m \u2248 4\u00d7 the 15s scrape; default 5m).",
+        "description": "Bucket width for the rate/histogram timeseries (floor 1m ≈ 4× the 15s scrape; default 5m).",
         "datasource": null,
         "query": "1m,5m,10m,30m,1h,6h,1d",
         "auto": true,
