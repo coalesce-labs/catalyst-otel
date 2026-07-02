@@ -19,7 +19,7 @@
       }
     ]
   },
-  "annotations": { "list": [] },
+  "annotations": { "list": [ { "datasource": { "type": "loki", "uid": "loki" }, "enable": true, "iconColor": "semi-dark-orange", "name": "Catalyst PR merged", "target": { "expr": "{service_name=\"catalyst.github\"} |= `github.pr.merged` |= `coalesce-labs/catalyst` | regexp `(?P<pr>PR #[0-9]+)` | line_format `merged {{.pr}}`", "queryType": "range", "refId": "prmerged" } }, { "datasource": { "type": "loki", "uid": "loki" }, "enable": false, "iconColor": "semi-dark-blue", "name": "Node restart (code live)", "target": { "expr": "{service_name=\"catalyst.broker\"} |= `stack.reload.complete` | line_format `{{.host_name}} restarted`", "queryType": "range", "refId": "restart" } } ] },
   "panels": [
     {
       "type": "text", "id": 1, "transparent": true, "gridPos": { "h": 3, "w": 24, "x": 0, "y": 0 },
