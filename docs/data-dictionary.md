@@ -3,6 +3,10 @@
 > Single source of truth for the **metrics, logs, and traces** flowing through the catalyst observability stack (OTel Collector → Prometheus + Loki + Tempo → Grafana). Use it to know what each signal means, which dimensions you can trust, and how to correlate across signals.
 >
 > **Last verified:** 2026-06-29 against the live home stack. **Owner:** OTL team. When you add/rename a signal or dimension, update this file (a CI governance check is planned — see [Data quality](#data-quality--desired-envelope)).
+>
+> **Managed backends:** all three signals also fan out to **Dash0** and **Honeycomb** (the `otlp_http/dash0` + `otlp_http/honeycomb` exporters) — metrics and logs since 2026-06-07, and **traces** since 2026-07-02 (added *after* `tail_sampling`, so the per-span vendor bill rides only the sampled stream).
+>
+> **Catalyst Cloud:** telemetry from the Cloudflare side (Workers + AI Gateway, `service.namespace=catalyst-cloud`) is catalogued separately in the overlay repo's `docs/data-dictionary-cloud.md`. This file covers the self-hosted (`service.namespace=catalyst`) fleet.
 
 ## How to query
 
@@ -312,7 +316,7 @@ Cross-signal correlation is reliable only on **service identity**; **host identi
 
 ## Traces catalog
 
-> **Status: LIVE (verified 2026-06-24).** Tier-3 OTLP spans are flowing for `catalyst.execution-core` on mini and verified in Tempo (the OTL-25 ⇄ CTL-1330 sign-off). The taxonomy below is the design contract, now confirmed-on-arrival — with two deviations flagged inline: `liveness.refresh` ships as its own ROOT span (not a tick child) this cut, and trace↔logs correlation does **not** round-trip yet (see Correlation + maturity note). Per-run `catalyst.install` traces are now also LIVE in Tempo (CTL-1369); `updater.refresh` traces are built-not-flowing (gated on CTL-1376).
+> **Status: LIVE (verified 2026-06-24).** Tier-3 OTLP spans are flowing for `catalyst.execution-core` on mini and verified in Tempo (the OTL-25 ⇄ CTL-1330 sign-off). The taxonomy below is the design contract, now confirmed-on-arrival — with two deviations flagged inline: `liveness.refresh` ships as its own ROOT span (not a tick child) this cut, and trace↔logs correlation does **not** round-trip yet (see Correlation + maturity note). Per-run `catalyst.install` traces are now also LIVE in Tempo (CTL-1369); `updater.refresh` traces are built-not-flowing (gated on CTL-1376). **Destinations (2026-07-02):** spans now fan out to **Tempo + Dash0 + Honeycomb** (the vendor legs sit after `tail_sampling`, so they bill only for the sampled stream) — previously Tempo-only.
 
 | Span | Kind | Parent | Key attributes | Status | Purpose |
 |------|------|--------|----------------|--------|---------|
