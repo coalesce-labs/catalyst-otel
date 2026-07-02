@@ -101,6 +101,30 @@ processors:
           - set(attributes["process_rss_mb"], attributes["process.rss_mb"])
           - set(attributes["process_ticket"], attributes["process.ticket"])
           - set(attributes["process_phase"], attributes["process.phase"])
+          # --- Log severity from pino numeric level ---
+          # catalyst pino logs arrive with a numeric `level` attribute (pino:
+          # 10=trace 20=debug 30=info 40=warn 50=error 60=fatal) but NO OTel
+          # SeverityNumber/SeverityText, so every operational log renders as
+          # UNKNOWN severity in Dash0/Loki (can't filter/alert/color by severity).
+          # Map level -> the OTel Logs Data Model severity fields. DURABLE fix is
+          # producer-side in otel-forward (it already sets severity for canonical
+          # EVENTS, just not raw operational logs) — tracked in CTL Linear.
+          # Guards: (1) only fill records whose severity is UNSET, so the events
+          # that already set severity are never clobbered; (2) only when `level`
+          # is present; Int() makes it robust to level arriving as int OR string.
+          # set text BEFORE number so the UNSPECIFIED guard still holds for both.
+          - set(severity_text, "TRACE") where severity_number == SEVERITY_NUMBER_UNSPECIFIED and attributes["level"] != nil and Int(attributes["level"]) == 10
+          - set(severity_number, SEVERITY_NUMBER_TRACE) where severity_number == SEVERITY_NUMBER_UNSPECIFIED and attributes["level"] != nil and Int(attributes["level"]) == 10
+          - set(severity_text, "DEBUG") where severity_number == SEVERITY_NUMBER_UNSPECIFIED and attributes["level"] != nil and Int(attributes["level"]) == 20
+          - set(severity_number, SEVERITY_NUMBER_DEBUG) where severity_number == SEVERITY_NUMBER_UNSPECIFIED and attributes["level"] != nil and Int(attributes["level"]) == 20
+          - set(severity_text, "INFO") where severity_number == SEVERITY_NUMBER_UNSPECIFIED and attributes["level"] != nil and Int(attributes["level"]) == 30
+          - set(severity_number, SEVERITY_NUMBER_INFO) where severity_number == SEVERITY_NUMBER_UNSPECIFIED and attributes["level"] != nil and Int(attributes["level"]) == 30
+          - set(severity_text, "WARN") where severity_number == SEVERITY_NUMBER_UNSPECIFIED and attributes["level"] != nil and Int(attributes["level"]) == 40
+          - set(severity_number, SEVERITY_NUMBER_WARN) where severity_number == SEVERITY_NUMBER_UNSPECIFIED and attributes["level"] != nil and Int(attributes["level"]) == 40
+          - set(severity_text, "ERROR") where severity_number == SEVERITY_NUMBER_UNSPECIFIED and attributes["level"] != nil and Int(attributes["level"]) == 50
+          - set(severity_number, SEVERITY_NUMBER_ERROR) where severity_number == SEVERITY_NUMBER_UNSPECIFIED and attributes["level"] != nil and Int(attributes["level"]) == 50
+          - set(severity_text, "FATAL") where severity_number == SEVERITY_NUMBER_UNSPECIFIED and attributes["level"] != nil and Int(attributes["level"]) == 60
+          - set(severity_number, SEVERITY_NUMBER_FATAL) where severity_number == SEVERITY_NUMBER_UNSPECIFIED and attributes["level"] != nil and Int(attributes["level"]) == 60
 
   # OTL-20: normalize the CLASS B catalyst attribute keys the logs->metrics
   # connectors group/read by. Loki sanitizes dot->underscore on ingest, so the
