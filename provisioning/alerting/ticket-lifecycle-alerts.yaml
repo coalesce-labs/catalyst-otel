@@ -1,0 +1,159 @@
+apiVersion: 1
+
+# Board-stuck alerting (companion to the Catalyst · Ticket Lifecycle dashboard).
+# Grafana-MANAGED rules, evaluated on the otel-stack host so they keep firing
+# even when a Catalyst node is unreachable.
+#
+# WHY TWO RULES — the naive "nothing is moving" alert is a FALSE POSITIVE here:
+# the pipeline is bursty (0 phase-completions for hours is NORMAL) and
+# `catalyst_scheduler_eligible_work>0 AND running_workers==0` was continuously
+# true for 6h+ during baselining. So we alert on the two signals that actually
+# separate STUCK from QUIET:
+#
+#   1. board_frozen_admission — the authoritative CTL-1420 latch. The fleet
+#      emits catalyst.alert.raised{event_label=fleet_frozen_admission} (WARN)
+#      only when EVERY registered team's reconcile is failing (admission truly
+#      frozen), and catalyst.alert.cleared on recovery. Low false-positive by
+#      construction. Emitted under service_name=catalyst.execution-core
+#      (fleet-freeze-alert.mjs) — NOT catalyst.broker.
+#
+#      LATCH SEMANTICS: raised/cleared are SINGLE-SHOT on state transition (no
+#      ~15m heartbeat like the broker alerts), and the latch is restart-durable.
+#      So the [6h] window (vs the broker rules' [20m]) is deliberate: it must
+#      span a realistic freeze so the lone `raised` doesn't age out before its
+#      `cleared`. A freeze outlasting 6h with no cleared would auto-resolve early
+#      — acceptable, since a >6h admission freeze is a separate catastrophe we'd
+#      already be paged on. The `or raised*0` arm injects a zero cleared series so
+#      LogQL's subtraction yields the raised count (unmatched series are dropped
+#      otherwise). UNVERIFIED against a live fire (the latch has never raised —
+#      correct); selector confirmed against fleet-freeze-alert.mjs emit shape.
+#
+#   2. board_work_aging — Prometheus. Healthy baseline is eligible_work==0 (work
+#      dispatches promptly). Fires when eligible_work>0 AND free_slots>0 hold for
+#      2h continuously = there is work AND idle capacity to run it, but it isn't
+#      moving. `for:2h` filters bursts; warning severity (not a pager).
+#      CALIBRATION NOTE: at ship time eligible_work has been parked at ~2 with
+#      free capacity for ~18h (post-freeze residue). This rule WILL fire on that
+#      state — which is the intent: either those tickets are genuinely stalled
+#      (investigate what they are) or they're a benign blocked class and the
+#      threshold gets tuned after one observation cycle. Do not silence blindly.
+groups:
+  - orgId: 1
+    name: catalyst-board-stuck
+    folder: Catalyst Alerts
+    interval: 1m
+    rules:
+      - uid: catalyst_board_frozen_admission
+        title: Catalyst board FROZEN for admission (fleet_frozen_admission)
+        condition: C
+        for: 0s
+        noDataState: OK
+        execErrState: Alerting
+        labels:
+          team: catalyst
+          event_label: fleet_frozen_admission
+          severity: critical
+        annotations:
+          summary: 'Catalyst board FROZEN for new-work admission — every team''s reconcile is failing (CTL-1420 latch)'
+          description: >
+            catalyst.alert.raised{event_label=fleet_frozen_admission} is active
+            (WARN latch) with no paired cleared. Every registered team's reconcile
+            is failing, so the eligible projection cannot refresh from the replica
+            OR linearis — the fleet cannot admit new work. This is the exact
+            silent-freeze class that went undetected for ~6h on 2026-07-01.
+            Auto-resolves on a catalyst.alert.cleared, or 6h after the raise.
+            Payload {kind,reason,source,count,teams} is in body.payload (stripped
+            from Loki) — only event_label/host_name/severity are queryable.
+          __dashboardUid__: catalyst-ticket-lifecycle
+          __panelId__: '6'
+        data:
+          - refId: A
+            relativeTimeRange: { from: 21600, to: 0 }
+            datasourceUid: loki
+            model:
+              datasource: { type: loki, uid: loki }
+              editorMode: code
+              queryType: range
+              refId: A
+              expr: >-
+                sum(count_over_time({service_name=`catalyst.execution-core`} | event_entity=`alert` | event_label=`fleet_frozen_admission` | event_action=`raised` [6h]))
+                -
+                (sum(count_over_time({service_name=`catalyst.execution-core`} | event_entity=`alert` | event_label=`fleet_frozen_admission` | event_action=`cleared` [6h]))
+                or
+                sum(count_over_time({service_name=`catalyst.execution-core`} | event_entity=`alert` | event_label=`fleet_frozen_admission` | event_action=`raised` [6h])) * 0)
+          - refId: B
+            relativeTimeRange: { from: 21600, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              expression: A
+              reducer: last
+              datasource: { type: __expr__, uid: __expr__ }
+          - refId: C
+            relativeTimeRange: { from: 21600, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              refId: C
+              expression: B
+              datasource: { type: __expr__, uid: __expr__ }
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+
+      - uid: catalyst_board_work_aging
+        title: Catalyst board work AGING (eligible work + idle capacity, sustained)
+        condition: C
+        for: 2h
+        noDataState: OK
+        execErrState: OK
+        labels:
+          team: catalyst
+          signal: board_work_aging
+          severity: warning
+        annotations:
+          summary: 'Eligible work has sat undispatched with free capacity for 2h (board aging — stuck, not quiet)'
+          description: >
+            catalyst_scheduler_eligible_work>0 AND catalyst_scheduler_free_slots>0
+            held continuously for 2h — there is work waiting AND idle worker slots
+            to run it, but it is not dispatching. Healthy baseline is eligible==0
+            (work clears promptly), so this separates a genuinely STUCK board from
+            a merely QUIET one. Check the Ticket Lifecycle dashboard's Board Health
+            row. If admission is frozen the board_frozen_admission (critical) rule
+            fires too; this warning also catches softer non-dispatch stalls.
+          __dashboardUid__: catalyst-ticket-lifecycle
+          __panelId__: '6'
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: prometheus
+            model:
+              datasource: { type: prometheus, uid: prometheus }
+              editorMode: code
+              instant: true
+              range: false
+              refId: A
+              expr: (sum(catalyst_scheduler_eligible_work) > 0) and (sum(catalyst_scheduler_free_slots) > 0)
+          - refId: B
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              expression: A
+              reducer: last
+              datasource: { type: __expr__, uid: __expr__ }
+          - refId: C
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              refId: C
+              expression: B
+              datasource: { type: __expr__, uid: __expr__ }
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
