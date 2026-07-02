@@ -1026,16 +1026,17 @@ service:
   #   ---------|-------------------------------------|-------------------------
   #   metrics  | prometheus (+ honeycomb, dash0)     | metrics.exporters list
   #   logs     | otlp_http=Loki (+ honeycomb, dash0) | logs.exporters list
-  #   traces   | otlp/tempo  ONLY                    | traces.exporters list
+  #   traces   | otlp/tempo (+ honeycomb, dash0)     | traces.exporters list
   #
-  # TRACES ROUTE TO TEMPO ONLY, BY DESIGN — do NOT add other trace destinations:
-  #   * Loki cannot ingest traces (404s -> retries/drops).
-  #   * Honeycomb & Dash0 bill PER SPAN, and traces are far higher volume than
-  #     logs/metrics, so a trace fan-out balloons cost. Enable a vendor trace
-  #     leg only deliberately, and only AFTER tail_sampling (already wired into
-  #     the traces pipeline) trims volume — never with an empty/env-driven
-  #     endpoint (that crash-loops the collector at boot).
-  # The vendor env-gated legs (honeycomb/dash0) stay on metrics + logs only.
+  # TRACES FAN OUT TO TEMPO + HONEYCOMB + DASH0 — enabled deliberately, and ONLY
+  # because this pipeline is POST-tail_sampling (keep errors + slow>1s + 20% of
+  # the rest, already wired below), so the per-span vendor bill is trimmed to the
+  # sampled stream rather than the full firehose. RULES that still hold:
+  #   * Do NOT add a vendor trace leg to any pipeline that lacks tail_sampling
+  #     ahead of it (e.g. never at 100% on a high-volume unsampled pipeline).
+  #   * Never point a vendor leg at an empty/env-driven endpoint (crash-loops the
+  #     collector at boot) — DASH0_*/HONEYCOMB_* must be set in .env first.
+  #   * Loki still cannot ingest traces — never add otlp_http to traces.exporters.
   # ---------------------------------------------------------------------------
   pipelines:
     metrics:
@@ -1077,11 +1078,12 @@ service:
       exporters: [debug, otlp_http, otlp_http/honeycomb, otlp_http/dash0, count, signal_to_metrics]
 
     traces:
-      # OTL-25: spans -> Tempo ONLY (see the forwarding table above). NO
-      # transform/logs here — that is a logs-only Loki-shaping step, wrong for
-      # traces. `resource` stamps environment=production; `tail_sampling` keeps
-      # slow ticks (>1s) + errors and samples the rest. One pipeline per signal
-      # (OTL-1). Runs healthy-but-empty until the daemons emit spans (CTL-1330).
+      # OTL-25: spans -> Tempo + Honeycomb + Dash0 (see the forwarding table
+      # above). NO transform/logs here — that is a logs-only Loki-shaping step,
+      # wrong for traces. `resource` stamps environment=production; `tail_sampling`
+      # keeps slow ticks (>1s) + errors and samples the rest, and the vendor legs
+      # sit AFTER it so they only bill for the sampled stream. One pipeline per
+      # signal (OTL-1). Runs healthy-but-empty until the daemons emit spans.
       receivers: [otlp]
       processors: [resource, tail_sampling]
-      exporters: [otlp/tempo, debug]
+      exporters: [otlp/tempo, otlp_http/honeycomb, otlp_http/dash0, debug]
