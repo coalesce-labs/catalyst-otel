@@ -29,8 +29,8 @@
         "label": "node",
         "type": "custom",
         "datasource": { "type": "loki", "uid": "loki" },
-        "query": "mini, mini-2",
-        "definition": "mini, mini-2",
+        "query": "mini, mini-2, laptop : Ryans-MacBook-Pro-2",
+        "definition": "mini, mini-2, laptop : Ryans-MacBook-Pro-2",
         "regex": "",
         "includeAll": true,
         "multi": true,
@@ -333,8 +333,8 @@
     {
       "id": 11,
       "type": "stat",
-      "title": "⚠ GAP — GitHub local-replica freshness per node",
-      "description": "GAP: GitHub replica freshness is emitted NOWHERE today (cloud-sync: freshness carries Linear only). This panel is a placeholder for when a GitHub-local freshness signal lands (mirrors the Linear staleness shape). Until then it returns no series.",
+      "title": "GitHub replica apply throughput per node",
+      "description": "GitHub replica sync signal. NOTE: unlike Linear there is no GitHub staleness-AGE field emitted — only apply THROUGHPUT (catalyst.replica.apply source=github). This shows applies/interval per node as the liveness proxy. A true github staleness-ms age is still a producer gap.",
       "datasource": { "type": "loki", "uid": "loki" },
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 33 },
       "fieldConfig": {
@@ -356,7 +356,7 @@
           "refId": "A",
           "queryType": "instant",
           "legendFormat": "{{host_name}}",
-          "expr": "max by (host_name)(max_over_time({service_name=\"catalyst.cloud-sync\"} |= \"cloud-sync: freshness\" | host_name=~\"$node\" | regexp `\"catalyst.github.replica.staleness\":(?P<s>[0-9]+)` | unwrap s [10m]))"
+          "expr": "sum by (host_name)(count_over_time({service_name=\"catalyst.cloud-sync\"} |= \"catalyst.replica.apply\" |= `\"source\":\"github\"` | host_name=~\"$node\" [$__range]))"
         }
       ]
     },
