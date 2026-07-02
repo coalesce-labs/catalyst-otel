@@ -1,0 +1,222 @@
+apiVersion: 1
+
+# OTL replica-freshness alerts. Grafana-MANAGED, evaluated on the otel-stack host.
+# Watches the Linear/GitHub mirror replication path: cloud ingest freshness
+# (catalyst.mirror.ingest.committed, CTC-144), node-side local Linear replica
+# staleness (catalyst.cloud-sync "cloud-sync: freshness"), and the cloud-vs-node
+# head-behind lag.
+#
+# !!! CRASH-LOOP DANGER: a malformed provisioned rule (dangling receiver, unknown
+# datasource uid, empty contact-point URL, bad YAML) is FATAL at Grafana startup and
+# crash-loops the SHARED live Grafana. ALWAYS validate against a THROWAWAY grafana-oss
+# container (mount this file read-only, boot it, confirm healthy + rules load) BEFORE
+# rolling onto home. NO contactPoints/notification policies are declared here — routing
+# falls through to the root catalyst-pager policy from the alerting baseline (its webhook
+# is a no-op placeholder until Ryan sets CATALYST_ALERT_WEBHOOK_URL → VISIBLE-but-silent).
+#
+# DATA SHAPE: catalyst-cloud has NO Prometheus pipeline — every cloud rule is a Loki
+# (LogQL) query (count_over_time / max_over_time). All cloud fields (source, headSeq,
+# receivedAt, deduped) live in the JSON body → regexp-extract, NEVER `| json`.
+#
+# A per-source CLOUD-INGEST-STALLED rule was DELIBERATELY DROPPED from this cut (was rule a).
+# Two reasons, both verified live 2026-06-30: (1) `sum by(src) count_over_time` does NOT emit a
+# 0 for a stalled source — the source simply vanishes from the vector (noData), so it can never
+# cross a `< 1` threshold, and because the other source keeps the query non-empty the whole rule
+# never reads noData either → the rule is a NO-OP that can't fire. (2) Both github (~54/burst) and
+# linear (~41/burst) ingest in BURSTS with long quiet gaps (counts identical across 1h/3h/6h
+# windows), and ingest.committed only has ~1h of history (CTC-144 just shipped) — so there is no
+# baseline to pick a safe stall window yet. The dashboard's ingest-rate + time-since-last-ingest
+# panels surface a stall visually; a baselined per-source stall rule is an OTL follow-up.
+#
+# noDataState rationale per (kept) rule:
+#   - local staleness > 60s → noData=OK. A quiet/absent node (laptop, office-desk) ships
+#     NO freshness line; absence must NOT fire. Only mini/mini-2 emit this.
+#   - cloud-vs-node lag     → noData=OK. Depends on both cloud head AND node cursor; if
+#     either side is quiet the math yields noData and must stay silent.
+#   - silent-drop spike     → noData=OK. deduped:true is rare; no drops = no rows = noData.
+groups:
+  - orgId: 1
+    name: catalyst-replica-freshness
+    folder: Catalyst Alerts
+    interval: 1m
+    rules:
+      # (b) Local Linear replica staleness > 60s per node.
+      # catalyst.linear.replica.staleness is an age in MS that oscillates 0->~30s over the
+      # ~30s poll. A sustained >60000ms (60s) means the node's local Linear replica is
+      # falling behind cloud — the user-facing staleness signal.
+      - uid: catalyst_replica_local_staleness_high
+        title: Local Linear replica staleness > 60s (per node)
+        condition: C
+        for: 5m
+        noDataState: OK
+        execErrState: OK
+        labels:
+          team: catalyst
+          signal: replica_local_staleness
+          severity: warning
+        annotations:
+          summary: 'Node-local Linear replica staleness over 60s (mini/mini-2)'
+          description: >
+            catalyst.linear.replica.staleness exceeded 60s for 5m on a node. Normal is
+            0->~30s oscillation over the ~30s poll; a sustained >60s means the node's
+            local Linear replica is lagging cloud (READ-SDK apply stalled, cloud-sync
+            poll failing, or cloud head itself stale). Cross-check the cloud-vs-node lag
+            panel — high lag + high staleness = cloud behind; low lag + high staleness =
+            node apply path stuck. Linear only; mini/mini-2 only.
+          __dashboardUid__: catalyst-replica-freshness
+          __panelId__: '6'
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: loki
+            model:
+              datasource: { type: loki, uid: loki }
+              editorMode: code
+              queryType: instant
+              refId: A
+              expr: 'max by (host_name)(max_over_time({service_name="catalyst.cloud-sync"} |= "cloud-sync: freshness" | regexp `"catalyst.linear.replica.staleness":(?P<s>[0-9]+)` | unwrap s [5m]))'
+          - refId: B
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              expression: A
+              reducer: last
+              datasource: { type: __expr__, uid: __expr__ }
+          - refId: C
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              refId: C
+              expression: B
+              datasource: { type: __expr__, uid: __expr__ }
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [60000]
+
+      # (c) Cloud-vs-node Linear lag > threshold (head behind).
+      # Lag = cloud headSeq(linear) - node cursor(linear). Built as a Grafana math
+      # expression because no single LogQL subtracts across two stream selectors.
+      # THRESHOLD = 500 seqs is a GUESS — see threshold_notes; tune with Ryan once a
+      # baseline of normal backfill lag is observed (live now ~0; backfill bursts seen
+      # mini 246 / mini-2 133).
+      - uid: catalyst_replica_cloud_node_lag_high
+        title: Cloud-vs-node Linear lag > 500 seqs (per node)
+        condition: D
+        for: 10m
+        noDataState: OK
+        execErrState: OK
+        labels:
+          team: catalyst
+          signal: replica_cloud_node_lag
+          severity: warning
+        annotations:
+          summary: 'Node Linear replica more than 500 seqs behind cloud head (per node)'
+          description: >
+            cloud headSeq(linear) - node cursor(linear) exceeded 500 for 10m on a node.
+            The node's local Linear replica is materially behind the cloud commit head —
+            READ-SDK apply is not keeping up with ingest, or the node poll is wedged.
+            THRESHOLD 500 IS A GUESS (no normal-backfill baseline yet) — confirm with
+            Ryan. Live lag is ~0 when caught up; transient backfill bursts of 100-250
+            are normal. Pair with the local-staleness alert to localize cloud-behind vs
+            node-apply-stuck.
+          __dashboardUid__: catalyst-replica-freshness
+          __panelId__: '8'
+        data:
+          - refId: A
+            relativeTimeRange: { from: 1800, to: 0 }
+            datasourceUid: loki
+            model:
+              datasource: { type: loki, uid: loki }
+              editorMode: code
+              queryType: instant
+              refId: A
+              expr: 'last_over_time({service_name="catalyst.cloud-sync"} |= "cloud-sync: freshness" | regexp `"catalyst.linear.replica.cursor":(?P<c>[0-9]+)` | unwrap c [10m]) by (host_name)'
+          - refId: B
+            relativeTimeRange: { from: 1800, to: 0 }
+            datasourceUid: loki
+            model:
+              datasource: { type: loki, uid: loki }
+              editorMode: code
+              queryType: instant
+              refId: B
+              expr: max(max_over_time({service_namespace="catalyst-cloud"} |= "ingest.committed" | regexp `"source":"(?P<src>[a-z_]+)"` | src="linear" | regexp `"headSeq":(?P<hs>[0-9]+)` | unwrap hs [30m]))
+          - refId: C
+            relativeTimeRange: { from: 1800, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: math
+              refId: C
+              expression: '$B - $A'
+              datasource: { type: __expr__, uid: __expr__ }
+          - refId: D
+            relativeTimeRange: { from: 1800, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              refId: D
+              expression: C
+              datasource: { type: __expr__, uid: __expr__ }
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [500]
+
+      # (d) Silent-drop (deduped=true) spike per source.
+      # ingest.committed with deduped:true = a silently-dropped delivery (CTC-139-class).
+      # Currently always 0. ANY sustained non-zero is a real problem.
+      - uid: catalyst_replica_silent_drop_spike
+        title: Silent-drop (deduped=true) spike (per source)
+        condition: C
+        for: 5m
+        noDataState: OK
+        execErrState: OK
+        labels:
+          team: catalyst
+          signal: replica_silent_drop
+          severity: critical
+        annotations:
+          summary: 'catalyst-cloud silently dropped deliveries (deduped=true) in 15m'
+          description: >
+            ingest.committed with deduped:true appeared (a silently-dropped delivery,
+            CTC-139-class) — more than 5 in 15m for a source. Live baseline is 0. A
+            non-zero rate means deliveries are arriving but being discarded at commit;
+            the replica will silently miss those updates. Inspect the cloud Worker logs
+            for the deduped deliveryIds. Threshold 5/15m filters one-off idempotent
+            retries from a real drop storm.
+          __dashboardUid__: catalyst-replica-freshness
+          __panelId__: '5'
+        data:
+          - refId: A
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: loki
+            model:
+              datasource: { type: loki, uid: loki }
+              editorMode: code
+              queryType: instant
+              refId: A
+              expr: 'sum(count_over_time({service_namespace="catalyst-cloud"} |= "ingest.committed" |= "\"deduped\":true" [15m]))'
+          - refId: B
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              expression: A
+              reducer: last
+              datasource: { type: __expr__, uid: __expr__ }
+          - refId: C
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              refId: C
+              expression: B
+              datasource: { type: __expr__, uid: __expr__ }
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [5]
