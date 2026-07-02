@@ -1,0 +1,178 @@
+{
+  "uid": "catalyst-ticket-lifecycle",
+  "title": "Catalyst · Ticket Lifecycle",
+  "tags": ["catalyst", "lifecycle", "cycle-time", "throughput"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "refresh": "1m",
+  "time": { "from": "now-24h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "ticket",
+        "type": "textbox",
+        "label": "Ticket (for the journey panel)",
+        "query": "",
+        "current": { "text": "", "value": "" }
+      }
+    ]
+  },
+  "annotations": { "list": [] },
+  "panels": [
+    {
+      "type": "row",
+      "title": "Board Health — is it QUIET or STUCK?",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 1,
+      "collapsed": false
+    },
+    {
+      "type": "stat",
+      "title": "Eligible work (waiting to dispatch)",
+      "description": "catalyst_scheduler_eligible_work summed over hosts. Healthy baseline is 0 (work clears promptly). A sustained non-zero value with free capacity = work aging (see the Work-aging alert).",
+      "id": 2,
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 1 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(catalyst_scheduler_eligible_work)", "instant": true }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 1 } ] }
+        },
+        "overrides": []
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "graphMode": "area" }
+    },
+    {
+      "type": "stat",
+      "title": "Running workers",
+      "description": "catalyst_scheduler_running_workers summed. NB: this gauge has read 0 across long idle windows — treat as a coarse activity hint, not authoritative.",
+      "id": 3,
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 1 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(catalyst_scheduler_running_workers)", "instant": true }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short", "thresholds": { "mode": "absolute", "steps": [ { "color": "blue", "value": null } ] } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "value", "graphMode": "area" }
+    },
+    {
+      "type": "stat",
+      "title": "Free worker slots",
+      "description": "catalyst_scheduler_free_slots summed. If eligible>0 AND free>0 for a sustained period, work could be dispatched but isn't = stuck.",
+      "id": 4,
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 1 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(catalyst_scheduler_free_slots)", "instant": true }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short", "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null } ] } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "value", "graphMode": "area" }
+    },
+    {
+      "type": "stat",
+      "title": "Phase completions (24h)",
+      "description": "sum(increase(catalyst_event_total{event_entity=\"phase\",event_action=\"complete\"}[24h])). The pipeline is bursty — 0 over an hour is normal.",
+      "id": 5,
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 1 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(increase(catalyst_event_total{event_entity=\"phase\",event_action=\"complete\"}[24h]))", "instant": true }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0, "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null } ] } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "value", "graphMode": "area" }
+    },
+    {
+      "type": "timeseries",
+      "title": "Quiet vs Stuck — Eligible work vs Running workers vs Free slots",
+      "description": "QUIET = eligible 0 (nothing waiting). STUCK = eligible >0 while free slots >0 and nothing running/dispatching (work could run but isn't). This is the picture the health check couldn't give as a single number.",
+      "id": 6,
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 5 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(catalyst_scheduler_eligible_work)", "legendFormat": "eligible work (waiting)" },
+        { "refId": "B", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(catalyst_scheduler_running_workers)", "legendFormat": "running workers" },
+        { "refId": "C", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(catalyst_scheduler_free_slots)", "legendFormat": "free slots" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "drawStyle": "line", "fillOpacity": 10, "stepAfter": true, "lineWidth": 2 } }, "overrides": [] },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["last", "max"] }, "tooltip": { "mode": "multi" } }
+    },
+    {
+      "type": "row",
+      "title": "Throughput — are we getting through more work over time?",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 13 },
+      "id": 10,
+      "collapsed": false
+    },
+    {
+      "type": "timeseries",
+      "title": "Phase completions per day (throughput trend)",
+      "description": "sum(increase(catalyst_event_total{event_entity=\"phase\",event_action=\"complete\"}[1d])). Rising = pipeline getting through more stage-transitions; the coarse 'are we speeding up' trend. (Aggregate cycle-time p50/p95 arrives with the Stage-2 duration field.)",
+      "id": 11,
+      "gridPos": { "h": 7, "w": 16, "x": 0, "y": 14 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(increase(catalyst_event_total{event_entity=\"phase\",event_action=\"complete\"}[1d]))", "legendFormat": "completions/day" },
+        { "refId": "B", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(increase(catalyst_event_total{event_entity=\"phase\",event_action=\"failed\"}[1d]))", "legendFormat": "failures/day" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "drawStyle": "line", "fillOpacity": 15, "lineWidth": 2 } }, "overrides": [ { "matcher": { "id": "byName", "options": "failures/day" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } } ] } ] },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["sum", "max"] }, "tooltip": { "mode": "multi" } }
+    },
+    {
+      "type": "stat",
+      "title": "Completions: 7d",
+      "description": "Total phase completions over 7 days.",
+      "id": 12,
+      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 14 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(increase(catalyst_event_total{event_entity=\"phase\",event_action=\"complete\"}[7d]))", "instant": true }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0, "thresholds": { "mode": "absolute", "steps": [ { "color": "blue", "value": null } ] } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "value", "graphMode": "none" }
+    },
+    {
+      "type": "row",
+      "title": "Bottleneck — where do tickets pile up?",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 21 },
+      "id": 20,
+      "collapsed": false
+    },
+    {
+      "type": "barchart",
+      "title": "Stage volume (completions by pipeline stage, in range)",
+      "description": "Loki: count of phase.<stage>.complete events by stage over the dashboard range. Stages with many entries elsewhere but few completions here are the pile-up points. Stage name is extracted from the event body (it is not a Prometheus label by design).",
+      "id": 21,
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 22 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "loki", "uid": "loki" }, "expr": "sum by (stage) (count_over_time({service_name=\"catalyst.phase-agent\"} | event_entity=`phase` | event_action=`complete` | line_format `{{.event_name}}` | regexp `phase\\.(?P<stage>[a-z0-9-]+)\\.complete` [$__range]))", "queryType": "instant", "legendFormat": "{{stage}}" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short", "color": { "mode": "palette-classic" } }, "overrides": [] },
+      "options": { "orientation": "horizontal", "showValue": "auto", "legend": { "showLegend": false } }
+    },
+    {
+      "type": "row",
+      "title": "Per-ticket journey — pick a ticket (set the $ticket variable, e.g. CTL-1416)",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 30 },
+      "id": 30,
+      "collapsed": false
+    },
+    {
+      "type": "logs",
+      "title": "Journey for $ticket (ordered phase events; first→last timestamp = cycle time)",
+      "description": "Loki: all phase events for the ticket, oldest first. Read total cycle time as last-minus-first timestamp; per-stage gaps are the time each stage took (coarse until the Stage-2 duration field lands). Join key is linear_key.",
+      "id": 31,
+      "gridPos": { "h": 11, "w": 24, "x": 0, "y": 31 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "loki", "uid": "loki" }, "expr": "{service_name=\"catalyst.phase-agent\"} | linear_key=`$ticket` | line_format `{{.event_name}}`", "queryType": "range" }
+      ],
+      "options": { "showTime": true, "sortOrder": "Ascending", "wrapLogMessage": true, "enableLogDetails": true, "dedupStrategy": "none" }
+    }
+  ]
+}
