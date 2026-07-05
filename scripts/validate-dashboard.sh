@@ -181,11 +181,13 @@ for sig in logs metrics traces; do
   fi
 done
 
-# --- collector: OTL-25 traces route to Tempo ONLY. Allowlist (not denylist):
-#     the traces pipeline's exporter set must be a SUBSET of {otlp/tempo, debug}.
-#     This fails on Loki (can't ingest traces), the per-span-billed vendors
-#     (honeycomb/dash0), ANY future otlp/<vendor> trace leg, AND the case where
-#     otlp/tempo is dropped entirely. The traces pipeline is last in the block. ---
+# --- collector: traces exporter allowlist. Must include otlp/tempo and stay a
+#     SUBSET of {otlp/tempo, otlp_http/honeycomb, otlp_http/dash0, debug}.
+#     OTL-45 (#82) added the vendor legs (honeycomb/dash0) AFTER tail_sampling, so
+#     the per-span bill rides only the sampled stream — they are now allowed.
+#     Loki (otlp_http) is STILL rejected (it cannot ingest traces -> 404s), as is
+#     any other unknown trace leg, AND the case where otlp/tempo is dropped
+#     entirely. The traces pipeline is last in the block. ---
 TRACES_EXPORTERS=$(echo "$PIPELINES_BLOCK" | awk '/^    traces:/{f=1} f' | grep -E "^\s+exporters:" | head -1)
 TRACES_IDS=$(echo "$TRACES_EXPORTERS" | sed -E 's/.*\[//; s/\].*//; s/,/ /g')
 BAD_TRACE_EXP=""
@@ -193,16 +195,17 @@ HAVE_TEMPO=0
 for id in $TRACES_IDS; do
   case "$id" in
     otlp/tempo) HAVE_TEMPO=1 ;;
+    otlp_http/honeycomb|otlp_http/dash0) : ;;
     debug) : ;;
     *) BAD_TRACE_EXP="$BAD_TRACE_EXP $id" ;;
   esac
 done
 if [ -n "$BAD_TRACE_EXP" ]; then
-  fail "traces pipeline exports to non-Tempo backend(s) (OTL-25: traces -> Tempo only):$BAD_TRACE_EXP"
+  fail "traces pipeline exports to a disallowed backend (allowed: otlp/tempo, otlp_http/honeycomb, otlp_http/dash0, debug):$BAD_TRACE_EXP"
 elif [ "$HAVE_TEMPO" -eq 1 ]; then
-  pass "traces pipeline routes to Tempo only (exporters subset of {otlp/tempo, debug})"
+  pass "traces pipeline exporters are within the allowlist {otlp/tempo, otlp_http/honeycomb, otlp_http/dash0, debug}"
 else
-  fail "traces pipeline is missing the otlp/tempo exporter (OTL-25: traces -> Tempo)"
+  fail "traces pipeline is missing the otlp/tempo exporter (traces must always reach Tempo)"
 fi
 
 # --- single pass/fail gate (moved here from mid-script so all checks run) ---
