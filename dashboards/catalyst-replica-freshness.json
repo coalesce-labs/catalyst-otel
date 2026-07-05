@@ -1,388 +1,88 @@
 {
   "uid": "catalyst-replica-freshness",
   "title": "Catalyst · Replica Freshness",
-  "tags": ["catalyst", "replica", "freshness", "catalyst-cloud"],
+  "tags": ["catalyst", "replica", "freshness", "cloud-sync"],
+  "timezone": "browser",
   "schemaVersion": 39,
   "version": 1,
   "editable": true,
-  "graphTooltip": 1,
   "refresh": "30s",
   "time": { "from": "now-6h", "to": "now" },
-  "timezone": "browser",
-  "annotations": {
-    "list": [
-      {
-        "builtIn": 1,
-        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
-        "enable": true,
-        "hide": true,
-        "iconColor": "rgba(0, 211, 255, 1)",
-        "name": "Annotations & Alerts",
-        "type": "dashboard"
-      }
-    ]
-  },
   "templating": {
     "list": [
       {
-        "name": "node",
-        "label": "node",
-        "type": "custom",
-        "datasource": { "type": "loki", "uid": "loki" },
-        "query": "mini, mini-2",
-        "definition": "mini, mini-2",
-        "regex": "",
-        "includeAll": true,
-        "multi": true,
-        "allValue": ".+",
-        "current": { "text": ["All"], "value": ["$__all"] },
-        "refresh": 2,
-        "sort": 1
+        "name": "node", "label": "node", "type": "custom",
+        "query": "mini, mini-2, laptop : Ryans-MacBook-Pro-2",
+        "definition": "mini, mini-2, laptop : Ryans-MacBook-Pro-2",
+        "includeAll": true, "multi": true, "allValue": ".+",
+        "current": { "text": ["All"], "value": ["$__all"] }, "refresh": 2, "sort": 1
       }
     ]
   },
+  "annotations": { "list": [ { "datasource": { "type": "loki", "uid": "loki" }, "enable": true, "iconColor": "semi-dark-orange", "name": "Catalyst PR merged", "target": { "expr": "{service_name=\"catalyst.github\"} |= `github.pr.merged` |= `coalesce-labs/catalyst` | regexp `(?P<pr>PR #[0-9]+)` | line_format `merged {{.pr}}`", "queryType": "range", "refId": "prmerged" } }, { "datasource": { "type": "loki", "uid": "loki" }, "enable": false, "iconColor": "semi-dark-blue", "name": "Node restart (code live)", "target": { "expr": "{service_name=\"catalyst.broker\"} |= `stack.reload.complete` | line_format `{{.host_name}} restarted`", "queryType": "range", "refId": "restart" } } ] },
   "panels": [
     {
-      "id": 1,
-      "type": "text",
-      "title": "How to read this dashboard",
-      "gridPos": { "h": 5, "w": 24, "x": 0, "y": 0 },
-      "options": {
-        "mode": "markdown",
-        "content": "## Catalyst Replica Freshness — three propagation hops\n\nThis dashboard watches the Linear/GitHub mirror replication path end to end. There is **no Prometheus pipeline for `catalyst-cloud`** — every cloud panel is **Loki aggregation-over-time** (`count_over_time` / `max_over_time`), never `rate()`/`increase()`. All cloud fields live in the **JSON body** (`source`, `headSeq`, `receivedAt`, `deduped`) — extracted with `regexp` + `unwrap`, **never `| json`**.\n\n- **Cloud ingest freshness** (top row) — `catalyst.mirror.ingest.committed` (CTC-144) is the terminal cloud commit. Ingest rate, time-since-last-commit, and the `headSeq` watermark per source. *Silent-drop* tracks `deduped:true` — any non-zero is a silently-dropped delivery (CTC-139-class).\n- **Local Linear staleness** (middle row) — `service_name=\"catalyst.cloud-sync\"` line `cloud-sync: freshness` carries `catalyst.linear.replica.{staleness,cursor}` per node (**Linear only; mini/mini-2 only** — dev nodes ship nothing). Staleness is already an **age in ms** so its thresholds color correctly.\n- **Cloud-vs-node lag** (HEADLINE) — `cloud.headSeq(linear)` − `node.cursor(linear)` per node. **No single LogQL can subtract across two stream selectors** — built as a Grafana math expression ($B − $A) combining the cloud-headSeq query and the per-node cursor query.\n\n**Apply-outcome panels** — **CTL-1402** (sdk@0.3.1 / CTC-149): `catalyst.replica.apply{result: applied|skipped|failed, seq, entity, source, err_message}` gives per-outcome counts + the failed-apply `err_message` (the errno:1 / catalyst-cloud#127 column-drift). Lights up when cloud-sync bumps to `^0.3.1`. True per-update *latency* is NOT shipped (0.3.1 emits no timestamps) — a future CTC ask. GitHub local-replica freshness still has **no producer** (emitted nowhere)."
-      }
+      "type": "text", "id": 1, "transparent": true, "gridPos": { "h": 3, "w": 24, "x": 0, "y": 0 },
+      "options": { "mode": "markdown", "content": "## Catalyst · Replica Freshness — how out of date is each node?\n**Top row = replica AGE per node** (lower = fresher; this is the number to watch). **Linear** reports its staleness directly (ms). **GitHub** has no staleness field, so we show *time since its last apply* (\"X ago\"). Nodes: **mini**, **mini-2**, **laptop** (`Ryans-MacBook-Pro-2`). Below: the cloud mirror watermark, then trends — including **apply rate** (that's *activity / throughput*, i.e. how many rows/sec are syncing — NOT freshness). Cloud fields come from the Loki JSON body via `regexp`+`unwrap` (no Prometheus pipeline for catalyst-cloud)." }
+    },
+    { "type": "row", "title": "Headline — how out of date is each node?", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 3 }, "id": 2, "collapsed": false },
+
+    { "type": "stat", "title": "mini · Linear replica age", "id": 10, "gridPos": { "h": 5, "w": 4, "x": 0, "y": 4 }, "datasource": { "type": "loki", "uid": "loki" }, "targets": [ { "refId": "A", "datasource": { "type": "loki", "uid": "loki" }, "expr": "last_over_time({service_name=\"catalyst.cloud-sync\"} |= `cloud-sync: freshness` | host_name=`mini` | regexp `\"catalyst.linear.replica.staleness\":(?P<v>[0-9]+)` | unwrap v [5m])", "queryType": "instant" } ], "fieldConfig": { "defaults": { "unit": "ms", "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 30000 }, { "color": "red", "value": 120000 } ] } } }, "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "graphMode": "area" } },
+    { "type": "stat", "title": "mini-2 · Linear replica age", "id": 11, "gridPos": { "h": 5, "w": 4, "x": 4, "y": 4 }, "datasource": { "type": "loki", "uid": "loki" }, "targets": [ { "refId": "A", "datasource": { "type": "loki", "uid": "loki" }, "expr": "last_over_time({service_name=\"catalyst.cloud-sync\"} |= `cloud-sync: freshness` | host_name=`mini-2` | regexp `\"catalyst.linear.replica.staleness\":(?P<v>[0-9]+)` | unwrap v [5m])", "queryType": "instant" } ], "fieldConfig": { "defaults": { "unit": "ms", "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 30000 }, { "color": "red", "value": 120000 } ] } } }, "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "graphMode": "area" } },
+    { "type": "stat", "title": "laptop · Linear replica age", "id": 12, "gridPos": { "h": 5, "w": 4, "x": 8, "y": 4 }, "datasource": { "type": "loki", "uid": "loki" }, "targets": [ { "refId": "A", "datasource": { "type": "loki", "uid": "loki" }, "expr": "last_over_time({service_name=\"catalyst.cloud-sync\"} |= `cloud-sync: freshness` | host_name=`Ryans-MacBook-Pro-2` | regexp `\"catalyst.linear.replica.staleness\":(?P<v>[0-9]+)` | unwrap v [5m])", "queryType": "instant" } ], "fieldConfig": { "defaults": { "unit": "ms", "noValue": "no data", "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 30000 }, { "color": "red", "value": 120000 } ] } } }, "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "graphMode": "area" } },
+    { "type": "stat", "title": "mini · GitHub last apply", "id": 13, "gridPos": { "h": 5, "w": 4, "x": 12, "y": 4 }, "datasource": { "type": "loki", "uid": "loki" }, "targets": [ { "refId": "A", "datasource": { "type": "loki", "uid": "loki" }, "expr": "max(max_over_time({service_name=\"catalyst.cloud-sync\"} |= `catalyst.replica.apply` |= `\"source\":\"github\"` | host_name=`mini` | regexp `\"time\":(?P<t>[0-9]+)` | unwrap t [1h]))", "queryType": "instant" } ], "fieldConfig": { "defaults": { "unit": "dateTimeFromNow", "thresholds": { "mode": "absolute", "steps": [ { "color": "blue", "value": null } ] } } }, "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "value", "graphMode": "none" } },
+    { "type": "stat", "title": "mini-2 · GitHub last apply", "id": 14, "gridPos": { "h": 5, "w": 4, "x": 16, "y": 4 }, "datasource": { "type": "loki", "uid": "loki" }, "targets": [ { "refId": "A", "datasource": { "type": "loki", "uid": "loki" }, "expr": "max(max_over_time({service_name=\"catalyst.cloud-sync\"} |= `catalyst.replica.apply` |= `\"source\":\"github\"` | host_name=`mini-2` | regexp `\"time\":(?P<t>[0-9]+)` | unwrap t [1h]))", "queryType": "instant" } ], "fieldConfig": { "defaults": { "unit": "dateTimeFromNow", "thresholds": { "mode": "absolute", "steps": [ { "color": "blue", "value": null } ] } } }, "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "value", "graphMode": "none" } },
+    { "type": "stat", "title": "laptop · GitHub last apply", "id": 15, "gridPos": { "h": 5, "w": 4, "x": 20, "y": 4 }, "datasource": { "type": "loki", "uid": "loki" }, "targets": [ { "refId": "A", "datasource": { "type": "loki", "uid": "loki" }, "expr": "max(max_over_time({service_name=\"catalyst.cloud-sync\"} |= `catalyst.replica.apply` |= `\"source\":\"github\"` | host_name=`Ryans-MacBook-Pro-2` | regexp `\"time\":(?P<t>[0-9]+)` | unwrap t [1h]))", "queryType": "instant" } ], "fieldConfig": { "defaults": { "unit": "dateTimeFromNow", "noValue": "no data", "thresholds": { "mode": "absolute", "steps": [ { "color": "blue", "value": null } ] } } }, "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "value", "graphMode": "none" } },
+
+    { "type": "row", "title": "Cloud mirror (upstream watermark)", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 9 }, "id": 3, "collapsed": false },
+    { "type": "stat", "title": "Cloud head watermark · linear", "id": 20, "gridPos": { "h": 4, "w": 6, "x": 0, "y": 10 }, "datasource": { "type": "loki", "uid": "loki" }, "targets": [ { "refId": "A", "datasource": { "type": "loki", "uid": "loki" }, "expr": "max(max_over_time({service_namespace=\"catalyst-cloud\"} |= `ingest.committed` |= `\"source\":\"linear\"` | regexp `\"headSeq\":(?P<h>[0-9]+)` | unwrap h [10m]))", "queryType": "instant" } ], "fieldConfig": { "defaults": { "unit": "short", "decimals": 0 } }, "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "none" } },
+    { "type": "stat", "title": "Cloud head watermark · github", "id": 21, "gridPos": { "h": 4, "w": 6, "x": 6, "y": 10 }, "datasource": { "type": "loki", "uid": "loki" }, "targets": [ { "refId": "A", "datasource": { "type": "loki", "uid": "loki" }, "expr": "max(max_over_time({service_namespace=\"catalyst-cloud\"} |= `ingest.committed` |= `\"source\":\"github\"` | regexp `\"headSeq\":(?P<h>[0-9]+)` | unwrap h [10m]))", "queryType": "instant" } ], "fieldConfig": { "defaults": { "unit": "short", "decimals": 0 } }, "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "none" } },
+    { "type": "stat", "title": "Time since last cloud ingest", "id": 22, "gridPos": { "h": 4, "w": 6, "x": 12, "y": 10 }, "datasource": { "type": "loki", "uid": "loki" }, "targets": [ { "refId": "A", "datasource": { "type": "loki", "uid": "loki" }, "expr": "max(max_over_time({service_namespace=\"catalyst-cloud\"} |= `ingest.committed` | regexp `\"receivedAt\":(?P<r>[0-9]+)` | unwrap r [15m]))", "queryType": "instant" } ], "fieldConfig": { "defaults": { "unit": "dateTimeFromNow", "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null } ] } } }, "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "value" } },
+    { "type": "stat", "title": "Silent drops (deduped) · 1h", "id": 23, "gridPos": { "h": 4, "w": 6, "x": 18, "y": 10 }, "datasource": { "type": "loki", "uid": "loki" }, "targets": [ { "refId": "A", "datasource": { "type": "loki", "uid": "loki" }, "expr": "sum(count_over_time({service_namespace=\"catalyst-cloud\"} |= `ingest.committed` |= `\"deduped\":true` [1h]))", "queryType": "instant" } ], "fieldConfig": { "defaults": { "unit": "short", "decimals": 0, "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 1 } ] } } }, "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" } },
+
+    { "type": "row", "title": "Trends", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 14 }, "id": 4, "collapsed": false },
+    {
+      "type": "timeseries", "title": "Linear replica age per node (staleness over time)", "id": 30, "gridPos": { "h": 7, "w": 24, "x": 0, "y": 15 },
+      "description": "How out of date each node's Linear replica is, over time. Lower = fresher.",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [ { "refId": "A", "datasource": { "type": "loki", "uid": "loki" }, "expr": "avg_over_time({service_name=\"catalyst.cloud-sync\"} |= `cloud-sync: freshness` | host_name=~`$node` | regexp `\"catalyst.linear.replica.staleness\":(?P<s>[0-9]+)` | unwrap s [$__interval]) by (host_name)", "queryType": "range", "legendFormat": "{{host_name}}" } ],
+      "fieldConfig": { "defaults": { "unit": "ms", "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 2 } } },
+      "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["last", "max", "mean"] }, "tooltip": { "mode": "multi" } }
     },
     {
-      "id": 2,
-      "type": "timeseries",
-      "title": "Cloud ingest rate by source",
-      "description": "CTC-144 catalyst.mirror.ingest.committed terminal commits per source over time. Loki count_over_time — no Prometheus pipeline for catalyst-cloud. Verified live: github=54, linear=26 events/1h.",
+      "type": "timeseries", "title": "Replica apply rate by source & result — ACTIVITY (throughput, not freshness)", "id": 31, "gridPos": { "h": 7, "w": 24, "x": 0, "y": 22 },
+      "description": "How many rows/interval are being applied, by source (linear/github) and result. This is sync ACTIVITY, not staleness — a busy node and an idle-but-fresh node both look healthy here. result=failed in red.",
       "datasource": { "type": "loki", "uid": "loki" },
-      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 5 },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "custom": { "drawStyle": "line", "fillOpacity": 10, "showPoints": "auto" },
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["sum", "lastNotNull"] },
-        "tooltip": { "mode": "multi", "sort": "desc" }
-      },
-      "targets": [
-        {
-          "datasource": { "type": "loki", "uid": "loki" },
-          "refId": "A",
-          "queryType": "range",
-          "legendFormat": "{{src}}",
-          "expr": "sum by (src)(count_over_time({service_namespace=\"catalyst-cloud\"} |= \"ingest.committed\" | regexp `\"source\":\"(?P<src>[a-z_]+)\"` [$__interval]))"
-        }
-      ]
+      "targets": [ { "refId": "A", "datasource": { "type": "loki", "uid": "loki" }, "expr": "sum by (source, result)(count_over_time({service_name=\"catalyst.cloud-sync\"} |= `catalyst.replica.apply` | host_name=~`$node` | regexp `\"result\":\"(?P<result>[a-z]+)\"` | regexp `\"source\":\"(?P<source>[a-z_]+)\"` [$__interval]))", "queryType": "range", "legendFormat": "{{source}} {{result}}" } ],
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 2 } }, "overrides": [ { "matcher": { "id": "byRegexp", "options": ".*failed.*" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } } ] } ] },
+      "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["last", "sum"] }, "tooltip": { "mode": "multi" } }
     },
     {
-      "id": 3,
-      "type": "stat",
-      "title": "Time since last cloud ingest (per source)",
-      "description": "Latest receivedAt epoch-ms per source, rendered as age via the dateTimeFromNow unit. The AGE TEXT is correct; coloring is intentionally NEUTRAL (blue) — LogQL has no now()/time() in metric queries, so a threshold on the raw epoch-ms value can't express age (it would pin red regardless of freshness). For age-based health use the staleness headline (Panel 8). Verified: ages render correctly.",
+      "type": "timeseries", "title": "Node cursor per node + cloud head watermark (Linear)", "id": 32, "gridPos": { "h": 7, "w": 24, "x": 0, "y": 29 },
+      "description": "Per-node Linear replica cursor vs the cloud headSeq. Separate series — node cursor and cloud head are related but NOT the same seq space, so don't read a naive subtraction as lag.",
       "datasource": { "type": "loki", "uid": "loki" },
-      "gridPos": { "h": 6, "w": 6, "x": 12, "y": 5 },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "dateTimeFromNow",
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] }
-        },
-        "overrides": []
-      },
-      "options": {
-        "colorMode": "value",
-        "graphMode": "none",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "" }
-      },
       "targets": [
-        {
-          "datasource": { "type": "loki", "uid": "loki" },
-          "refId": "A",
-          "queryType": "instant",
-          "legendFormat": "{{src}}",
-          "expr": "max by (src)(max_over_time({service_namespace=\"catalyst-cloud\"} |= \"ingest.committed\" | regexp `\"source\":\"(?P<src>[a-z_]+)\"` | regexp `\"receivedAt\":(?P<ra>[0-9]+)` | unwrap ra [1h]))"
-        }
-      ]
+        { "refId": "A", "datasource": { "type": "loki", "uid": "loki" }, "expr": "last_over_time({service_name=\"catalyst.cloud-sync\"} |= `cloud-sync: freshness` | host_name=~`$node` | regexp `\"catalyst.linear.replica.cursor\":(?P<c>[0-9]+)` | unwrap c [$__interval]) by (host_name)", "queryType": "range", "legendFormat": "cursor {{host_name}}" },
+        { "refId": "B", "datasource": { "type": "loki", "uid": "loki" }, "expr": "max(max_over_time({service_namespace=\"catalyst-cloud\"} |= `ingest.committed` |= `\"source\":\"linear\"` | regexp `\"headSeq\":(?P<h>[0-9]+)` | unwrap h [$__interval]))", "queryType": "range", "legendFormat": "cloud headSeq" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0, "custom": { "drawStyle": "line", "fillOpacity": 0, "lineWidth": 2 } }, "overrides": [ { "matcher": { "id": "byName", "options": "cloud headSeq" }, "properties": [ { "id": "custom.lineStyle", "value": { "fill": "dash" } }, { "id": "color", "value": { "mode": "fixed", "fixedColor": "purple" } } ] } ] },
+      "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["last"] }, "tooltip": { "mode": "multi" } }
     },
     {
-      "id": 4,
-      "type": "stat",
-      "title": "Cloud head watermark (headSeq) by source",
-      "description": "Monotonic head-sequence watermark per source — the cloud-side commit cursor. Verified: github=327008, linear=327132 (linear matches live head ~327073-327132). Named-group regexp anchors on the literal 'headSeq' key so there is no digit collision with the adjacent receivedAt epoch.",
+      "type": "timeseries", "title": "Cloud ingest rate by source", "id": 33, "gridPos": { "h": 7, "w": 24, "x": 0, "y": 36 },
+      "description": "Rows/interval landing at the cloud mirror by source (upstream of the nodes).",
       "datasource": { "type": "loki", "uid": "loki" },
-      "gridPos": { "h": 6, "w": 6, "x": 18, "y": 5 },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] }
-        },
-        "overrides": []
-      },
-      "options": {
-        "colorMode": "value",
-        "graphMode": "none",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "" }
-      },
-      "targets": [
-        {
-          "datasource": { "type": "loki", "uid": "loki" },
-          "refId": "A",
-          "queryType": "instant",
-          "legendFormat": "{{src}}",
-          "expr": "max by (src)(max_over_time({service_namespace=\"catalyst-cloud\"} |= \"ingest.committed\" | regexp `\"source\":\"(?P<src>[a-z_]+)\"` | regexp `\"headSeq\":(?P<hs>[0-9]+)` | unwrap hs [1h]))"
-        }
-      ]
+      "targets": [ { "refId": "A", "datasource": { "type": "loki", "uid": "loki" }, "expr": "sum by (src)(count_over_time({service_namespace=\"catalyst-cloud\"} |= `ingest.committed` | regexp `\"source\":\"(?P<src>[a-z_]+)\"` [$__interval]))", "queryType": "range", "legendFormat": "{{src}}" } ],
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 2 } } },
+      "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["last", "sum"] }, "tooltip": { "mode": "multi" } }
     },
+
+    { "type": "row", "title": "Failures", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 43 }, "id": 5, "collapsed": false },
     {
-      "id": 5,
-      "type": "timeseries",
-      "title": "Silent-drop rate (deduped=true) by source",
-      "description": "CTC-139-class signal: ingest.committed with deduped:true = a silently-dropped delivery at CLOUD COMMIT. Occurs at a LOW baseline (~1 per 24h observed), so treat ANY reading as signal, not noise. NOTE: this is the cloud-commit dedup drop — it is SEPARATE from the node-side apply-failure incident (those drops are at the apply stage; that hop is CTL-1402, the gap panel below).",
+      "type": "logs", "title": "Failed replica applies — err_message (CTL-1402)", "id": 40, "gridPos": { "h": 8, "w": 24, "x": 0, "y": 44 },
       "datasource": { "type": "loki", "uid": "loki" },
-      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 11 },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "custom": { "drawStyle": "line", "fillOpacity": 10, "showPoints": "auto" },
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 1 }, { "color": "red", "value": 5 }] }
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["sum", "lastNotNull"] },
-        "tooltip": { "mode": "multi", "sort": "desc" }
-      },
-      "targets": [
-        {
-          "datasource": { "type": "loki", "uid": "loki" },
-          "refId": "A",
-          "queryType": "range",
-          "legendFormat": "{{src}}",
-          "expr": "sum by (src)(count_over_time({service_namespace=\"catalyst-cloud\"} |= \"ingest.committed\" |= \"\\\"deduped\\\":true\" | regexp `\"source\":\"(?P<src>[a-z_]+)\"` [$__interval]))"
-        }
-      ]
-    },
-    {
-      "id": 6,
-      "type": "timeseries",
-      "title": "Local Linear replica staleness per node",
-      "description": "Node-self-reported Linear replica staleness (catalyst.linear.replica.staleness, ms) from cloud-sync: freshness. Already an age in ms so thresholds color correctly. Verified: mini avg 7426ms, mini-2 avg 7436ms; laptop absent (dev node ships nothing). Linear only; mini/mini-2 only.",
-      "datasource": { "type": "loki", "uid": "loki" },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 17 },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "ms",
-          "custom": { "drawStyle": "line", "fillOpacity": 10, "showPoints": "auto" },
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 30000 }, { "color": "red", "value": 120000 }] }
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max", "lastNotNull"] },
-        "tooltip": { "mode": "multi", "sort": "desc" }
-      },
-      "targets": [
-        {
-          "datasource": { "type": "loki", "uid": "loki" },
-          "refId": "A",
-          "queryType": "range",
-          "legendFormat": "{{host_name}}",
-          "expr": "avg_over_time({service_name=\"catalyst.cloud-sync\"} |= \"cloud-sync: freshness\" | host_name=~\"$node\" | regexp `\"catalyst.linear.replica.staleness\":(?P<s>[0-9]+)` | unwrap s [1m]) by (host_name)"
-        }
-      ]
-    },
-    {
-      "id": 7,
-      "type": "timeseries",
-      "title": "Node Linear replica cursor per node",
-      "description": "Per-node Linear replica cursor (catalyst.linear.replica.cursor) — same Linear seq space as cloud headSeq. Monotonic; last_over_time so a reduction shows the newest cursor. Verified: mini=327134, mini-2=327134 (both caught up to head).",
-      "datasource": { "type": "loki", "uid": "loki" },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 17 },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "none",
-          "custom": { "drawStyle": "line", "fillOpacity": 0, "showPoints": "auto" },
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull"] },
-        "tooltip": { "mode": "multi", "sort": "desc" }
-      },
-      "targets": [
-        {
-          "datasource": { "type": "loki", "uid": "loki" },
-          "refId": "A",
-          "queryType": "range",
-          "legendFormat": "{{host_name}}",
-          "expr": "last_over_time({service_name=\"catalyst.cloud-sync\"} |= \"cloud-sync: freshness\" | host_name=~\"$node\" | regexp `\"catalyst.linear.replica.cursor\":(?P<c>[0-9]+)` | unwrap c [2m]) by (host_name)"
-        }
-      ]
-    },
-    {
-      "id": 8,
-      "type": "stat",
-      "title": "Local Linear replica staleness — HEADLINE",
-      "description": "Authoritative per-node freshness: catalyst.linear.replica.staleness (age in ms) — how stale each node's local Linear replica is. It is an age, so it cannot go falsely negative. This REPLACED the cloud-vs-node seq-delta that was the headline: cloud headSeq is a GLOBAL interleaved commit position, not a per-source Linear watermark, so it can't be cleanly differenced against the node's Linear cursor — the delta ran chronically negative and could show green while a node was behind. Seq semantics pending CTC/READ-SDK; true per-update latency = CTL-1402 (panel below). Linear only; mini/mini-2 only.",
-      "datasource": { "type": "loki", "uid": "loki" },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 25 },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "ms",
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 30000 }, { "color": "red", "value": 120000 }] }
-        },
-        "overrides": []
-      },
-      "options": {
-        "colorMode": "background",
-        "graphMode": "none",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "" }
-      },
-      "targets": [
-        {
-          "datasource": { "type": "loki", "uid": "loki" },
-          "refId": "A",
-          "queryType": "instant",
-          "legendFormat": "{{host_name}}",
-          "expr": "max by (host_name)(max_over_time({service_name=\"catalyst.cloud-sync\"} |= \"cloud-sync: freshness\" | host_name=~\"$node\" | regexp `\"catalyst.linear.replica.staleness\":(?P<s>[0-9]+)` | unwrap s [5m]))"
-        }
-      ]
-    },
-    {
-      "id": 9,
-      "type": "timeseries",
-      "title": "Cloud-vs-node seq delta over time (EXPERIMENTAL — not a true lag)",
-      "description": "EXPERIMENTAL / directional only. Plots cloud headSeq(linear) − node Linear cursor over time. These are NOT a clean shared seq space — headSeq is a GLOBAL interleaved commit position, the node cursor is Linear-specific — so the delta is biased (runs negative) and must NOT be read as a true lag. Authoritative freshness = the staleness headline (Panel 8) + Panel 6. Kept as a raw diagnostic pending CTC/READ-SDK clarification of the seq semantics; true per-update latency = CTL-1402.",
-      "datasource": { "type": "loki", "uid": "loki" },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 25 },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "none",
-          "custom": { "drawStyle": "line", "fillOpacity": 10, "showPoints": "auto" },
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 50 }, { "color": "red", "value": 200 }] }
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["max", "lastNotNull"] },
-        "tooltip": { "mode": "multi", "sort": "desc" }
-      },
-      "targets": [
-        {
-          "datasource": { "type": "loki", "uid": "loki" },
-          "refId": "A",
-          "queryType": "range",
-          "legendFormat": "{{host_name}}",
-          "expr": "last_over_time({service_name=\"catalyst.cloud-sync\"} |= \"cloud-sync: freshness\" | host_name=~\"$node\" | regexp `\"catalyst.linear.replica.cursor\":(?P<c>[0-9]+)` | unwrap c [2m]) by (host_name)"
-        },
-        {
-          "datasource": { "type": "loki", "uid": "loki" },
-          "refId": "B",
-          "queryType": "range",
-          "hide": true,
-          "expr": "max(max_over_time({service_namespace=\"catalyst-cloud\"} |= \"ingest.committed\" | regexp `\"source\":\"(?P<src>[a-z_]+)\"` | src=\"linear\" | regexp `\"headSeq\":(?P<hs>[0-9]+)` | unwrap hs [5m]))"
-        },
-        {
-          "refId": "Lag",
-          "datasource": { "type": "__expr__", "uid": "__expr__" },
-          "type": "math",
-          "expression": "$B - $A"
-        }
-      ]
-    },
-    {
-      "id": 10,
-      "type": "timeseries",
-      "title": "Replica apply outcome by result (CTL-1402)",
-      "description": "CTL-1402 (sdk@0.3.1, CTC-149): catalyst.replica.apply{result: applied|skipped|failed} counted over time. applied=delta wrote the row; skipped=last-write-wins stale-guard dropped an out-of-order delta; failed=apply threw (carries the untruncated err_message — the errno:1 / catalyst-cloud#127 column-drift). ANY failed>0 is signal. Emitted via the SDK log callback on cloud-sync's console.log path → service_name=catalyst.cloud-sync (stream selector confirmed live against the pre-bump 'apply failed for' lines). Lights up when cloud-sync bumps to ^0.3.1; the result-field regexp is pending verification against the first live 0.3.1 body. NB: true per-update LATENCY (applied_at−received_at) is NOT in 0.3.1 — no timestamp fields shipped — so that stays a future CTC ask, not this panel.",
-      "datasource": { "type": "loki", "uid": "loki" },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 33 },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "custom": { "drawStyle": "line", "fillOpacity": 15, "showPoints": "auto", "stacking": { "mode": "normal" } },
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }
-        },
-        "overrides": [
-          { "matcher": { "id": "byName", "options": "applied" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } }] },
-          { "matcher": { "id": "byName", "options": "skipped" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "yellow" } }] },
-          { "matcher": { "id": "byName", "options": "failed" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } }] }
-        ]
-      },
-      "options": {
-        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["sum", "lastNotNull"] },
-        "tooltip": { "mode": "multi", "sort": "desc" }
-      },
-      "targets": [
-        {
-          "datasource": { "type": "loki", "uid": "loki" },
-          "refId": "A",
-          "queryType": "range",
-          "legendFormat": "{{result}}",
-          "expr": "sum by (result)(count_over_time({service_name=\"catalyst.cloud-sync\"} |= \"catalyst.replica.apply\" | host_name=~\"$node\" | regexp `\"result\":\"(?P<result>[a-z]+)\"` [$__interval]))"
-        }
-      ]
-    },
-    {
-      "id": 11,
-      "type": "stat",
-      "title": "⚠ GAP — GitHub local-replica freshness per node",
-      "description": "GAP: GitHub replica freshness is emitted NOWHERE today (cloud-sync: freshness carries Linear only). This panel is a placeholder for when a GitHub-local freshness signal lands (mirrors the Linear staleness shape). Until then it returns no series.",
-      "datasource": { "type": "loki", "uid": "loki" },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 33 },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "ms",
-          "noValue": "No data yet (no GitHub-local producer)",
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 30000 }, { "color": "red", "value": 120000 }] }
-        },
-        "overrides": []
-      },
-      "options": {
-        "colorMode": "background",
-        "graphMode": "none",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "" }
-      },
-      "targets": [
-        {
-          "datasource": { "type": "loki", "uid": "loki" },
-          "refId": "A",
-          "queryType": "instant",
-          "legendFormat": "{{host_name}}",
-          "expr": "max by (host_name)(max_over_time({service_name=\"catalyst.cloud-sync\"} |= \"cloud-sync: freshness\" | host_name=~\"$node\" | regexp `\"catalyst.github.replica.staleness\":(?P<s>[0-9]+)` | unwrap s [10m]))"
-        }
-      ]
-    },
-    {
-      "id": 12,
-      "type": "logs",
-      "title": "Failed replica applies — err_message (CTL-1402 → catalyst-cloud#127 drift)",
-      "description": "Raw catalyst.replica.apply{result:failed} lines — the untruncated err_message pins the drifted column behind the errno:1 SQLITE_ERROR (catalyst-cloud#127). Low volume (~0.7% of applies). Post-bump these REPLACE the old '[catalyst-cloud-sync] error: apply failed for <entity> seq=<seq>' string lines on the same cloud-sync.log stream. Filter shape pending verification against the first live 0.3.1 body.",
-      "datasource": { "type": "loki", "uid": "loki" },
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 41 },
-      "options": {
-        "showTime": true,
-        "showLabels": false,
-        "wrapLogMessage": true,
-        "enableLogDetails": true,
-        "dedupStrategy": "none",
-        "sortOrder": "Descending"
-      },
-      "targets": [
-        {
-          "datasource": { "type": "loki", "uid": "loki" },
-          "refId": "A",
-          "queryType": "range",
-          "expr": "{service_name=\"catalyst.cloud-sync\"} |= \"catalyst.replica.apply\" |= `\"result\":\"failed\"` | host_name=~\"$node\""
-        }
-      ]
+      "targets": [ { "refId": "A", "datasource": { "type": "loki", "uid": "loki" }, "expr": "{service_name=\"catalyst.cloud-sync\"} |= `catalyst.replica.apply` |= `\"result\":\"failed\"` | host_name=~`$node`", "queryType": "range" } ],
+      "options": { "showTime": true, "sortOrder": "Descending", "wrapLogMessage": true, "enableLogDetails": true, "dedupStrategy": "none" }
     }
   ]
 }
