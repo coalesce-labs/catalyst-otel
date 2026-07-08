@@ -177,6 +177,12 @@ processors:
           - set(attributes["operation"], attributes["catalyst.install.operation"]) where attributes["catalyst.install.operation"] != nil
           - set(attributes["outcome"], attributes["catalyst.install.outcome"]) where attributes["catalyst.install.outcome"] != nil
           - set(attributes["phase"], attributes["catalyst.install.phase"]) where attributes["catalyst.install.phase"] != nil
+          # CTL-1403 / OTL-50 reads-by-source: emit-side dotted linear.read.{source,result}
+          # -> bare connector labels (only set on catalyst.linear.read events via the guard,
+          # so no collision with other events' fields). age_ms stays dotted (histogram reads
+          # it directly, like install phase_duration_ms). Same pattern as install operation.
+          - set(attributes["source"], attributes["linear.read.source"]) where attributes["linear.read.source"] != nil
+          - set(attributes["result"], attributes["linear.read.result"]) where attributes["linear.read.result"] != nil
 
   # OTL-31: Tier-1 daemon scheduler-health logs (service_name=catalyst.execution-core,
   # CTL-1330/1332 full-pino-body) carry their fields ONLY in the JSON body string.
@@ -521,6 +527,27 @@ connectors:
           - key: outcome
             default_value: unknown
           - key: host_name
+
+      # ----- catalyst.linear reads-by-source (CTL-1403 / OTL-50) -----
+      # Every Linear read by source + outcome across 3 emit sites (daemon
+      # fetchTicketState = catalyst.execution-core; agent bash linear_read_ticket +
+      # CLI linear-cli.mjs = catalyst.linear-read). Service-name-agnostic (gates on
+      # event_name only, like the install/checkout counters). source/result are the
+      # bare labels transform/metrics_normalize copies from linear.read.{source,result}.
+      # Three signals from one counter: {source="linearis"}=replica bypass (guarantee
+      # violated), {source=~"linearis.*"}=quota burn (all live-API toward the 5000/hr
+      # wall), {source="linearis_miss"}=replica sync-lag; {result="failed"}=read-path
+      # blocked (supersedes the OTL-40 `issues list failed` Loki grep). host_name
+      # defaulted so an agent read that lacks a resource host.name still counts.
+      catalyst_linear_read_total:
+        description: "Linear reads by source (replica/linearis/linearis_miss/linearis_exception) and result (ok/failed) — reads-by-source + replica-bypass (CTL-1403)"
+        conditions:
+          - 'attributes["event_name"] == "catalyst.linear.read"'
+        attributes:
+          - key: source
+          - key: result
+          - key: host_name
+            default_value: unknown
 
   # Numeric gauges from event fields. Values are strings in transit -> Double() cast.
   # Do NOT set `error_mode: ignore` here — in otelcol 0.154.0 it suppresses ALL
@@ -1032,6 +1059,23 @@ connectors:
         histogram:
           buckets: [0.25, 0.5, 1, 2, 5, 10, 30, 60, 120]
           value: 'Double(attributes["catalyst.install.phase_duration_ms"]) / 1000'
+
+      # ----- catalyst.linear read staleness (CTL-1403 / OTL-50) — SPARSE -----
+      # Replica read staleness distribution (linear.read.age_ms / 1000) by source —
+      # the user-facing "how stale is what agents read" number; p99 backs the
+      # freshness-SLO alert. Sparse initially: age_ms currently rides only the CLI
+      # replica-hit + daemon live-read paths (the replica-tier epoch-ms<->ISO parity
+      # age is a READ-SDK fast-follow), so Double(nil) drops the datapoint until then.
+      # Buckets in seconds: replica staleness lives ~0-30s (cloud-sync polls ~30s),
+      # tail to 1h for pathological lag.
+      - name: catalyst_linear_read_age_seconds
+        description: "Linear replica read staleness (seconds) by source — user-facing freshness (GATED on age_ms; CTL-1403)"
+        conditions: ['attributes["event_name"] == "catalyst.linear.read"']
+        attributes:
+          - key: source
+        histogram:
+          buckets: [1, 5, 15, 30, 60, 120, 300, 600, 1800, 3600]
+          value: 'Double(attributes["linear.read.age_ms"]) / 1000'
 
 service:
   # PAYLOAD-PARITY INVARIANT (OTL-1): exactly ONE pipeline per signal type.
