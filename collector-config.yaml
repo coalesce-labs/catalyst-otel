@@ -39,6 +39,17 @@ processors:
           - set(attributes["launcher_name"], resource.attributes["launcher.name"])
           - set(attributes["service_namespace"], resource.attributes["service.namespace"])
           - set(attributes["user"], resource.attributes["user"])
+          # operator (OTL-51): WHO was at the keyboard. Distinct from the user.*
+          # family, which Claude Code populates from the authenticated Anthropic
+          # account — when an account is shared those are identical for everyone
+          # and cannot separate two people. Deliberately NOT `user.name`: semconv
+          # `user.*` means the authenticated principal, so `user.name` would
+          # contradict `user_email` on the same series. Prometheus needs no
+          # statement (resource_to_telemetry_conversion promotes any resource
+          # attribute to a label); Loki does, because this transform is an
+          # allowlist — and Loki is what session review reads. No-op under
+          # error_mode: ignore when the attribute is unset.
+          - set(attributes["operator"], resource.attributes["operator"])
           - set(attributes["resource_environment"], resource.attributes["environment"])
           # Session context
           - set(attributes["working_directory"], resource.attributes["working.directory"])
