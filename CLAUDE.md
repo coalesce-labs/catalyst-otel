@@ -135,6 +135,7 @@ Claude Code (with telemetry enabled)
 | `app.version` | Claude Code version | `OTEL_METRICS_INCLUDE_VERSION` |
 | `organization.id` | Organization UUID | Always included when authenticated |
 | `user.account_uuid` | Account UUID | `OTEL_METRICS_INCLUDE_ACCOUNT_UUID` |
+| `operator` | Who was at the keyboard (short name, e.g. `ryan`) | Set manually in `OTEL_RESOURCE_ATTRIBUTES` |
 | `project` | Project name | Set via direnv `use_otel_context` |
 | `hostname` | Machine short name | Set via direnv `use_otel_context` |
 | `branch` | Git branch | Set via direnv `use_otel_context` |
