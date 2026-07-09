@@ -12,7 +12,7 @@
       }
     ]
   },
-  "description": "Per-Claude-account rate-limit budget usage from the standalone claude-limits monitor (claude_limits.* metrics). Answers: which account to burn next, when each window resets, is any account near saturation, is each login still valid. Accounts are labelled by claude_limits_account_alias; the technical slice key is service_instance_id.",
+  "description": "Per-Claude-account rate-limit budget usage from the standalone claude-limits monitor (claude_limits.* metrics). One column per account: usage % vs. time-elapsed % of window (stacked bars, same row order, for at-a-glance pace comparison), resets-in duration, and a per-account trend line. Accounts are labelled by claude_limits_account_alias; the technical slice key is service_instance_id.",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
@@ -44,20 +44,20 @@
       },
       {
         "allValue": ".*",
-        "current": { "selected": true, "text": "5-hour", "value": "five_hour" },
+        "current": { "selected": true, "text": "All", "value": "$__all" },
         "includeAll": true,
         "multi": true,
         "name": "window",
         "options": [
           { "selected": true, "text": "5-hour", "value": "five_hour" },
-          { "selected": false, "text": "7-day", "value": "seven_day" }
+          { "selected": true, "text": "7-day", "value": "seven_day" }
         ],
         "query": "five_hour, seven_day",
         "type": "custom"
       }
     ]
   },
-  "time": { "from": "now-6h", "to": "now" },
+  "time": { "from": "now-7d", "to": "now" },
   "timepicker": {
     "refresh_intervals": ["10s", "30s", "1m", "5m"],
     "time_options": ["5m", "15m", "1h", "3h", "6h", "12h", "24h", "7d"]
@@ -65,12 +65,12 @@
   "timezone": "browser",
   "title": "Claude — Account Usage",
   "uid": "claude-account-usage",
-  "version": 1,
+  "version": 2,
   "weekStart": "",
   "panels": [
     {
       "type": "row",
-      "title": "Account Utilization",
+      "title": "Usage vs. Time Elapsed — $account",
       "collapsed": false,
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
       "id": 100,
@@ -79,18 +79,28 @@
     {
       "id": 1,
       "type": "bargauge",
-      "title": "5-Hour Utilization by Account",
-      "description": "Fraction of the 5-hour rolling rate-limit window consumed, per account. Red past 95%.",
+      "title": "$account — % of Limit Used",
+      "description": "Fraction of each rate-limit window consumed. Compare row-for-row against the 'Time Elapsed in Window' panel directly below — if 'used' is far ahead of 'elapsed' for the same window, this account is burning faster than a linear pace and will exhaust before reset.",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 1 },
+      "repeat": "account",
+      "repeatDirection": "h",
+      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 1 },
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "max by (claude_limits_account_alias) (claude_limits_account_utilization_ratio{claude_limits_window=\"five_hour\", claude_limits_model=\"all\", claude_limits_account_alias=~\"$account\", claude_limits_account_alias!=\"\", job=\"otel-collector\"})",
-          "legendFormat": "{{claude_limits_account_alias}}",
+          "expr": "max(claude_limits_account_utilization_ratio{claude_limits_window=\"five_hour\", claude_limits_model=\"all\", claude_limits_account_alias=~\"$account\", claude_limits_account_alias!=\"\", job=\"otel-collector\"})",
+          "legendFormat": "5h used",
           "instant": true,
           "range": false,
           "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "max(claude_limits_account_utilization_ratio{claude_limits_window=\"seven_day\", claude_limits_model=\"all\", claude_limits_account_alias=~\"$account\", claude_limits_account_alias!=\"\", job=\"otel-collector\"})",
+          "legendFormat": "7d used",
+          "instant": true,
+          "range": false,
+          "refId": "B"
         }
       ],
       "fieldConfig": {
@@ -123,18 +133,28 @@
     {
       "id": 2,
       "type": "bargauge",
-      "title": "7-Day Utilization by Account",
-      "description": "Fraction of the 7-day rate-limit window consumed, per account. Red past 95%.",
+      "title": "$account — Time Elapsed in Window",
+      "description": "How far through each rate-limit window we currently are (1 − remaining/window length). At a linear burn rate, this should track roughly even with the 'used' bar above it for the same window.",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 1 },
+      "repeat": "account",
+      "repeatDirection": "h",
+      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 8 },
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "max by (claude_limits_account_alias) (claude_limits_account_utilization_ratio{claude_limits_window=\"seven_day\", claude_limits_model=\"all\", claude_limits_account_alias=~\"$account\", claude_limits_account_alias!=\"\", job=\"otel-collector\"})",
-          "legendFormat": "{{claude_limits_account_alias}}",
+          "expr": "clamp(1 - (max(claude_limits_account_reset_time_seconds{claude_limits_window=\"five_hour\", claude_limits_model=\"all\", claude_limits_account_alias=~\"$account\", claude_limits_account_alias!=\"\", job=\"otel-collector\"}) - time()) / 18000, 0, 1)",
+          "legendFormat": "5h elapsed",
           "instant": true,
           "range": false,
           "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "clamp(1 - (max(claude_limits_account_reset_time_seconds{claude_limits_window=\"seven_day\", claude_limits_model=\"all\", claude_limits_account_alias=~\"$account\", claude_limits_account_alias!=\"\", job=\"otel-collector\"}) - time()) / 604800, 0, 1)",
+          "legendFormat": "7d elapsed",
+          "instant": true,
+          "range": false,
+          "refId": "B"
         }
       ],
       "fieldConfig": {
@@ -143,15 +163,8 @@
           "min": 0,
           "max": 1,
           "decimals": 0,
-          "color": { "mode": "thresholds" },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 0.8 },
-              { "color": "red", "value": 0.95 }
-            ]
-          },
+          "color": { "mode": "fixed", "fixedColor": "blue" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] },
           "mappings": []
         },
         "overrides": []
@@ -163,79 +176,29 @@
         "valueMode": "color",
         "reduceOptions": { "calcs": ["lastNotNull"], "values": false, "fields": "" }
       }
-    },
-    {
-      "type": "row",
-      "title": "Burn Routing · Reset · Auth",
-      "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 9 },
-      "id": 101,
-      "panels": []
     },
     {
       "id": 3,
-      "type": "bargauge",
-      "title": "Which Account to Burn Next (5h headroom)",
-      "description": "Remaining 5-hour headroom per account (1 − utilization). Most headroom sorts to the top in green — that is the account to route work to next.",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 10 },
-      "targets": [
-        {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "sort_desc(1 - max by (claude_limits_account_alias) (claude_limits_account_utilization_ratio{claude_limits_window=\"five_hour\", claude_limits_model=\"all\", claude_limits_account_alias=~\"$account\", claude_limits_account_alias!=\"\", job=\"otel-collector\"}))",
-          "legendFormat": "{{claude_limits_account_alias}}",
-          "instant": true,
-          "range": false,
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percentunit",
-          "min": 0,
-          "max": 1,
-          "decimals": 0,
-          "color": { "mode": "thresholds" },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "red", "value": null },
-              { "color": "yellow", "value": 0.2 },
-              { "color": "green", "value": 0.5 }
-            ]
-          },
-          "mappings": []
-        },
-        "overrides": []
-      },
-      "options": {
-        "displayMode": "gradient",
-        "orientation": "horizontal",
-        "showUnfilled": true,
-        "valueMode": "color",
-        "reduceOptions": { "calcs": ["lastNotNull"], "values": false, "fields": "" }
-      }
-    },
-    {
-      "id": 4,
       "type": "table",
-      "title": "Time to Reset",
-      "description": "Time remaining until each window rolls over (reset_time − now). Red when a reset is imminent (<15m).",
+      "title": "$account — Resets In",
+      "description": "Time remaining until each window rolls over. Red when the 5-hour reset is imminent (<15m).",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 8, "w": 9, "x": 8, "y": 10 },
+      "repeat": "account",
+      "repeatDirection": "h",
+      "gridPos": { "h": 5, "w": 8, "x": 0, "y": 15 },
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "clamp_min(max by (claude_limits_account_alias) (claude_limits_account_reset_time_seconds{claude_limits_window=\"five_hour\", claude_limits_model=\"all\", claude_limits_account_alias=~\"$account\", claude_limits_account_alias!=\"\", job=\"otel-collector\"}) - time(), 0)",
-          "legendFormat": "{{claude_limits_account_alias}}",
+          "expr": "clamp_min(max(claude_limits_account_reset_time_seconds{claude_limits_window=\"five_hour\", claude_limits_model=\"all\", claude_limits_account_alias=~\"$account\", claude_limits_account_alias!=\"\", job=\"otel-collector\"}) - time(), 0)",
+          "format": "table",
           "instant": true,
           "range": false,
           "refId": "A"
         },
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "clamp_min(max by (claude_limits_account_alias) (claude_limits_account_reset_time_seconds{claude_limits_window=\"seven_day\", claude_limits_model=\"all\", claude_limits_account_alias=~\"$account\", claude_limits_account_alias!=\"\", job=\"otel-collector\"}) - time(), 0)",
-          "legendFormat": "{{claude_limits_account_alias}}",
+          "expr": "clamp_min(max(claude_limits_account_reset_time_seconds{claude_limits_window=\"seven_day\", claude_limits_model=\"all\", claude_limits_account_alias=~\"$account\", claude_limits_account_alias!=\"\", job=\"otel-collector\"}) - time(), 0)",
+          "format": "table",
           "instant": true,
           "range": false,
           "refId": "B"
@@ -243,23 +206,15 @@
       ],
       "transformations": [
         {
-          "id": "joinByField",
-          "options": { "byField": "claude_limits_account_alias", "mode": "outer" }
+          "id": "merge",
+          "options": {}
         },
         {
           "id": "organize",
           "options": {
-            "excludeByName": { "Time": true, "Time 1": true, "Time 2": true },
-            "renameByName": {
-              "claude_limits_account_alias": "Account",
-              "Value #A": "5h resets in",
-              "Value #B": "7d resets in"
-            },
-            "indexByName": {
-              "claude_limits_account_alias": 0,
-              "Value #A": 1,
-              "Value #B": 2
-            }
+            "excludeByName": { "Time": true },
+            "renameByName": { "Value #A": "5h resets in", "Value #B": "7d resets in" },
+            "indexByName": { "Value #A": 0, "Value #B": 1 }
           }
         }
       ],
@@ -267,7 +222,7 @@
         "defaults": {
           "unit": "dtdurations",
           "decimals": 0,
-          "custom": { "align": "auto", "cellOptions": { "type": "auto" }, "filterable": true },
+          "custom": { "align": "auto", "cellOptions": { "type": "auto" }, "filterable": false },
           "mappings": []
         },
         "overrides": [
@@ -296,9 +251,82 @@
       "options": {
         "showHeader": true,
         "cellHeight": "sm",
-        "footer": { "show": false, "reducer": ["sum"], "countRows": false, "fields": "" },
-        "sortBy": [{ "displayName": "5h resets in", "desc": false }]
+        "footer": { "show": false, "reducer": ["sum"], "countRows": false, "fields": "" }
       }
+    },
+    {
+      "type": "row",
+      "title": "Trends",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 20 },
+      "id": 101,
+      "panels": []
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "$account — Utilization Over Time",
+      "description": "This account's burn velocity across the range, one line per window. Dashed lines mark the 80% and 95% ceilings. Default range is 7 days so both the 5-hour and 7-day cycles are guaranteed to be visible.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "repeat": "account",
+      "repeatDirection": "h",
+      "gridPos": { "h": 9, "w": 8, "x": 0, "y": 21 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "max by (claude_limits_window) (claude_limits_account_utilization_ratio{claude_limits_window=~\"$window\", claude_limits_model=\"all\", claude_limits_account_alias=~\"$account\", claude_limits_account_alias!=\"\", job=\"otel-collector\"})",
+          "legendFormat": "{{claude_limits_window}}",
+          "instant": false,
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "spanNulls": true,
+            "showPoints": "never",
+            "lineInterpolation": "smooth",
+            "thresholdsStyle": { "mode": "dashed" }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.8 },
+              { "color": "red", "value": 0.95 }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": ["lastNotNull", "max"],
+          "showLegend": true,
+          "sortBy": "Last *",
+          "sortDesc": true
+        },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "type": "row",
+      "title": "Auth Status",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 30 },
+      "id": 102,
+      "panels": []
     },
     {
       "id": 5,
@@ -306,12 +334,12 @@
       "title": "Auth Status",
       "description": "OAuth login validity per account. RE-LOGIN (red) means the identity needs an interactive re-login. This gauge is the only wired auth signal today (the auth log event is a v1 fast-follow).",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 8, "w": 7, "x": 17, "y": 10 },
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 31 },
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
           "expr": "min by (claude_limits_account_alias) (claude_limits_account_auth_active{claude_limits_account_alias=~\"$account\", claude_limits_account_alias!=\"\", job=\"otel-collector\"})",
-          "legendFormat": "{{claude_limits_account_alias}}",
+          "format": "table",
           "instant": true,
           "range": false,
           "refId": "A"
@@ -356,119 +384,6 @@
         "showHeader": true,
         "cellHeight": "sm",
         "footer": { "show": false, "reducer": ["sum"], "countRows": false, "fields": "" }
-      }
-    },
-    {
-      "type": "row",
-      "title": "Trends",
-      "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 18 },
-      "id": 102,
-      "panels": []
-    },
-    {
-      "id": 6,
-      "type": "timeseries",
-      "title": "Utilization Over Time",
-      "description": "Per-account burn velocity across the range, filterable by $account and $window. Dashed lines mark the 80% and 95% ceilings.",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 19 },
-      "targets": [
-        {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "max by (claude_limits_account_alias, claude_limits_window) (claude_limits_account_utilization_ratio{claude_limits_window=~\"$window\", claude_limits_model=\"all\", claude_limits_account_alias=~\"$account\", claude_limits_account_alias!=\"\", job=\"otel-collector\"})",
-          "legendFormat": "{{claude_limits_account_alias}} · {{claude_limits_window}}",
-          "instant": false,
-          "range": true,
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percentunit",
-          "min": 0,
-          "max": 1,
-          "color": { "mode": "palette-classic" },
-          "custom": {
-            "drawStyle": "line",
-            "lineWidth": 2,
-            "fillOpacity": 10,
-            "spanNulls": true,
-            "showPoints": "never",
-            "lineInterpolation": "smooth",
-            "thresholdsStyle": { "mode": "dashed" }
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 0.8 },
-              { "color": "red", "value": 0.95 }
-            ]
-          },
-          "mappings": []
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "right",
-          "calcs": ["lastNotNull", "max"],
-          "showLegend": true,
-          "width": 300,
-          "sortBy": "Last *",
-          "sortDesc": true
-        },
-        "tooltip": { "mode": "multi", "sort": "desc" }
-      }
-    },
-    {
-      "id": 7,
-      "type": "timeseries",
-      "title": "Per-Model Utilization (forward-compat)",
-      "description": "Empty while the limits API returns model=all. Auto-populates when per-model (opus/sonnet) sub-utilization becomes available for a plan — no dashboard edit needed.",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 28 },
-      "targets": [
-        {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "max by (claude_limits_account_alias, claude_limits_model) (claude_limits_account_utilization_ratio{claude_limits_window=~\"$window\", claude_limits_model!=\"all\", claude_limits_account_alias=~\"$account\", claude_limits_account_alias!=\"\", job=\"otel-collector\"})",
-          "legendFormat": "{{claude_limits_account_alias}} · {{claude_limits_model}}",
-          "instant": false,
-          "range": true,
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percentunit",
-          "min": 0,
-          "max": 1,
-          "color": { "mode": "palette-classic" },
-          "custom": {
-            "drawStyle": "line",
-            "lineWidth": 2,
-            "fillOpacity": 10,
-            "spanNulls": true,
-            "showPoints": "never",
-            "lineInterpolation": "smooth"
-          },
-          "mappings": []
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "right",
-          "calcs": ["lastNotNull", "max"],
-          "showLegend": true,
-          "width": 300,
-          "sortBy": "Last *",
-          "sortDesc": true
-        },
-        "tooltip": { "mode": "multi", "sort": "desc" }
       }
     }
   ]
