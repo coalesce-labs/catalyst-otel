@@ -102,7 +102,8 @@
           }
         },
         "overrides": []
-      }
+      },
+      "description": "Sum of the per-session cost counter's maximum within the selected range."
     },
     {
       "type": "stat",
@@ -225,7 +226,8 @@
           }
         },
         "overrides": []
-      }
+      },
+      "description": "Counts claude_code.user_prompt events. This includes local slash commands such as /status and /effort, which never call the API \u2014 so this can exceed the number of sessions that show tokens or cost."
     },
     {
       "type": "stat",
@@ -282,7 +284,7 @@
     },
     {
       "type": "timeseries",
-      "title": "Cost rate by operator",
+      "title": "Cumulative cost by operator",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -296,7 +298,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (operator) (rate(claude_code_cost_usage_USD_total{operator=~\"$operator\"}[$__rate_interval]))",
+          "expr": "sum by (operator) (max_over_time(claude_code_cost_usage_USD_total{operator=~\"$operator\"}[$__interval]))",
           "legendFormat": "{{operator}}"
         }
       ],
@@ -305,7 +307,7 @@
           "displayMode": "table",
           "placement": "bottom",
           "calcs": [
-            "mean",
+            "lastNotNull",
             "max"
           ]
         }
@@ -315,15 +317,20 @@
           "unit": "currencyUSD",
           "custom": {
             "fillOpacity": 10,
-            "showPoints": "never"
-          }
+            "showPoints": "always",
+            "spanNulls": true,
+            "drawStyle": "line",
+            "lineInterpolation": "stepAfter"
+          },
+          "min": 0
         },
         "overrides": []
-      }
+      },
+      "description": "Cumulative spend, not a rate. Prometheus expires idle series after 15m, so rate() over sparse Claude Code counters reads near-zero and is misleading."
     },
     {
       "type": "timeseries",
-      "title": "Token rate by type",
+      "title": "Cumulative tokens by type",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -337,7 +344,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (type) (rate(claude_code_token_usage_tokens_total{operator=~\"$operator\"}[$__rate_interval]))",
+          "expr": "sum by (type) (max_over_time(claude_code_token_usage_tokens_total{operator=~\"$operator\"}[$__interval]))",
           "legendFormat": "{{type}}"
         }
       ],
@@ -346,7 +353,7 @@
           "displayMode": "table",
           "placement": "bottom",
           "calcs": [
-            "mean",
+            "lastNotNull",
             "max"
           ]
         }
@@ -356,11 +363,16 @@
           "unit": "short",
           "custom": {
             "fillOpacity": 10,
-            "showPoints": "never"
-          }
+            "showPoints": "always",
+            "spanNulls": true,
+            "drawStyle": "line",
+            "lineInterpolation": "stepAfter"
+          },
+          "min": 0
         },
         "overrides": []
-      }
+      },
+      "description": "Cumulative token counts. Same reason as the cost panel: rate() is unreliable on sparse counters."
     },
     {
       "type": "piechart",
@@ -553,20 +565,50 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (operator, host_name, session_id, model) (max_over_time(claude_code_token_usage_tokens_total{operator=~\"$operator\"}[$__range]))",
           "instant": true,
-          "format": "table"
+          "format": "table",
+          "expr": "sum by (operator, host_name, session_id) (max_over_time(claude_code_session_count_total{operator=~\"$operator\"}[$__range]))"
+        },
+        {
+          "refId": "B",
+          "instant": true,
+          "format": "table",
+          "expr": "sum by (session_id, model) (max_over_time(claude_code_token_usage_tokens_total{operator=~\"$operator\"}[$__range]))"
+        },
+        {
+          "refId": "C",
+          "instant": true,
+          "format": "table",
+          "expr": "sum by (session_id) (max_over_time(claude_code_cost_usage_USD_total{operator=~\"$operator\"}[$__range]))"
         }
       ],
       "transformations": [
         {
+          "id": "joinByField",
+          "options": {
+            "byField": "session_id",
+            "mode": "outer"
+          }
+        },
+        {
           "id": "organize",
           "options": {
             "excludeByName": {
-              "Time": true
+              "Time": true,
+              "Time 1": true,
+              "Time 2": true,
+              "Time 3": true
             },
             "renameByName": {
-              "Value": "tokens"
+              "Value #A": "sessions",
+              "Value #B": "tokens",
+              "Value #C": "cost (USD)"
+            },
+            "indexByName": {
+              "operator": 0,
+              "host_name": 1,
+              "session_id": 2,
+              "model": 3
             }
           }
         },
@@ -587,8 +629,38 @@
       },
       "fieldConfig": {
         "defaults": {},
-        "overrides": []
-      }
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "cost (USD)"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyUSD"
+              },
+              {
+                "id": "decimals",
+                "value": 4
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "tokens"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              }
+            ]
+          }
+        ]
+      },
+      "description": "Every session that started, including ones that never called the API. Blank tokens/cost means the session only ran local slash commands."
     }
   ]
 }
