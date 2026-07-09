@@ -34,6 +34,25 @@
           "text": "All",
           "value": "$__all"
         }
+      },
+      {
+        "name": "session",
+        "label": "Session",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "query": "label_values(claude_code_session_count_total{operator=~\"$operator\"}, session_id)",
+        "refresh": 2,
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": true,
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "description": "Cascades from Operator and the dashboard time range. Pick one session to read it end to end."
       }
     ]
   },
@@ -661,6 +680,48 @@
         ]
       },
       "description": "Every session that started, including ones that never called the API. Blank tokens/cost means the session only ran local slash commands."
+    },
+    {
+      "type": "row",
+      "title": "Conversation",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 44
+      },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "logs",
+      "title": "Conversation (prompts and responses, oldest first)",
+      "description": "Interleaves claude_code.user_prompt and claude_code.assistant_response by timestamp. Slash commands such as /status never call the model, so they appear as a USER line with no CLAUDE reply. The two events share a prompt_id if you need to pair them exactly.",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "h": 18,
+        "w": 24,
+        "x": 0,
+        "y": 45
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "{service_name=~\"claude-code.*\"} | event_name=~\"user_prompt|assistant_response\" | operator=~\"$operator\" | session_id=~\"$session\" | line_format \"{{ if eq .event_name \\\"user_prompt\\\" }}\u25b6 USER    {{ .prompt }}{{ else }}\u25c0 CLAUDE  {{ .response }}{{ end }}\"",
+          "direction": "forward"
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "sortOrder": "Ascending",
+        "wrapLogMessage": true,
+        "enableLogDetails": true,
+        "prettifyLogMessage": false,
+        "dedupStrategy": "none"
+      }
     }
   ]
 }
