@@ -65,7 +65,7 @@
   "timezone": "browser",
   "title": "Claude — Account Usage",
   "uid": "claude-account-usage",
-  "version": 6,
+  "version": 7,
   "weekStart": "",
   "panels": [
     {
@@ -179,13 +179,13 @@
     },
     {
       "id": 3,
-      "type": "bargauge",
+      "type": "stat",
       "title": "$account — Resets In",
-      "description": "Time remaining until each window rolls over, shown as a fraction of the full window length. Auto-scales precision: days+hours when far out, hours+minutes as reset gets close. An idle window (no usage yet) has nothing to count down to, so it reads as 0 remaining until first use opens it.",
+      "description": "Time remaining until each window rolls over, as plain text (no bar — a third bar next to 'Elapsed' read as one visual metaphor too many). Auto-scales precision: days+hours when far out, hours+minutes as reset gets close. An idle window (no usage yet) has nothing to count down to, so it reads as 0 remaining until first use opens it.",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "repeat": "account",
       "repeatDirection": "h",
-      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 15 },
+      "gridPos": { "h": 5, "w": 8, "x": 0, "y": 15 },
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
@@ -209,35 +209,25 @@
           "unit": "dtdurations",
           "decimals": 1,
           "min": 0,
-          "color": { "mode": "fixed", "fixedColor": "purple" },
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "purple", "value": null }] },
+          "color": { "mode": "fixed", "fixedColor": "text" },
           "mappings": []
         },
-        "overrides": [
-          {
-            "matcher": { "id": "byName", "options": "5h resets in" },
-            "properties": [{ "id": "max", "value": 18000 }]
-          },
-          {
-            "matcher": { "id": "byName", "options": "7d resets in" },
-            "properties": [{ "id": "max", "value": 604800 }]
-          }
-        ]
+        "overrides": []
       },
       "options": {
-        "displayMode": "gradient",
+        "graphMode": "none",
+        "colorMode": "none",
+        "justifyMode": "auto",
         "orientation": "horizontal",
-        "showUnfilled": true,
-        "valueMode": "color",
-        "reduceOptions": { "calcs": ["lastNotNull"], "values": false, "fields": "" },
-        "text": { "valueSize": 16 }
+        "textMode": "value_and_name",
+        "reduceOptions": { "calcs": ["lastNotNull"], "values": false, "fields": "" }
       }
     },
     {
       "type": "row",
       "title": "Trends",
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 22 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 20 },
       "id": 101,
       "panels": []
     },
@@ -249,7 +239,7 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "repeat": "account",
       "repeatDirection": "h",
-      "gridPos": { "h": 9, "w": 8, "x": 0, "y": 23 },
+      "gridPos": { "h": 9, "w": 8, "x": 0, "y": 21 },
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
@@ -303,7 +293,7 @@
       "type": "row",
       "title": "Auth Status",
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 32 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 30 },
       "id": 102,
       "panels": []
     },
@@ -313,7 +303,7 @@
       "title": "Auth Status",
       "description": "OAuth login validity per account. RE-LOGIN (red) means the identity needs an interactive re-login. This gauge is the only wired auth signal today (the auth log event is a v1 fast-follow).",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 33 },
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 31 },
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
