@@ -65,7 +65,7 @@
   "timezone": "browser",
   "title": "Claude — Account Usage",
   "uid": "claude-account-usage",
-  "version": 5,
+  "version": 6,
   "weekStart": "",
   "panels": [
     {
@@ -229,7 +229,8 @@
         "orientation": "horizontal",
         "showUnfilled": true,
         "valueMode": "color",
-        "reduceOptions": { "calcs": ["lastNotNull"], "values": false, "fields": "" }
+        "reduceOptions": { "calcs": ["lastNotNull"], "values": false, "fields": "" },
+        "text": { "valueSize": 16 }
       }
     },
     {
