@@ -65,7 +65,7 @@
   "timezone": "browser",
   "title": "Claude — Account Usage",
   "uid": "claude-account-usage",
-  "version": 4,
+  "version": 5,
   "weekStart": "",
   "panels": [
     {
@@ -179,94 +179,64 @@
     },
     {
       "id": 3,
-      "type": "table",
-      "title": "Resets In",
-      "description": "Time remaining until each window rolls over, one row per account. Red when the 5-hour reset is imminent (<15m).",
+      "type": "bargauge",
+      "title": "$account — Resets In",
+      "description": "Time remaining until each window rolls over, shown as a fraction of the full window length. Auto-scales precision: days+hours when far out, hours+minutes as reset gets close. An idle window (no usage yet) has nothing to count down to, so it reads as 0 remaining until first use opens it.",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 15 },
+      "repeat": "account",
+      "repeatDirection": "h",
+      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 15 },
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "clamp_min(max by (claude_limits_account_alias) (claude_limits_account_reset_time_seconds{claude_limits_window=\"five_hour\", claude_limits_model=\"all\", claude_limits_account_alias=~\"$account\", claude_limits_account_alias!=\"\", job=\"otel-collector\"}) - time(), 0)",
-          "format": "table",
+          "expr": "clamp_min(max(claude_limits_account_reset_time_seconds{claude_limits_window=\"five_hour\", claude_limits_model=\"all\", claude_limits_account_alias=~\"$account\", claude_limits_account_alias!=\"\", job=\"otel-collector\"}) - time(), 0) or on() vector(0)",
+          "legendFormat": "5h resets in",
           "instant": true,
           "range": false,
           "refId": "A"
         },
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "clamp_min(max by (claude_limits_account_alias) (claude_limits_account_reset_time_seconds{claude_limits_window=\"seven_day\", claude_limits_model=\"all\", claude_limits_account_alias=~\"$account\", claude_limits_account_alias!=\"\", job=\"otel-collector\"}) - time(), 0)",
-          "format": "table",
+          "expr": "clamp_min(max(claude_limits_account_reset_time_seconds{claude_limits_window=\"seven_day\", claude_limits_model=\"all\", claude_limits_account_alias=~\"$account\", claude_limits_account_alias!=\"\", job=\"otel-collector\"}) - time(), 0) or on() vector(0)",
+          "legendFormat": "7d resets in",
           "instant": true,
           "range": false,
           "refId": "B"
         }
       ],
-      "transformations": [
-        {
-          "id": "joinByField",
-          "options": { "byField": "claude_limits_account_alias", "mode": "outer" }
-        },
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": { "Time": true, "Time 1": true, "Time 2": true },
-            "renameByName": {
-              "claude_limits_account_alias": "Account",
-              "Value #A": "5h resets in",
-              "Value #B": "7d resets in"
-            },
-            "indexByName": { "claude_limits_account_alias": 0, "Value #A": 1, "Value #B": 2 }
-          }
-        }
-      ],
       "fieldConfig": {
         "defaults": {
           "unit": "dtdurations",
-          "decimals": 0,
-          "custom": { "align": "auto", "cellOptions": { "type": "auto" }, "filterable": false, "width": 200 },
+          "decimals": 1,
+          "min": 0,
+          "color": { "mode": "fixed", "fixedColor": "purple" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "purple", "value": null }] },
           "mappings": []
         },
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "Account" },
-            "properties": [{ "id": "custom.width", "value": 160 }]
-          },
-          {
             "matcher": { "id": "byName", "options": "5h resets in" },
-            "properties": [
-              { "id": "custom.width", "value": 220 },
-              { "id": "custom.cellOptions", "value": { "type": "color-text" } },
-              { "id": "thresholds", "value": { "mode": "absolute", "steps": [
-                { "color": "red", "value": null },
-                { "color": "yellow", "value": 900 },
-                { "color": "green", "value": 3600 }
-              ] } }
-            ]
+            "properties": [{ "id": "max", "value": 18000 }]
           },
           {
             "matcher": { "id": "byName", "options": "7d resets in" },
-            "properties": [
-              { "id": "custom.width", "value": 220 },
-              { "id": "custom.cellOptions", "value": { "type": "color-text" } },
-              { "id": "thresholds", "value": { "mode": "absolute", "steps": [
-                { "color": "green", "value": null }
-              ] } }
-            ]
+            "properties": [{ "id": "max", "value": 604800 }]
           }
         ]
       },
       "options": {
-        "showHeader": true,
-        "cellHeight": "sm",
-        "footer": { "show": false, "reducer": ["sum"], "countRows": false, "fields": "" }
+        "displayMode": "gradient",
+        "orientation": "horizontal",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "reduceOptions": { "calcs": ["lastNotNull"], "values": false, "fields": "" }
       }
     },
     {
       "type": "row",
       "title": "Trends",
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 21 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 22 },
       "id": 101,
       "panels": []
     },
@@ -278,7 +248,7 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "repeat": "account",
       "repeatDirection": "h",
-      "gridPos": { "h": 9, "w": 8, "x": 0, "y": 22 },
+      "gridPos": { "h": 9, "w": 8, "x": 0, "y": 23 },
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
@@ -332,7 +302,7 @@
       "type": "row",
       "title": "Auth Status",
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 31 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 32 },
       "id": 102,
       "panels": []
     },
@@ -342,7 +312,7 @@
       "title": "Auth Status",
       "description": "OAuth login validity per account. RE-LOGIN (red) means the identity needs an interactive re-login. This gauge is the only wired auth signal today (the auth log event is a v1 fast-follow).",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 32 },
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 33 },
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
