@@ -65,7 +65,7 @@
   "timezone": "browser",
   "title": "Claude — Account Usage",
   "uid": "claude-account-usage",
-  "version": 3,
+  "version": 4,
   "weekStart": "",
   "panels": [
     {
@@ -142,7 +142,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "clamp(1 - (max(claude_limits_account_reset_time_seconds{claude_limits_window=\"five_hour\", claude_limits_model=\"all\", claude_limits_account_alias=~\"$account\", claude_limits_account_alias!=\"\", job=\"otel-collector\"}) - time()) / 18000, 0, 1)",
+          "expr": "clamp(1 - (max(claude_limits_account_reset_time_seconds{claude_limits_window=\"five_hour\", claude_limits_model=\"all\", claude_limits_account_alias=~\"$account\", claude_limits_account_alias!=\"\", job=\"otel-collector\"}) - time()) / 18000, 0, 1) or on() vector(0)",
           "legendFormat": "5h elapsed",
           "instant": true,
           "range": false,
@@ -150,7 +150,7 @@
         },
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "clamp(1 - (max(claude_limits_account_reset_time_seconds{claude_limits_window=\"seven_day\", claude_limits_model=\"all\", claude_limits_account_alias=~\"$account\", claude_limits_account_alias!=\"\", job=\"otel-collector\"}) - time()) / 604800, 0, 1)",
+          "expr": "clamp(1 - (max(claude_limits_account_reset_time_seconds{claude_limits_window=\"seven_day\", claude_limits_model=\"all\", claude_limits_account_alias=~\"$account\", claude_limits_account_alias!=\"\", job=\"otel-collector\"}) - time()) / 604800, 0, 1) or on() vector(0)",
           "legendFormat": "7d elapsed",
           "instant": true,
           "range": false,
