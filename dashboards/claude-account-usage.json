@@ -65,7 +65,7 @@
   "timezone": "browser",
   "title": "Claude — Account Usage",
   "uid": "claude-account-usage",
-  "version": 2,
+  "version": 3,
   "weekStart": "",
   "panels": [
     {
@@ -180,16 +180,14 @@
     {
       "id": 3,
       "type": "table",
-      "title": "$account — Resets In",
-      "description": "Time remaining until each window rolls over. Red when the 5-hour reset is imminent (<15m).",
+      "title": "Resets In",
+      "description": "Time remaining until each window rolls over, one row per account. Red when the 5-hour reset is imminent (<15m).",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "repeat": "account",
-      "repeatDirection": "h",
-      "gridPos": { "h": 5, "w": 8, "x": 0, "y": 15 },
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 15 },
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "clamp_min(max(claude_limits_account_reset_time_seconds{claude_limits_window=\"five_hour\", claude_limits_model=\"all\", claude_limits_account_alias=~\"$account\", claude_limits_account_alias!=\"\", job=\"otel-collector\"}) - time(), 0)",
+          "expr": "clamp_min(max by (claude_limits_account_alias) (claude_limits_account_reset_time_seconds{claude_limits_window=\"five_hour\", claude_limits_model=\"all\", claude_limits_account_alias=~\"$account\", claude_limits_account_alias!=\"\", job=\"otel-collector\"}) - time(), 0)",
           "format": "table",
           "instant": true,
           "range": false,
@@ -197,7 +195,7 @@
         },
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "clamp_min(max(claude_limits_account_reset_time_seconds{claude_limits_window=\"seven_day\", claude_limits_model=\"all\", claude_limits_account_alias=~\"$account\", claude_limits_account_alias!=\"\", job=\"otel-collector\"}) - time(), 0)",
+          "expr": "clamp_min(max by (claude_limits_account_alias) (claude_limits_account_reset_time_seconds{claude_limits_window=\"seven_day\", claude_limits_model=\"all\", claude_limits_account_alias=~\"$account\", claude_limits_account_alias!=\"\", job=\"otel-collector\"}) - time(), 0)",
           "format": "table",
           "instant": true,
           "range": false,
@@ -206,15 +204,19 @@
       ],
       "transformations": [
         {
-          "id": "merge",
-          "options": {}
+          "id": "joinByField",
+          "options": { "byField": "claude_limits_account_alias", "mode": "outer" }
         },
         {
           "id": "organize",
           "options": {
-            "excludeByName": { "Time": true },
-            "renameByName": { "Value #A": "5h resets in", "Value #B": "7d resets in" },
-            "indexByName": { "Value #A": 0, "Value #B": 1 }
+            "excludeByName": { "Time": true, "Time 1": true, "Time 2": true },
+            "renameByName": {
+              "claude_limits_account_alias": "Account",
+              "Value #A": "5h resets in",
+              "Value #B": "7d resets in"
+            },
+            "indexByName": { "claude_limits_account_alias": 0, "Value #A": 1, "Value #B": 2 }
           }
         }
       ],
@@ -222,13 +224,18 @@
         "defaults": {
           "unit": "dtdurations",
           "decimals": 0,
-          "custom": { "align": "auto", "cellOptions": { "type": "auto" }, "filterable": false },
+          "custom": { "align": "auto", "cellOptions": { "type": "auto" }, "filterable": false, "width": 200 },
           "mappings": []
         },
         "overrides": [
           {
+            "matcher": { "id": "byName", "options": "Account" },
+            "properties": [{ "id": "custom.width", "value": 160 }]
+          },
+          {
             "matcher": { "id": "byName", "options": "5h resets in" },
             "properties": [
+              { "id": "custom.width", "value": 220 },
               { "id": "custom.cellOptions", "value": { "type": "color-text" } },
               { "id": "thresholds", "value": { "mode": "absolute", "steps": [
                 { "color": "red", "value": null },
@@ -240,6 +247,7 @@
           {
             "matcher": { "id": "byName", "options": "7d resets in" },
             "properties": [
+              { "id": "custom.width", "value": 220 },
               { "id": "custom.cellOptions", "value": { "type": "color-text" } },
               { "id": "thresholds", "value": { "mode": "absolute", "steps": [
                 { "color": "green", "value": null }
@@ -258,7 +266,7 @@
       "type": "row",
       "title": "Trends",
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 20 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 21 },
       "id": 101,
       "panels": []
     },
@@ -270,7 +278,7 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "repeat": "account",
       "repeatDirection": "h",
-      "gridPos": { "h": 9, "w": 8, "x": 0, "y": 21 },
+      "gridPos": { "h": 9, "w": 8, "x": 0, "y": 22 },
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
@@ -324,7 +332,7 @@
       "type": "row",
       "title": "Auth Status",
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 30 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 31 },
       "id": 102,
       "panels": []
     },
@@ -334,7 +342,7 @@
       "title": "Auth Status",
       "description": "OAuth login validity per account. RE-LOGIN (red) means the identity needs an interactive re-login. This gauge is the only wired auth signal today (the auth log event is a v1 fast-follow).",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 31 },
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 32 },
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
