@@ -416,6 +416,9 @@ by hand.
   comment) **instead of** opening review threads. Detect it via the PR's reactions and issue
   comments, not only the reviews API — otherwise a review that already passed reads as silence and
   you wait on it forever.
-- **Reading one Linear ticket → the local replica, not bare `linearis`.** Use `linear_read_ticket
-  <ID>` (it gates freshness and falls back loudly); a bare `linearis issues read <ID>` 429s the
+- **Reading one Linear ticket → the local replica, not bare `linearis`.** Read the local replica
+  directly — `sqlite3 ~/catalyst/catalyst-replica.db` (a SQLite mirror kept fresh by the cloud-sync
+  daemon) — or, where the `catalyst-dev` tooling is present, `source` its
+  `plugins/dev/scripts/lib/linear-read-replica.sh` and call `linear_read_ticket <ID>` (it gates
+  replica freshness and falls back loudly). Never a bare `linearis issues read <ID>` — it 429s the
   shared fleet quota. Writes and list/search still go through `linearis`.
