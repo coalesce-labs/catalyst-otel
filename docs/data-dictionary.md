@@ -161,6 +161,19 @@ Cross-signal correlation is reliable only on **service identity**; **host identi
 | `claude_code_code_edit_tool_decision_total` | counter | decisions | Count of code-editing tool permission decisions (accept/reject) for Edit, Write, and NotebookEdit tools. Tracks auto-accept vs reject. | decision (accept/reject), tool_name (Edit/Write/NotebookEdit), language, source, user_email, project, branch, linear_key, session_id, host_name, + standard resource labels | claude-code | COUNTER — `rate()`/`increase()`. Scoped to the 3 edit tools only (not Bash/Read/etc.). scope=com.anthropic.claude_code. |
 | `claude_code_active_time_seconds_total` | counter | seconds | Cumulative active (engaged) time in Claude Code, in seconds. Engagement/usage-duration signal. | user_email, project, branch, linear_key, session_id, host_name, catalyst_role, catalyst_orchestration, type, terminal_type, + standard resource labels | claude-code | COUNTER of seconds — use `increase()` over a window for 'active seconds in range'; do NOT graph raw cumulative. Not in the legacy CLAUDE.md metrics table (newer addition). scope=com.anthropic.claude_code. |
 
+### codex (scope=codex; service_name=codex_exec / other per-entry-point originators; OTL-53)
+
+OpenAI Codex CLI/desktop native OTLP metrics, enabled via the `[otel]` block in `~/.codex/config.toml` (endpoint = the home collector, same as Claude Code). Rust SDK; NO cost metric exists (auth_mode=Chatgpt subscription). ~80 series families ship; the dashboard-relevant ones:
+
+| Metric | Type | Unit | Description | Dimensions | Source | Notes |
+|--------|------|------|-------------|------------|--------|-------|
+| `codex_turn_token_usage_*` | histogram | tokens | Per-turn token usage, split by token class. `_sum` is the token-burn signal. | token_type (input/cached_input/output), model, originator, session_source, auth_mode, + resource labels (os, app_version) | codex native | SPARSE-COUNTER GOTCHA: codex processes are short-lived, so `increase()`/`rate()` on a single-sample series reads 0/NaN — hero totals come from Loki `codex.sse_event` token counts instead (see events). Fine for rate timelines under sustained activity. |
+| `codex_conversation_turn_count_total` | counter | turns | Conversation turns completed. | model, originator, session_source, + resource labels | codex native | Same sparse gotcha — dashboard counts turns via Loki `codex.turn_ttft` events. |
+| `codex_tool_call_total` | counter | calls | Tool executions by tool and success (native `codex.tool.call`). | tool, success, originator, + resource labels | codex native | Label is `tool` (the Loki event uses `tool_name`). Same sparse gotcha — occurrence panels use Loki `codex.tool_result`. |
+| `codex_turn_{ttft,ttfm,e2e}_duration_ms_milliseconds_*` | histogram | ms | Turn latency: time-to-first-token, first-meaningful, end-to-end. | model, originator, + resource labels | codex native | `histogram_quantile` works during sustained activity; sparse hero p50 uses Loki `quantile_over_time` on `codex.turn_ttft` `duration_ms`. |
+| `codex_websocket_request_total` / `codex_websocket_event_total` | counter | requests | Backend WebSocket requests/events (Codex uses a WS transport, not per-request HTTP). | success, originator, + resource labels | codex native | success=false rate is the transport-error signal. |
+| `codex_thread_started_total`, `codex_process_start_total`, `codex_startup_phase_duration_ms_*`, `codex_rollout_size_bytes_*`, `codex_mcp_tools_*`, `codex_shell_snapshot_*` | counter/histogram | misc | Session/process lifecycle + internals (startup phases, MCP tool cache, shell snapshots). | originator, is_git, + resource labels | codex native | Ops detail; not on the usage dashboard except Conversations Started (Loki-sourced). |
+
 ## Logs & events catalog
 
 ### claude-code (`service_name=claude-code`)
@@ -176,6 +189,20 @@ Cross-signal correlation is reliable only on **service identity**; **host identi
 | `claude_code.mcp_server_connection` | claude-code | An MCP server connection attempt/result (~108/6h). | server_name, server_scope, transport_type, status, duration_ms, is_plugin, plugin_name, plugin_id_hash. | Not in CLAUDE.md table. plugin_id_hash is hashed (not raw id). status = connect outcome — useful for MCP health, distinct from api_error. |
 | `claude_code.skill_activated` | claude-code | A skill/slash-command was invoked (~6/6h). | skill_name, skill_source, invocation_trigger, plugin_name, marketplace_name, prompt_id. | Not in CLAUDE.md table. Low volume. invocation_trigger distinguishes user-typed vs model-invoked skills. |
 | `claude_code.subagent_completed` | claude-code | A spawned subagent (Task tool) finished (~6/6h). | agent_type, agent_source, model, duration_ms, total_tokens, total_tool_uses, is_async, is_built_in, plugin_name. | Not in CLAUDE.md table. total_tokens/total_tool_uses summarize the whole subagent run — useful for orchestration cost, distinct from per-request api_request rows. |
+
+### codex (`service_name=codex_exec` / other per-entry-point originators; OTL-53)
+
+OpenAI Codex events. `event_name` is the FULL prefixed form (`codex.tool_result`) — unlike claude-code's short form. All attrs are Loki structured metadata; `user_email` + `user_account_id` ride every event (PII — Loki-only, not on metrics). Feeds the `codex-usage` dashboard.
+
+| Event / Log | Service | Purpose | Key fields | Notes |
+|-------------|---------|---------|------------|-------|
+| `codex.sse_event` (`event_kind=response.completed`) | codex_* | One model response completion — THE token-economics event. | input_token_count, cached_token_count, output_token_count, reasoning_token_count, tool_token_count, model, ttft_ms (sometimes), service_tier, model_reasoning_effort | `cached_token_count` is a SUBSET of `input_token_count` (Responses API semantics) — cache hit rate = cached/input, total tokens = input+output. Other `event_kind` values exist (stream lifecycle); filter on `response.completed` for token math. |
+| `codex.turn_ttft` | codex_* | One per conversation turn, at first token. | duration_ms (the TTFT), model, originator, conversation_id | The turn-count proxy for Loki `count_over_time` (reliable where the sparse native counter is not); `quantile_over_time(0.5, ... \| unwrap duration_ms) by ()` = median TTFT (the `by ()` pools per-event pseudo-streams). |
+| `codex.tool_result` | codex_* | Result of a tool execution. | tool_name, call_id, success (true/false), duration_ms, arguments, output, mcp_server, mcp_server_origin | `tool_name` here vs `tool` on the native metric. `output`/`arguments` are full-text (can be large). |
+| `codex.tool_decision` | codex_* | Tool approval decision. | tool_name, call_id, decision, source | Only fires when an approval flow runs (approval_policy != never). |
+| `codex.conversation_starts` | codex_* | New conversation with its config. | model, model_reasoning_effort/reasoning_effort, approval_policy, sandbox_policy, mcp_servers, provider_name, originator | Session-count proxy + config audit trail. |
+| `codex.api_request` | codex_* | One backend HTTP request (incl. auth/token refresh). | duration_ms, http_response_status_code, success, attempt, endpoint, error_message, auth_* | Emit-side keys are dotted (`http.response.status_code`) → Loki-sanitized to underscores. Auth-refresh requests carry no model/conversation_id. |
+| `codex.websocket_connect` / `codex.websocket_request` / `codex.user_prompt` / `codex.startup_phase` / `codex.auth_recovery` / `codex.sandbox_outcome` | codex_* | Transport, prompt, startup, sandbox detail. | duration_ms, success, prompt_length, startup_phase, outcome | `codex.user_prompt` carries `prompt` only when `log_user_prompt=true` (we set false). `sandbox_outcome` tracks sandbox escalations by tool. |
 
 ### Catalyst events — execution-core / scheduler / recovery (forwarded by catalyst.otel-forward)
 
