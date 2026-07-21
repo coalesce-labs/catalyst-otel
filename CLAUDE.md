@@ -98,6 +98,7 @@ Claude Code (with telemetry enabled)
 | `grafana-datasources.yml` | Auto-provisions Prometheus, Loki, and Alertmanager data sources |
 | `grafana-dashboards.yml` | Auto-loads dashboard from JSON file |
 | `dashboards/unified-dashboard.json` | Unified Grafana dashboard (33 panels across 10 sections) |
+| `dashboards/codex-usage.json` | Codex Usage dashboard (Codex OpenAI CLI/desktop telemetry) |
 | `Makefile` | All management commands for the stack |
 | `CLAUDE_OBSERVABILITY.md` | Official Claude Code telemetry documentation reference |
 
@@ -144,6 +145,44 @@ Claude Code (with telemetry enabled)
 | `catalyst.role` | Catalyst worker/orchestrator role | Set via shell wrapper when `CATALYST_ORCHESTRATOR_ID` exists |
 | `catalyst.orchestrator` | Catalyst orchestrator session ID | Set via shell wrapper when `CATALYST_ORCHESTRATOR_ID` exists |
 
+## Codex Metrics Reference
+
+Codex (OpenAI) CLI/desktop telemetry rides the **same** collector pipelines as Claude Code — no
+Codex-specific collector, Prometheus, or Loki config exists. Native `codex_*` Prometheus metrics pass
+straight through the OTLP receiver → Prometheus exporter (`:8889`); Codex log events land in Loki
+under `service_name="codex_exec"` (widen selectors to `service_name=~"codex.*"`) via the
+service-agnostic `transform/metrics_normalize` (`event.name → event_name`). Surfaced by the
+**Codex Usage** dashboard (`dashboards/codex-usage.json`).
+
+**No cost telemetry**: Codex authenticates via a ChatGPT subscription and emits **no** cost metric —
+there is no `codex_*_cost_*` series and the dashboard has no cost panels.
+
+### Metrics (Prometheus)
+
+| Prometheus Name | Description | Attributes |
+|-----------------|-------------|------------|
+| `codex_conversation_turn_count_total` | Conversation turns | model, originator, host_name |
+| `codex_tool_call_total` | Tool invocations | tool, success, originator |
+| `codex_turn_token_usage_sum` / `_count` / `_bucket` | Token usage histogram per turn | token_type, model |
+| `codex_turn_ttft_seconds_bucket` | Time-to-first-token latency histogram | model (use `histogram_quantile` with `le` inside `sum by`) |
+| `codex_turn_ttfm_seconds_bucket` | Time-to-first-message latency histogram | model |
+| `codex_turn_e2e_seconds_bucket` | End-to-end turn latency histogram | model |
+| `codex_websocket_request_total` (and related) | Websocket request counters | - |
+
+### Events (Loki Logs)
+
+Filter on the log body (e.g. `|= "codex.tool_result"`) under `{service_name=~"codex.*"}`. Codex log
+attributes (`event_name`, `originator`, `model`, `tool`, `success`) arrive as ordinary Loki labels.
+
+| Event Name | Description | Key Attributes |
+|------------|-------------|----------------|
+| `codex.api_request` | API request | model, originator, duration |
+| `codex.tool_result` | Tool execution result | tool, success, originator |
+| `codex.tool_decision` | Tool permission decision | tool, decision, originator |
+| `codex.conversation_starts` | New conversation/thread started | originator, model |
+| `codex.user_prompt` | User prompt submission | originator, prompt_length |
+| `codex.turn_ttft` | Turn time-to-first-token event | model, originator |
+
 ## Dashboard Development
 
 ### Current Dashboard Structure
@@ -160,6 +199,29 @@ Single unified dashboard (`dashboards/unified-dashboard.json`, UID: `claude-code
 8. **Catalyst Orchestration** (y=92, collapsed) — Cost by Role + Worker Activity (only shows data when Catalyst is running)
 9. **Cumulative Totals** (y=93) — Cumulative Cost + Tokens using `increase()` + Grafana `cumulativeTotal` transform
 10. **Event Logs** (y=101) — Tool Execution Events + API Errors
+
+### Codex Usage Dashboard
+
+Separate dashboard `dashboards/codex-usage.json` (UID: `codex-usage`, title `Codex Usage`) surfacing
+Codex (OpenAI) telemetry. Auto-provisioned via the same hot-reload provider as the unified dashboard
+and gated by `scripts/validate-dashboard.sh` (structural + named-panel + query-shape assertions) and
+`make dashboard-validate`. Sections:
+
+1. **Codex — Overview** — 6 hero stats: Turns, Tokens, Tool Calls, Cache Hit Rate, Threads, TTFT p50
+2. **Tokens & Turns** — Token Rate by Type, Turn Rate by Model, Tokens by Originator (timeseries)
+3. **Latency** — Turn Latency (p50/p95, E2E) + TTFT/TTFM percentiles via `histogram_quantile`
+4. **Tools** — Tool Usage (topk barchart) + Tool Success Rate
+5. **Logs** — Codex Events + Codex Errors (Loki)
+
+Query conventions:
+
+- **No cost panels** — Codex ChatGPT-subscription auth emits no cost telemetry.
+- Metric selectors filter on `service_name=~"codex.*"` events (Loki) and `codex_*` series
+  (Prometheus), threaded with `model` / `originator` / `hostname` / `bucket` template variables.
+- **Sparse-event/occurrence panels** (Threads, event logs) use Loki `count_over_time`, **not**
+  Prometheus-counter `increase()` — native `codex_*` counters expire at `metric_expiration:15m`, so
+  `increase()` errors on empty/idle ranges. This keeps idle-range panels empty without query errors.
+- `histogram_quantile` queries keep `le` inside `sum by (le, ...)`.
 
 ### Template Variables
 

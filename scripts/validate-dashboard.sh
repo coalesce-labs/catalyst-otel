@@ -279,6 +279,13 @@ else
   fail "codex histogram_quantile query missing le in sum by()"
 fi
 
+# --- docs: CLAUDE.md references the codex dashboard (OTL-53 Phase 3) ---
+if grep -q "codex-usage.json" CLAUDE.md; then
+  pass "CLAUDE.md documents codex-usage.json"
+else
+  fail "CLAUDE.md does not mention codex-usage.json"
+fi
+
 # --- single pass/fail gate (moved here from mid-script so all checks run) ---
 if [ "$FAIL" -ne 0 ]; then
   echo ""
