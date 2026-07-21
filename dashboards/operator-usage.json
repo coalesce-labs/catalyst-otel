@@ -25,7 +25,7 @@
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "query": "label_values(claude_code_token_usage_tokens_total, operator)",
+        "query": "label_values({__name__=~\"claude_code_token_usage_tokens_total|claude_code_session_count_total\"}, operator)",
         "refresh": 2,
         "includeAll": true,
         "allValue": ".*",
@@ -85,7 +85,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(max_over_time(claude_code_cost_usage_USD_total{operator=~\"$operator\"}[$__range])) or vector(0)",
+          "expr": "sum(increase(claude_code_cost_usage_USD_total{operator=~\"$operator\"}[$__range])) or vector(0)",
           "instant": true
         }
       ],
@@ -122,7 +122,7 @@
         },
         "overrides": []
       },
-      "description": "Sum of the per-session cost counter's maximum within the selected range."
+      "description": "Estimated cost increase within the selected time range."
     },
     {
       "type": "stat",
@@ -140,7 +140,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(max_over_time(claude_code_token_usage_tokens_total{operator=~\"$operator\"}[$__range])) or vector(0)",
+          "expr": "sum(increase(claude_code_token_usage_tokens_total{operator=~\"$operator\"}[$__range])) or vector(0)",
           "instant": true
         }
       ],
@@ -181,7 +181,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(max_over_time(claude_code_session_count_total{operator=~\"$operator\"}[$__range])) or vector(0)",
+          "expr": "sum(increase(claude_code_session_count_total{operator=~\"$operator\"}[$__range])) or vector(0)",
           "instant": true
         }
       ],
@@ -264,7 +264,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(max_over_time(claude_code_lines_of_code_count_total{operator=~\"$operator\"}[$__range])) or vector(0)",
+          "expr": "sum(increase(claude_code_lines_of_code_count_total{operator=~\"$operator\"}[$__range])) or vector(0)",
           "instant": true
         }
       ],
@@ -317,8 +317,20 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (operator) (max_over_time(claude_code_cost_usage_USD_total{operator=~\"$operator\"}[$__interval]))",
+          "expr": "sum by (operator) (increase(claude_code_cost_usage_USD_total{operator=~\"$operator\"}[$__interval]))",
           "legendFormat": "{{operator}}"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "calculateField",
+          "options": {
+            "mode": "cumulativeFunctions",
+            "cumulative": {
+              "reducer": "sum"
+            },
+            "replaceFields": true
+          }
         }
       ],
       "options": {
@@ -345,7 +357,7 @@
         },
         "overrides": []
       },
-      "description": "Cumulative spend, not a rate. Prometheus expires idle series after 15m, so rate() over sparse Claude Code counters reads near-zero and is misleading."
+      "description": "Cumulative spend within the selected window. Uses increase() per interval accumulated via the cumulativeTotal transform — counts only cost added during the window, not prior history."
     },
     {
       "type": "timeseries",
@@ -363,8 +375,20 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (type) (max_over_time(claude_code_token_usage_tokens_total{operator=~\"$operator\"}[$__interval]))",
+          "expr": "sum by (type) (increase(claude_code_token_usage_tokens_total{operator=~\"$operator\"}[$__interval]))",
           "legendFormat": "{{type}}"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "calculateField",
+          "options": {
+            "mode": "cumulativeFunctions",
+            "cumulative": {
+              "reducer": "sum"
+            },
+            "replaceFields": true
+          }
         }
       ],
       "options": {
@@ -391,7 +415,7 @@
         },
         "overrides": []
       },
-      "description": "Cumulative token counts. Same reason as the cost panel: rate() is unreliable on sparse counters."
+      "description": "Cumulative token counts within the selected window. Uses increase() per interval accumulated via the cumulativeTotal transform."
     },
     {
       "type": "piechart",
@@ -409,7 +433,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (model) (max_over_time(claude_code_token_usage_tokens_total{operator=~\"$operator\"}[$__range]))",
+          "expr": "sum by (model) (increase(claude_code_token_usage_tokens_total{operator=~\"$operator\"}[$__range]))",
           "legendFormat": "{{model}}",
           "instant": true
         }
@@ -586,19 +610,19 @@
           "refId": "A",
           "instant": true,
           "format": "table",
-          "expr": "sum by (operator, host_name, session_id) (max_over_time(claude_code_session_count_total{operator=~\"$operator\"}[$__range]))"
+          "expr": "sum by (operator, host_name, session_id) (increase(claude_code_session_count_total{operator=~\"$operator\"}[$__range]))"
         },
         {
           "refId": "B",
           "instant": true,
           "format": "table",
-          "expr": "sum by (session_id, model) (max_over_time(claude_code_token_usage_tokens_total{operator=~\"$operator\"}[$__range]))"
+          "expr": "sum by (session_id) (increase(claude_code_token_usage_tokens_total{operator=~\"$operator\"}[$__range]))"
         },
         {
           "refId": "C",
           "instant": true,
           "format": "table",
-          "expr": "sum by (session_id) (max_over_time(claude_code_cost_usage_USD_total{operator=~\"$operator\"}[$__range]))"
+          "expr": "sum by (session_id) (increase(claude_code_cost_usage_USD_total{operator=~\"$operator\"}[$__range]))"
         }
       ],
       "transformations": [
@@ -626,8 +650,7 @@
             "indexByName": {
               "operator": 0,
               "host_name": 1,
-              "session_id": 2,
-              "model": 3
+              "session_id": 2
             }
           }
         },
