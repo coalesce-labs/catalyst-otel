@@ -1,0 +1,27 @@
+{
+  "uid": "codex-usage",
+  "title": "Codex Usage",
+  "description": "Codex (OpenAI) CLI/desktop telemetry — turns, tokens, latency, tools, and events. No cost panels (ChatGPT-subscription auth emits no cost telemetry).",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "graphTooltip": 1,
+  "style": "dark",
+  "timezone": "browser",
+  "refresh": "30s",
+  "liveNow": false,
+  "fiscalYearStartMonth": 0,
+  "tags": ["codex", "observability"],
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "annotations": { "list": [] },
+  "links": [],
+  "templating": { "list": [] },
+  "panels": [
+    { "id": 100, "type": "row", "title": "Codex — Overview", "collapsed": false, "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }, "panels": [] },
+    { "id": 200, "type": "row", "title": "Tokens & Turns", "collapsed": false, "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 }, "panels": [] },
+    { "id": 300, "type": "row", "title": "Latency", "collapsed": false, "gridPos": { "h": 1, "w": 24, "x": 0, "y": 13 }, "panels": [] },
+    { "id": 400, "type": "row", "title": "Tools", "collapsed": false, "gridPos": { "h": 1, "w": 24, "x": 0, "y": 21 }, "panels": [] },
+    { "id": 500, "type": "row", "title": "Logs", "collapsed": false, "gridPos": { "h": 1, "w": 24, "x": 0, "y": 29 }, "panels": [] }
+  ]
+}

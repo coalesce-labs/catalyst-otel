@@ -5,6 +5,7 @@ set -euo pipefail
 
 DASH="dashboards/unified-dashboard.json"
 HOSTS="dashboards/catalyst-fleet-hosts.json"   # OTL-21: Fleet & Hosts split out of $DASH
+CODEX="dashboards/codex-usage.json"            # OTL-53: net-new Codex Usage dashboard
 COLLECTOR="collector-config.yaml"
 FAIL=0
 
@@ -207,6 +208,37 @@ elif [ "$HAVE_TEMPO" -eq 1 ]; then
 else
   fail "traces pipeline is missing the otlp/tempo exporter (traces must always reach Tempo)"
 fi
+
+# =============================================================================
+# OTL-53: Codex Usage dashboard ($CODEX) — structural + content assertions.
+# Mirrors the $DASH/$HOSTS blocks so the net-new dashboard is a first-class,
+# regression-gated artifact. Accumulates into $FAIL like every other check.
+# =============================================================================
+
+# --- codex dashboard: file exists + JSON validity ---
+if [ -f "$CODEX" ] && jq empty "$CODEX" 2>/dev/null; then
+  pass "codex dashboard JSON is valid"
+else
+  fail "codex dashboard JSON missing or invalid ($CODEX)"
+fi
+
+# --- codex dashboard: unique panel IDs ---
+DUPC=$(jq '[.. | objects | select(has("id") and has("gridPos")) | .id]
+           | (length) as $n | (unique | length) as $u | $n - $u' "$CODEX" 2>/dev/null || echo 1)
+[ "${DUPC:-1}" -eq 0 ] && pass "codex panel IDs are unique" \
+                       || fail "codex duplicate panel IDs (count: ${DUPC:-?})"
+
+# --- codex dashboard: datasource UIDs resolve to known sources ---
+BADC=$(jq '[.. | objects | select(.datasource?.uid) | .datasource.uid]
+           | map(select(. != "prometheus" and . != "loki" and . != "-- Grafana --"
+                        and (startswith("$") | not))) | length' "$CODEX" 2>/dev/null || echo 1)
+[ "${BADC:-1}" -eq 0 ] && pass "codex datasource UIDs are known" \
+                       || fail "codex unknown datasource UIDs (count: ${BADC:-?})"
+
+# --- codex dashboard: unique uid, not the unified dashboard's ---
+UIDC=$(jq -r '.uid // empty' "$CODEX" 2>/dev/null || echo "")
+[ "$UIDC" = "codex-usage" ] && pass "codex uid is codex-usage" \
+                            || fail "codex uid must be 'codex-usage' (got: '${UIDC:-none}')"
 
 # --- single pass/fail gate (moved here from mid-script so all checks run) ---
 if [ "$FAIL" -ne 0 ]; then
