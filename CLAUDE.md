@@ -208,7 +208,7 @@ and gated by `scripts/validate-dashboard.sh` (structural + named-panel + query-s
 `make dashboard-validate`. Sections:
 
 1. **Codex — Overview** — 6 hero stats: Turns, Tokens, Tool Calls, Cache Hit Rate, Threads, TTFT p50
-2. **Tokens & Turns** — Token Rate by Type, Turn Rate by Model, Tokens by Originator (timeseries)
+2. **Tokens & Turns** — Token Rate by Type, Turn Rate by Model, Tokens by Model (timeseries)
 3. **Latency** — Turn Latency (p50/p95, E2E) + TTFT/TTFM percentiles via `histogram_quantile`
 4. **Tools** — Tool Usage (topk barchart) + Tool Success Rate
 5. **Logs** — Codex Events + Codex Errors (Loki)
@@ -218,9 +218,14 @@ Query conventions:
 - **No cost panels** — Codex ChatGPT-subscription auth emits no cost telemetry.
 - Metric selectors filter on `service_name=~"codex.*"` events (Loki) and `codex_*` series
   (Prometheus), threaded with `model` / `originator` / `hostname` / `bucket` template variables.
-- **Sparse-event/occurrence panels** (Threads, event logs) use Loki `count_over_time`, **not**
-  Prometheus-counter `increase()` — native `codex_*` counters expire at `metric_expiration:15m`, so
-  `increase()` errors on empty/idle ranges. This keeps idle-range panels empty without query errors.
+- **Sparse-event/occurrence panels** (Turns, Tool Calls, Threads, event logs) use Loki
+  `count_over_time`, **not** Prometheus-counter `increase()` — native `codex_*` counters expire at
+  `metric_expiration:15m`, so a short/idle session keeps only its first sample and `increase()`
+  returns zero (or errors on empty ranges), making the KPI read zero despite recorded activity.
+  Turns count `codex.turn_ttft` events; Tool Calls count `codex.tool_result` events; Threads count
+  `codex.conversation_starts`. The **Tokens** KPI is a summed histogram quantity with no per-event
+  Loki source, so it necessarily uses the Prometheus `codex_turn_token_usage_sum` histogram (filtered
+  by `model` only — the histogram carries `token_type` and `model`, never `originator`/`host_name`).
 - `histogram_quantile` queries keep `le` inside `sum by (le, ...)`.
 
 ### Template Variables

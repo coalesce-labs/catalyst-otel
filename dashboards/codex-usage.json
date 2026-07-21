@@ -104,10 +104,10 @@
       "type": "stat",
       "title": "Turns",
       "gridPos": { "h": 4, "w": 4, "x": 0, "y": 1 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "datasource": { "type": "loki", "uid": "loki" },
       "targets": [
         {
-          "expr": "sum(increase(codex_conversation_turn_count_total{model=~\"$model\",originator=~\"$originator\",host_name=~\"$hostname\"}[$__range]))",
+          "expr": "sum(count_over_time({service_name=~\"codex.*\"} |= \"codex.turn_ttft\" | originator=~\"$originator\" [$__range]))",
           "legendFormat": "Turns",
           "refId": "A"
         }
@@ -139,7 +139,7 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "sum(increase(codex_turn_token_usage_sum{model=~\"$model\",originator=~\"$originator\",host_name=~\"$hostname\"}[$__range]))",
+          "expr": "sum(increase(codex_turn_token_usage_sum{model=~\"$model\"}[$__range]))",
           "legendFormat": "Tokens",
           "refId": "A"
         }
@@ -168,10 +168,10 @@
       "type": "stat",
       "title": "Tool Calls",
       "gridPos": { "h": 4, "w": 4, "x": 8, "y": 1 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "datasource": { "type": "loki", "uid": "loki" },
       "targets": [
         {
-          "expr": "sum(increase(codex_tool_call_total{originator=~\"$originator\",host_name=~\"$hostname\"}[$__range]))",
+          "expr": "sum(count_over_time({service_name=~\"codex.*\"} |= \"codex.tool_result\" | originator=~\"$originator\" [$__range]))",
           "legendFormat": "Tool Calls",
           "refId": "A"
         }
@@ -382,14 +382,14 @@
     {
       "id": 12,
       "type": "timeseries",
-      "title": "Tokens by Originator",
+      "title": "Tokens by Model",
       "gridPos": { "h": 7, "w": 24, "x": 0, "y": 13 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "interval": "$bucket",
       "targets": [
         {
-          "expr": "sum by (originator) (rate(codex_turn_token_usage_sum{model=~\"$model\",originator=~\"$originator\",host_name=~\"$hostname\"}[$__interval]))",
-          "legendFormat": "{{originator}}",
+          "expr": "sum by (model) (rate(codex_turn_token_usage_sum{model=~\"$model\"}[$__interval]))",
+          "legendFormat": "{{model}}",
           "refId": "A"
         }
       ],
@@ -492,6 +492,11 @@
           "expr": "histogram_quantile(0.5, sum by (le) (rate(codex_turn_ttfm_seconds_bucket{model=~\"$model\",originator=~\"$originator\",host_name=~\"$hostname\"}[$__interval])))",
           "legendFormat": "TTFM p50",
           "refId": "C"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(codex_turn_ttfm_seconds_bucket{model=~\"$model\",originator=~\"$originator\",host_name=~\"$hostname\"}[$__interval])))",
+          "legendFormat": "TTFM p95",
+          "refId": "D"
         }
       ],
       "fieldConfig": {
@@ -624,7 +629,7 @@
       },
       "targets": [
         {
-          "expr": "{service_name=~\"codex.*\"} |= \"codex.tool_result\" | originator=~\"$originator\" | line_format \"[{{.originator}}] {{.tool}} {{if eq .success \\\"true\\\"}}OK{{else}}FAIL{{end}}\"",
+          "expr": "{service_name=~\"codex.*\"} |= \"codex.\" | originator=~\"$originator\" | line_format \"[{{.originator}}] {{.event_name}} {{.tool}}\"",
           "queryType": "range",
           "refId": "A"
         }
