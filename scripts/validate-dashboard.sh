@@ -242,7 +242,8 @@ UIDC=$(jq -r '.uid // empty' "$CODEX" 2>/dev/null || echo "")
 
 # --- codex dashboard: required named panels present (acceptance scenario 1) ---
 for t in "Turns" "Tokens" "Tool Calls" "Cache Hit Rate" "Threads" "TTFT p50" \
-         "Token Rate by Type" "Turn Rate by Model" "Turn Latency (p50/p95)" \
+         "Token Rate by Type" "Turn Rate by Model" "Tokens by Originator" \
+         "Turn Latency (p50/p95)" "TTFT / TTFM Latency (p50/p95)" \
          "Tool Usage" "Tool Success Rate" "Codex Events" "Codex Errors"; do
   if jq -e --arg t "$t" '[.. | objects | select(.title==$t)] | length > 0' "$CODEX" >/dev/null 2>&1; then
     pass "codex panel present: $t"
