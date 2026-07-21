@@ -240,6 +240,45 @@ UIDC=$(jq -r '.uid // empty' "$CODEX" 2>/dev/null || echo "")
 [ "$UIDC" = "codex-usage" ] && pass "codex uid is codex-usage" \
                             || fail "codex uid must be 'codex-usage' (got: '${UIDC:-none}')"
 
+# --- codex dashboard: required named panels present (acceptance scenario 1) ---
+for t in "Turns" "Tokens" "Tool Calls" "Cache Hit Rate" "Threads" "TTFT p50" \
+         "Token Rate by Type" "Turn Rate by Model" "Turn Latency (p50/p95)" \
+         "Tool Usage" "Tool Success Rate" "Codex Events" "Codex Errors"; do
+  if jq -e --arg t "$t" '[.. | objects | select(.title==$t)] | length > 0' "$CODEX" >/dev/null 2>&1; then
+    pass "codex panel present: $t"
+  else
+    fail "codex panel missing: $t"
+  fi
+done
+
+# --- codex dashboard: no cost telemetry (ChatGPT-sub auth emits none) ---
+if jq -e '[.. | objects | select(.expr?) | .expr | select(test("cost"))] | length == 0' \
+     "$CODEX" >/dev/null 2>&1; then
+  pass "codex dashboard has no cost queries"
+else
+  fail "codex dashboard references a cost metric (must be absent)"
+fi
+
+# --- codex dashboard: sparse-event occurrence panels use count_over_time, not increase() ---
+# Any Loki target that filters a codex.* event body must use count_over_time /
+# last_over_time, never increase() (a Prometheus-counter idiom that expires at 15m
+# and errors on empty ranges — see acceptance scenario 2).
+if jq -e '[.. | objects | select(.datasource?.uid=="loki") | .targets[]?.expr
+          | select(test("increase\\("))] | length == 0' "$CODEX" >/dev/null 2>&1; then
+  pass "codex Loki targets avoid increase()"
+else
+  fail "codex Loki target uses increase() (use count_over_time for sparse events)"
+fi
+
+# --- codex dashboard: histogram_quantile keeps le inside sum by() ---
+if jq -e '[.. | objects | select(.expr?) | .expr
+          | select(test("histogram_quantile")) | select(test("sum by \\([^)]*le") | not)]
+          | length == 0' "$CODEX" >/dev/null 2>&1; then
+  pass "codex histogram_quantile queries keep le in sum by()"
+else
+  fail "codex histogram_quantile query missing le in sum by()"
+fi
+
 # --- single pass/fail gate (moved here from mid-script so all checks run) ---
 if [ "$FAIL" -ne 0 ]; then
   echo ""
