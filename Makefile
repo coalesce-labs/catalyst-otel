@@ -111,3 +111,5 @@ dashboard-validate: ## Validate dashboard JSON files
 			jq . "$$f" > /dev/null && echo "✅ $$f is valid" || echo "❌ $$f is invalid"; \
 		fi \
 	done
+	@echo "🔎 Running structural + content assertions (scripts/validate-dashboard.sh)..."
+	@bash scripts/validate-dashboard.sh

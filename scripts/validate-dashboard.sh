@@ -5,6 +5,7 @@ set -euo pipefail
 
 DASH="dashboards/unified-dashboard.json"
 HOSTS="dashboards/catalyst-fleet-hosts.json"   # OTL-21: Fleet & Hosts split out of $DASH
+CODEX="dashboards/codex-usage.json"            # OTL-53: net-new Codex Usage dashboard
 COLLECTOR="collector-config.yaml"
 FAIL=0
 
@@ -206,6 +207,84 @@ elif [ "$HAVE_TEMPO" -eq 1 ]; then
   pass "traces pipeline exporters are within the allowlist {otlp/tempo, otlp_http/honeycomb, otlp_http/dash0, debug}"
 else
   fail "traces pipeline is missing the otlp/tempo exporter (traces must always reach Tempo)"
+fi
+
+# =============================================================================
+# OTL-53: Codex Usage dashboard ($CODEX) — structural + content assertions.
+# Mirrors the $DASH/$HOSTS blocks so the net-new dashboard is a first-class,
+# regression-gated artifact. Accumulates into $FAIL like every other check.
+# =============================================================================
+
+# --- codex dashboard: file exists + JSON validity ---
+if [ -f "$CODEX" ] && jq empty "$CODEX" 2>/dev/null; then
+  pass "codex dashboard JSON is valid"
+else
+  fail "codex dashboard JSON missing or invalid ($CODEX)"
+fi
+
+# --- codex dashboard: unique panel IDs ---
+DUPC=$(jq '[.. | objects | select(has("id") and has("gridPos")) | .id]
+           | (length) as $n | (unique | length) as $u | $n - $u' "$CODEX" 2>/dev/null || echo 1)
+[ "${DUPC:-1}" -eq 0 ] && pass "codex panel IDs are unique" \
+                       || fail "codex duplicate panel IDs (count: ${DUPC:-?})"
+
+# --- codex dashboard: datasource UIDs resolve to known sources ---
+BADC=$(jq '[.. | objects | select(.datasource?.uid) | .datasource.uid]
+           | map(select(. != "prometheus" and . != "loki" and . != "-- Grafana --"
+                        and (startswith("$") | not))) | length' "$CODEX" 2>/dev/null || echo 1)
+[ "${BADC:-1}" -eq 0 ] && pass "codex datasource UIDs are known" \
+                       || fail "codex unknown datasource UIDs (count: ${BADC:-?})"
+
+# --- codex dashboard: unique uid, not the unified dashboard's ---
+UIDC=$(jq -r '.uid // empty' "$CODEX" 2>/dev/null || echo "")
+[ "$UIDC" = "codex-usage" ] && pass "codex uid is codex-usage" \
+                            || fail "codex uid must be 'codex-usage' (got: '${UIDC:-none}')"
+
+# --- codex dashboard: required named panels present (acceptance scenario 1) ---
+for t in "Turns" "Tokens" "Tool Calls" "Cache Hit Rate" "Threads" "TTFT p50" \
+         "Token Rate by Type" "Turn Rate by Model" "Tokens by Model" \
+         "Turn Latency (p50/p95)" "TTFT / TTFM Latency (p50/p95)" \
+         "Tool Usage" "Tool Success Rate" "Codex Events" "Codex Errors"; do
+  if jq -e --arg t "$t" '[.. | objects | select(.title==$t)] | length > 0' "$CODEX" >/dev/null 2>&1; then
+    pass "codex panel present: $t"
+  else
+    fail "codex panel missing: $t"
+  fi
+done
+
+# --- codex dashboard: no cost telemetry (ChatGPT-sub auth emits none) ---
+if jq -e '[.. | objects | select(.expr?) | .expr | select(test("cost"))] | length == 0' \
+     "$CODEX" >/dev/null 2>&1; then
+  pass "codex dashboard has no cost queries"
+else
+  fail "codex dashboard references a cost metric (must be absent)"
+fi
+
+# --- codex dashboard: sparse-event occurrence panels use count_over_time, not increase() ---
+# Any Loki target that filters a codex.* event body must use count_over_time /
+# last_over_time, never increase() (a Prometheus-counter idiom that expires at 15m
+# and errors on empty ranges — see acceptance scenario 2).
+if jq -e '[.. | objects | select(.datasource?.uid=="loki") | .targets[]?.expr
+          | select(test("increase\\("))] | length == 0' "$CODEX" >/dev/null 2>&1; then
+  pass "codex Loki targets avoid increase()"
+else
+  fail "codex Loki target uses increase() (use count_over_time for sparse events)"
+fi
+
+# --- codex dashboard: histogram_quantile keeps le inside sum by() ---
+if jq -e '[.. | objects | select(.expr?) | .expr
+          | select(test("histogram_quantile")) | select(test("sum by \\([^)]*le") | not)]
+          | length == 0' "$CODEX" >/dev/null 2>&1; then
+  pass "codex histogram_quantile queries keep le in sum by()"
+else
+  fail "codex histogram_quantile query missing le in sum by()"
+fi
+
+# --- docs: CLAUDE.md references the codex dashboard (OTL-53 Phase 3) ---
+if grep -q "codex-usage.json" CLAUDE.md; then
+  pass "CLAUDE.md documents codex-usage.json"
+else
+  fail "CLAUDE.md does not mention codex-usage.json"
 fi
 
 # --- single pass/fail gate (moved here from mid-script so all checks run) ---
