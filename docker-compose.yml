@@ -2,6 +2,30 @@ networks:
   otel-network:
     driver: bridge
 
+# -----------------------------------------------------------------------------
+# Container log rotation (OTL-54). Docker's json-file driver defaults to NO
+# rotation at all — an empty `LogConfig.Config` means the *-json.log file grows
+# without bound for the life of the container. Left unset, this stack had
+# accumulated ~356 GB of container logs (otel-collector alone: 314 GiB, growing
+# ~12.7 GB/day; otel-loki: 17.7 GB), i.e. >50% of the /data volume, none of it
+# ever read.
+#
+# NOTE: json-file rotates by SIZE, not by time — there is no "daily" option.
+# max-size x max-file is therefore a hard CEILING per container (700 MB here),
+# which is the property that actually matters: the growth is bounded forever.
+# How much wall-clock history that buys depends on the service's log rate, so
+# the real fix is to not firehose in the first place — see the `debug` exporter
+# removal in collector-config.yaml (same ticket).
+#
+# Anchored so every service gets the same policy and a new service can't silently
+# reintroduce the unbounded default. Compose merges `logging` by key, so the
+# private docker-compose.override.yml (which does not set it) inherits this.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "100m"
+    max-file: "7"
+
 services:
   otel-collector:
     # PINNED (OTL-20): the logs->metrics pipeline needs the signal_to_metrics
@@ -31,6 +55,7 @@ services:
       - "4318:4318"      # OTLP HTTP  in
       - "8889:8889"      # Prometheus scrape out
     restart: unless-stopped
+    logging: *default-logging
     networks:
       - otel-network
 
@@ -49,6 +74,7 @@ services:
     ports:
       - "9098:9090"
     restart: unless-stopped
+    logging: *default-logging
     depends_on: [otel-collector]
     networks:
       - otel-network
@@ -62,6 +88,7 @@ services:
     volumes:
       - "${OTEL_LOKI_DATA:-otel-loki-data}:/loki"
     restart: unless-stopped
+    logging: *default-logging
     networks:
       - otel-network
 
@@ -90,6 +117,7 @@ services:
       # collector's own 4317/4318 host bindings.
       - "3200:3200"
     restart: unless-stopped
+    logging: *default-logging
     networks:
       - otel-network
 
@@ -131,6 +159,7 @@ services:
     ports:
       - "13001:3000"
     restart: unless-stopped
+    logging: *default-logging
     depends_on: [otel-prometheus, otel-loki, otel-tempo]
     networks:
       - otel-network

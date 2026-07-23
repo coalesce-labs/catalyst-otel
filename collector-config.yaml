@@ -331,6 +331,14 @@ exporters:
     resource_to_telemetry_conversion:
       enabled: true
 
+  # OTL-54: DEFINED but no longer wired into any PUBLIC pipeline. `verbosity:
+  # normal` serializes every record to stdout; with Docker's json-file driver
+  # unrotated that grew this container's log to 314 GiB (~12.7 GB/day). The
+  # definition stays because the PRIVATE Cloudflare pipelines
+  # (catalyst-otel-private/private/collector-config-private.yaml) still list it
+  # — deleting it here would fail their validation at boot. Removing it there is
+  # the follow-up that actually gets the log down to operational-only volume.
+  # Re-add to a pipeline only while actively debugging, then remove.
   debug:
     verbosity: normal
 
@@ -1128,11 +1136,17 @@ service:
       # To fan metrics out to Honeycomb/Dash0 as well, append the SAME exporter
       # ids here once their blocks are uncommented, e.g.:
       #
-      #   exporters: [prometheus, debug, otlp_http/honeycomb, otlp_http/dash0]
+      #   exporters: [prometheus, otlp_http/honeycomb, otlp_http/dash0]
       #
       # (One exporter definition can serve both pipelines.)
-      exporters: [prometheus, debug, otlp_http/honeycomb, otlp_http/dash0]
-    
+      # OTL-54: `debug` REMOVED. It serialized every metric record to stdout,
+      # and with Docker's json-file driver unrotated that produced a 314 GiB
+      # container log (~12.7 GB/day). It is a troubleshooting tool, not a
+      # production exporter — re-add it TEMPORARILY when debugging, then take it
+      # back out. The exporter block itself stays DEFINED (the private
+      # Cloudflare pipelines still reference it).
+      exporters: [prometheus, otlp_http/honeycomb, otlp_http/dash0]
+
     logs:
       receivers: [otlp]
       # OTL-20: transform/metrics_normalize runs AFTER transform/logs so the
@@ -1141,9 +1155,10 @@ service:
       # otlp_http = Loki (OTL-8 rename). To turn on the CTL-812 fan-out:
       # (1) uncomment the matching exporter block above, (2) set the env vars in
       # docker-compose.yml, and (3) replace the line below with the "enable
-      # fan-out" line. Keep otlp_http and debug; add the new ones:
+      # fan-out" line. Keep otlp_http; add the new ones (do NOT re-add `debug` —
+      # OTL-54):
       #
-      #   exporters: [debug, otlp_http, otlp_http/honeycomb, otlp_http/dash0]
+      #   exporters: [otlp_http, otlp_http/honeycomb, otlp_http/dash0]
       #
       # (Enable only the destinations you have keys for — e.g. omit
       # otlp_http/dash0 if DASH0_* is unset, and leave its exporter block
@@ -1154,7 +1169,10 @@ service:
       # emit into the metrics pipeline above. They are derivation, not storage,
       # so the payload-parity invariant (identical payload to every STORAGE
       # destination) is unaffected.
-      exporters: [debug, otlp_http, otlp_http/honeycomb, otlp_http/dash0, count, signal_to_metrics]
+      # OTL-54: `debug` REMOVED (see the metrics pipeline above). This was the
+      # single largest contributor to the 314 GiB log — every catalyst log
+      # record was serialized to stdout on top of being shipped to Loki.
+      exporters: [otlp_http, otlp_http/honeycomb, otlp_http/dash0, count, signal_to_metrics]
 
     traces:
       # OTL-25: spans -> Tempo + Honeycomb + Dash0 (see the forwarding table
@@ -1165,4 +1183,8 @@ service:
       # signal (OTL-1). Runs healthy-but-empty until the daemons emit spans.
       receivers: [otlp]
       processors: [resource, tail_sampling]
-      exporters: [otlp/tempo, otlp_http/honeycomb, otlp_http/dash0, debug]
+      # OTL-54: `debug` REMOVED (see the metrics pipeline above). Span volume
+      # here is dominated by codex-app-server emitting Rust h2 HTTP/2 library
+      # internals (one span per frame op) — serializing that to stdout as well
+      # was pure waste.
+      exporters: [otlp/tempo, otlp_http/honeycomb, otlp_http/dash0]
