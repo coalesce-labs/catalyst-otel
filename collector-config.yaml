@@ -1097,6 +1097,37 @@ connectors:
           value: 'Double(attributes["linear.read.age_ms"]) / 1000'
 
 service:
+  # ---------------------------------------------------------------------------
+  # SELF-TELEMETRY (OTL-55). Without this block the collector emits NONE of its
+  # own internal metrics: `count({__name__=~"otelcol_.+"})` returned an empty
+  # vector, and :8888 refused connections outright (verified — :8889, the
+  # prometheus EXPORTER, is a different thing and was always up). That blind
+  # spot is why 314 GiB of log growth (OTL-54) and an ongoing 503/data-loss bug
+  # both ran for weeks with nothing to alert on.
+  #
+  # `host: 0.0.0.0` is REQUIRED, not cosmetic: the collector defaults this
+  # endpoint to localhost, which is unreachable from the Prometheus container
+  # across the docker network. Bound to loopback it would look identical to
+  # "not configured" from every scrape.
+  #
+  # level: normal emits the metrics that matter here —
+  #   otelcol_exporter_queue_size / _queue_capacity   (saturation)
+  #   otelcol_exporter_enqueue_failed_*               (the 503 mechanism)
+  #   otelcol_exporter_send_failed_*                  (per-destination drops)
+  #   otelcol_receiver_refused_*  /  _processor_dropped_*
+  # `detailed` additionally emits per-RPC series; it is higher cardinality and
+  # was deliberately NOT chosen. Prometheus scrapes this via a second job in
+  # prometheus.yml (targets otel-collector:8888).
+  telemetry:
+    metrics:
+      level: normal
+      readers:
+        - pull:
+            exporter:
+              prometheus:
+                host: "0.0.0.0"
+                port: 8888
+
   # PAYLOAD-PARITY INVARIANT (OTL-1): exactly ONE pipeline per signal type.
   # Fan out by appending exporters to the existing pipeline (after the shared
   # processors) so every destination receives the identical post-transform
