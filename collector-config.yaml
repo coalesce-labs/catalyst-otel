@@ -303,6 +303,44 @@ processors:
   # decision_wait, then ORs the policies: a trace is kept if ANY policy matches.
   # We run a single collector instance, so all spans of a trace arrive here and
   # the decision is complete. Inert until traces actually flow.
+  # OTL-56: drop THIRD-PARTY CRATE INTERNALS from traces.
+  #
+  # codex-app-server emits Rust `h2` HTTP/2 library internals as spans — one per
+  # frame operation (`send_data`, `reserve_capacity`, `assign_connection_capacity`,
+  # `Prioritize::queue_frame`, …). Measured cost: **$61.10/30d on Dash0 alone**
+  # (~102M spans), and Honeycomb receives a byte-identical stream, so roughly
+  # double that in reality. This is TRACE-level instrumentation that escaped to
+  # production; nobody has ever wanted these spans in any backend.
+  #
+  # SELECTOR — why `code.file.path` and not the span name or scope:
+  #   * span NAMES are arbitrary Rust fn names and would need endless upkeep;
+  #   * the instrumentation SCOPE is just "codex-app-server" for every span,
+  #     so it cannot discriminate (verified against a live trace).
+  #   * `code.file.path` for these spans is
+  #     /Users/runner/.cargo/registry/src/…/h2-0.4.13/src/proto/streams/…
+  #     i.e. the cargo registry. A span whose source file lives in the registry
+  #     is BY CONSTRUCTION third-party crate internals, never codex's own code —
+  #     so codex's real spans (`list_models`, `auth`,
+  #     `endpoint_session.execute_with`, `codex_core::*`) are structurally safe.
+  #     It is also future-proof: another crate leaking spans is caught for free.
+  #
+  # TRADE-OFF: if a dependency ever emits a span we genuinely want (say a DB
+  # driver's query span), this drops it. Narrow to `IsMatch(attributes["target"],
+  # "^h2::")` if that happens.
+  #
+  # NIL-GUARD IS LOAD-BEARING: most spans have no `code.file.path`, and
+  # IsMatch(nil, …) raises. We deliberately do NOT set `error_mode: ignore` —
+  # on 0.154.0 that silently breaks ALL output from the processor — so the
+  # `!= nil` short-circuit is what keeps the default (propagate) mode safe.
+  #
+  # Applied to the ONE traces pipeline, so it drops for Tempo as well as the
+  # vendors. That is intentional and keeps the OTL-1 payload-parity invariant
+  # intact: these spans have no diagnostic value anywhere.
+  filter/drop_crate_internals:
+    traces:
+      span:
+        - 'attributes["code.file.path"] != nil and IsMatch(attributes["code.file.path"], "/\\.cargo/registry/")'
+
   tail_sampling:
     decision_wait: 10s
     policies:
@@ -1213,7 +1251,10 @@ service:
       # sit AFTER it so they only bill for the sampled stream. One pipeline per
       # signal (OTL-1). Runs healthy-but-empty until the daemons emit spans.
       receivers: [otlp]
-      processors: [resource, tail_sampling]
+      # OTL-56: filter/drop_crate_internals runs BEFORE tail_sampling on purpose
+      # — dropping the h2 firehose first means the sampler's decisions are made
+      # over real spans instead of library noise, and it does less work.
+      processors: [resource, filter/drop_crate_internals, tail_sampling]
       # OTL-54: `debug` REMOVED (see the metrics pipeline above). Span volume
       # here is dominated by codex-app-server emitting Rust h2 HTTP/2 library
       # internals (one span per frame op) — serializing that to stdout as well
