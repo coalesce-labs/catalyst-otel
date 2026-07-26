@@ -29,7 +29,7 @@ Tickets live in the **OTL** team; states are `Backlog → Research → Plan → 
 - **File the ticket before coding** so the branch carries its id. Default one ticket per branch/PR: branch `otl-NN-slug`, title starts `OTL-NN`, body has `Closes OTL-NN`.
 - **Bundling multiple tickets:** the branch names one; list **every** delivered ticket in the body with its own `Closes`. Preflight: `git log --oneline origin/main..HEAD | grep -oE 'OTL-[0-9]+' | sort -u` — if >1, ensure each is in the body or split.
 - Post a progress trail on the ticket (at least at PR time): `linearis issues discuss OTL-NN --body "…"`, attach artifacts with `linearis attachments create OTL-NN --url …`.
-- Prefer the `catalyst-dev` skills (`create-pr` → PR state, `merge-pr` → Done). `linearis` is plural-only (`issues read|discuss|update`); `issues usage` for syntax.
+- Prefer the catalyst-dev skills: the create-pr skill moves the ticket to PR state, and merge-pr moves it to Done. `linearis` is plural-only (`issues read|discuss|update`); `issues usage` for syntax.
 
 <!-- catalyst-house-rules:begin -->
 ## Working the Loop (every agent — interactive too, not just skills)
