@@ -4,7 +4,7 @@ Vendor-neutral agent instructions; `CLAUDE.md` imports this.
 
 ## What this is
 
-OTel observability stack for Claude Code / Codex usage, cost, and performance: Collector → Prometheus (metrics) + Loki (logs) → Grafana. Config-as-code; runs on the `home` host.
+OTel observability stack for Claude Code / Codex usage, cost, and performance: Collector → Prometheus (metrics) + Loki (logs) → Grafana. Config-as-code; runs on a single deploy host (reached over SSH as `$OTEL_STACK_HOST`).
 
 - Commands: `make help`.
 - Telemetry / env-var reference: `CLAUDE_OBSERVABILITY.md`.
