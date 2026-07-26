@@ -11,5 +11,5 @@ loaded on demand rather than every session.
 
 - **Worktrees:** do NOT use the built-in `EnterWorktree` tool here — its hardcoded
   default puts worktrees under `.claude/worktrees/` inside this checkout, which we
-  never want. Use the Catalyst convention instead: `catalyst-dev:create-worktree`
-  (→ `~/catalyst/wt/<repo>/<TICKET>`, outside the repo).
+  never want. Use the Catalyst convention instead — the catalyst-dev
+  create-worktree skill (→ `~/catalyst/wt/<repo>/<TICKET>`, outside the repo).
