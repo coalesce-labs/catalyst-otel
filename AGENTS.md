@@ -1,35 +1,30 @@
 # AGENTS.md
 
-Agent instructions for this repo (vendor-neutral; `CLAUDE.md` imports this file).
+Vendor-neutral agent instructions; `CLAUDE.md` imports this.
 
 ## What this is
 
-OpenTelemetry observability stack for monitoring Claude Code / Codex usage, cost, and performance: OTel Collector → Prometheus (metrics) + Loki (logs) → Grafana. Config-as-code; the stack runs on the `home` host.
+OTel observability stack for Claude Code / Codex usage, cost, and performance: Collector → Prometheus (metrics) + Loki (logs) → Grafana. Config-as-code; runs on the `home` host.
 
-- Commands: `make help` (self-documenting).
-- Env-var / telemetry reference: `CLAUDE_OBSERVABILITY.md`.
+- Commands: `make help`.
+- Telemetry / env-var reference: `CLAUDE_OBSERVABILITY.md`.
 - Research notes: `thoughts/shared/research/`.
 
-## Task-specific context (load on demand)
+## Skills (load on demand)
 
-Skills live in `.agents/skills/` (vendor-neutral; Claude Code discovers them via
-the `.claude/skills` → `../.agents/skills` symlink, and they are readable by any
-agent at the path below):
+In `.agents/skills/` — Claude Code finds them via the `.claude/skills` symlink; any agent can read the path. Read the relevant one; don't restate it here.
 
-- **Building/editing dashboards** (telemetry schema, PromQL/LogQL patterns, Loki-label gotcha, panel/color conventions) → `.agents/skills/otel-dashboards/SKILL.md`.
-- **Changing config or debugging missing data** (restart-vs-hot-reload matrix, extending the collector, data-flow troubleshooting) → `.agents/skills/otel-stack-ops/SKILL.md`.
-
-Don't restate those here — read the skill when the task calls for it.
+- Dashboards — telemetry schema, PromQL/LogQL, Loki gotchas, panels → `otel-dashboards`.
+- Stack config changes & missing-data debugging → `otel-stack-ops`.
 
 ## Linear + PR workflow (OTL team)
 
-Tickets live in the **OTL** team; states are `Backlog → Research → Plan → Implement → Validate → PR → Done`. Keep a shipped ticket out of Backlog.
+States: `Backlog → Research → Plan → Implement → Validate → PR → Done`. Don't leave shipped tickets in Backlog.
 
-- Linear's GitHub integration links a PR to a ticket **only via the `OTL-NN` token in the PR branch, title, or body — never commit messages.** `Closes OTL-NN` in the body auto-advances Backlog→PR→Done on merge; bare `Refs` links but won't auto-Done — prefer `Closes`.
-- **File the ticket before coding** so the branch carries its id. Default one ticket per branch/PR: branch `otl-NN-slug`, title starts `OTL-NN`, body has `Closes OTL-NN`.
-- **Bundling multiple tickets:** the branch names one; list **every** delivered ticket in the body with its own `Closes`. Preflight: `git log --oneline origin/main..HEAD | grep -oE 'OTL-[0-9]+' | sort -u` — if >1, ensure each is in the body or split.
-- Post a progress trail on the ticket (at least at PR time): `linearis issues discuss OTL-NN --body "…"`, attach artifacts with `linearis attachments create OTL-NN --url …`.
-- Prefer the catalyst-dev skills: the create-pr skill moves the ticket to PR state, and merge-pr moves it to Done. `linearis` is plural-only (`issues read|discuss|update`); `issues usage` for syntax.
+- GitHub↔Linear links a PR only via the `OTL-NN` token in the branch, title, or body — never commit messages. `Closes OTL-NN` in the body auto-advances Backlog→PR→Done on merge; bare `Refs` won't — prefer `Closes`.
+- File the ticket before coding so the branch carries its id: `otl-NN-slug` branch, `OTL-NN` title, `Closes OTL-NN` body. One ticket per PR by default.
+- Bundling >1 ticket: list each in the body with its own `Closes` (the branch names only one). Preflight `git log --oneline origin/main..HEAD | grep -oE 'OTL-[0-9]+' | sort -u`.
+- Progress trail at PR time: the catalyst-dev create-pr / merge-pr skills handle it; else `linearis issues discuss OTL-NN` + `linearis attachments create`. `linearis` is plural (`issues read|discuss|update`; `issues usage` for syntax).
 
 <!-- catalyst-house-rules:begin -->
 ## Working the Loop (every agent — interactive too, not just skills)
