@@ -1,6 +1,7 @@
 ---
 name: otel-stack-ops
 description: Operating and changing the OTel stack — which config change needs a restart vs hot-reloads, how to extend the collector pipeline, and the data-flow troubleshooting path (collector → Prometheus → Loki → Grafana). Use when editing collector-config.yaml, prometheus.yml, docker-compose.yml, or debugging missing data.
+disable-model-invocation: true
 ---
 
 # OTel stack operations
