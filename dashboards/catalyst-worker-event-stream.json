@@ -1,0 +1,187 @@
+{
+  "uid": "catalyst-worker-event-stream",
+  "title": "Catalyst — Worker Event Stream Tail",
+  "description": "Loki-only forensic tail of the worker (mini/mini-2) event stream: a decoded, filterable live read of whether the fleet is working or wedged, without ssh. Distinct from the aggregate views (control-loop-live, scheduler-health, ticket-lifecycle) and from the pino-log tail (fleet-daemon-logs). The noise floor ($noise + $noisename) is the primary control — a naive tail is ~75% heartbeats/samples/ticks/reads.",
+  "tags": ["catalyst", "events", "fleet", "forensic"],
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "refresh": "30s",
+  "timezone": "browser",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "links": [],
+  "templating": {
+    "list": [
+      {
+        "name": "node",
+        "label": "node",
+        "type": "custom",
+        "description": "Worker host filter (host_name). Default = a single node so mirrored webhook events (catalyst.github / catalyst.linear emit on BOTH minis) show once, not twice — defect #2. Widen to All (.+) for a fleet-wide tail.",
+        "query": "mini,mini-2",
+        "options": [
+          {
+            "text": "mini",
+            "value": "mini",
+            "selected": false
+          },
+          {
+            "text": "mini-2",
+            "value": "mini-2",
+            "selected": true
+          }
+        ],
+        "includeAll": true,
+        "multi": true,
+        "allValue": ".+",
+        "current": {
+          "text": ["mini-2"],
+          "value": ["mini-2"]
+        }
+      },
+      {
+        "name": "service",
+        "label": "service",
+        "type": "query",
+        "datasource": {
+          "type": "loki",
+          "uid": "loki"
+        },
+        "query": "label_values(service_name)",
+        "definition": "label_values(service_name)",
+        "regex": "/^catalyst\\..+/",
+        "includeAll": true,
+        "multi": true,
+        "allValue": "catalyst..+",
+        "current": {
+          "text": ["All"],
+          "value": ["$__all"]
+        },
+        "refresh": 2,
+        "sort": 1
+      },
+      {
+        "name": "noise",
+        "label": "noise floor (action)",
+        "type": "custom",
+        "description": "Suppresses the ~75% event_action noise floor (heartbeat / sampled / tick / read / autotune-gauge / parallelism-sampled). 'signal' hides them; 'all' selects a never-match sentinel so the !~ filter becomes a no-op → raw firehose. Paired with $noisename for undecomposed families (defect #1).",
+        "query": "signal : heartbeat|sampled|tick|read|autotune-gauge|parallelism-sampled, all : zzz_never_zzz",
+        "options": [
+          {
+            "text": "signal",
+            "value": "heartbeat|sampled|tick|read|autotune-gauge|parallelism-sampled",
+            "selected": true
+          },
+          {
+            "text": "all",
+            "value": "zzz_never_zzz",
+            "selected": false
+          }
+        ],
+        "includeAll": false,
+        "multi": false,
+        "current": {
+          "text": "signal",
+          "value": "heartbeat|sampled|tick|read|autotune-gauge|parallelism-sampled"
+        }
+      },
+      {
+        "name": "noisename",
+        "label": "noise floor (name)",
+        "type": "custom",
+        "description": "Second noise clause on event_name for legacy / undecomposed families that carry NO event_action — broker.daemon.heartbeat, observability.forward_lag / forward_failed (defect #1). 'all' = never-match sentinel (no-op).",
+        "query": "signal : broker\\.daemon\\.heartbeat|observability\\.forward, all : zzz_never_zzz",
+        "options": [
+          {
+            "text": "signal",
+            "value": "broker\\.daemon\\.heartbeat|observability\\.forward",
+            "selected": true
+          },
+          {
+            "text": "all",
+            "value": "zzz_never_zzz",
+            "selected": false
+          }
+        ],
+        "includeAll": false,
+        "multi": false,
+        "current": {
+          "text": "signal",
+          "value": "broker\\.daemon\\.heartbeat|observability\\.forward"
+        }
+      },
+      {
+        "name": "minsev",
+        "label": "min severity",
+        "type": "custom",
+        "description": "Floors the tail on numeric severity_number (INFO=9, WARN=13, ERROR=17). all=1 keeps everything; warn+ hides INFO; errors shows only ERROR.",
+        "query": "all : 1, warn+ : 13, errors : 17",
+        "options": [
+          {
+            "text": "all",
+            "value": "1",
+            "selected": true
+          },
+          {
+            "text": "warn+",
+            "value": "13",
+            "selected": false
+          },
+          {
+            "text": "errors",
+            "value": "17",
+            "selected": false
+          }
+        ],
+        "includeAll": false,
+        "multi": false,
+        "current": {
+          "text": "all",
+          "value": "1"
+        }
+      },
+      {
+        "name": "search",
+        "label": "search",
+        "type": "textbox",
+        "description": "Plain-text substring filter over the event body (|= \"...\"). No regex / backslashes. Empty = all.",
+        "query": "",
+        "current": {
+          "text": "",
+          "value": ""
+        }
+      },
+      {
+        "name": "ticket",
+        "label": "ticket",
+        "type": "textbox",
+        "description": "Filter to a single Linear key via | linear_key=~\"...\" (regex). Empty = no-op (matches all).",
+        "query": "",
+        "current": {
+          "text": "",
+          "value": ""
+        }
+      }
+    ]
+  },
+  "panels": []
+}

@@ -6,6 +6,7 @@ set -euo pipefail
 DASH="dashboards/unified-dashboard.json"
 HOSTS="dashboards/catalyst-fleet-hosts.json"   # OTL-21: Fleet & Hosts split out of $DASH
 CODEX="dashboards/codex-usage.json"            # OTL-53: net-new Codex Usage dashboard
+EVENTS="dashboards/catalyst-worker-event-stream.json"  # OTL-63: Loki-only forensic event tail
 COLLECTOR="collector-config.yaml"
 FAIL=0
 
@@ -286,6 +287,50 @@ if grep -q "codex-usage.json" CLAUDE.md; then
 else
   fail "CLAUDE.md does not mention codex-usage.json"
 fi
+
+# =============================================================================
+# OTL-63: Worker Event Stream Tail ($EVENTS) — structural + Loki-only assertions.
+# Mirrors the $CODEX block so the net-new forensic tail is a first-class,
+# regression-gated artifact. Accumulates into $FAIL like every other check.
+# =============================================================================
+
+# file exists + valid JSON
+[ -f "$EVENTS" ] && jq empty "$EVENTS" 2>/dev/null && pass "events dashboard JSON valid" || fail "events dashboard missing/invalid ($EVENTS)"
+# unique panel IDs
+DUPE=$(jq '[..|objects|select(has("id") and has("gridPos"))|.id]|(length) as $n|(unique|length) as $u|$n-$u' "$EVENTS" 2>/dev/null || echo 1)
+[ "${DUPE:-1}" -eq 0 ] && pass "events panel IDs unique" || fail "events duplicate panel IDs"
+# datasource UID allowlist
+BADE=$(jq '[..|objects|select(.datasource?.uid)|.datasource.uid]|map(select(.!="prometheus" and .!="loki" and .!="-- Grafana --" and (startswith("$")|not)))|length' "$EVENTS" 2>/dev/null || echo 1)
+[ "${BADE:-1}" -eq 0 ] && pass "events datasource UIDs known" || fail "events unknown datasource UIDs"
+# uid pinned
+[ "$(jq -r '.uid//empty' "$EVENTS" 2>/dev/null)" = "catalyst-worker-event-stream" ] && pass "events uid ok" || fail "events uid must be catalyst-worker-event-stream"
+# Loki-only: NO prometheus datasource anywhere (OTL-63 scope)
+[ "$(jq '[..|objects|select(.datasource?.uid=="prometheus")]|length' "$EVENTS" 2>/dev/null||echo 1)" -eq 0 ] && pass "events dashboard is Loki-only" || fail "events dashboard references prometheus (must be Loki-only)"
+# required template vars present (the noise floor + facets)
+for v in node service noise noisename minsev search ticket; do
+  jq -e --arg v "$v" '[.templating.list[]|select(.name==$v)]|length>0' "$EVENTS" >/dev/null 2>&1 \
+    && pass "events var present: \$$v" || fail "events var missing: \$$v"
+done
+# events-only scope: every Loki target filters log_file_name="" (no pino leak)
+jq -e '[..|objects|select(.datasource?.uid=="loki")|.targets[]?.expr]|all(test("log_file_name\\s*=\\s*\"\""))' "$EVENTS" >/dev/null 2>&1 \
+  && pass "events targets scope log_file_name=\"\"" || fail "an events target does not scope log_file_name=\"\""
+# never `| json` (shipped-broken gotcha)
+jq -e '[..|objects|select(.targets?)|.targets[]?.expr|select(test("\\|\\s*json"))]|length==0' "$EVENTS" >/dev/null 2>&1 \
+  && pass "events dashboard avoids | json" || fail "events dashboard uses | json (forbidden)"
+# line_format uses {{ __line__ }} not {{ .__line__ }}
+jq -e '[..|objects|select(.targets?)|.targets[]?.expr|select(test("\\.__line__"))]|length==0' "$EVENTS" >/dev/null 2>&1 \
+  && pass "events line_format uses __line__" || fail "events uses {{ .__line__ }} (wrong)"
+# no count_over_time(...) by (...) — grouping on log-range agg is a parse error; use sum by()(count_over_time())
+jq -e '[..|objects|select(.targets?)|.targets[]?.expr|select(test("count_over_time\\([^)]*\\)\\s*by\\s*\\("))]|length==0' "$EVENTS" >/dev/null 2>&1 \
+  && pass "events avoids count_over_time(...) by (...)" || fail "events has count_over_time(...) by (...)"
+# no increase() in Loki targets
+jq -e '[..|objects|select(.datasource?.uid=="loki")|.targets[]?.expr|select(test("increase\\("))]|length==0' "$EVENTS" >/dev/null 2>&1 \
+  && pass "events Loki targets avoid increase()" || fail "events Loki target uses increase()"
+# required named panels (filled in Phase 2/3)
+for t in "Event Tail" "Events / min by node" "Last Seen by Entity / Action"; do
+  jq -e --arg t "$t" '[..|objects|select(.title==$t)]|length>0' "$EVENTS" >/dev/null 2>&1 \
+    && pass "events panel present: $t" || fail "events panel missing: $t"
+done
 
 # --- single pass/fail gate (moved here from mid-script so all checks run) ---
 if [ "$FAIL" -ne 0 ]; then
