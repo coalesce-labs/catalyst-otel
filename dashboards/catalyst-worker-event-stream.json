@@ -83,12 +83,12 @@
         "name": "noise",
         "label": "noise floor (action)",
         "type": "custom",
-        "description": "Suppresses the ~75% event_action noise floor (heartbeat / sampled / tick / read / autotune-gauge / parallelism-sampled). 'signal' hides them; 'all' selects a never-match sentinel so the !~ filter becomes a no-op → raw firehose. Paired with $noisename for undecomposed families (defect #1).",
-        "query": "signal : heartbeat|sampled|tick|read|autotune-gauge|parallelism-sampled, all : zzz_never_zzz",
+        "description": "Suppresses the ~75% event_action noise floor (heartbeat / sampled / tick / read / autotune-gauge / parallelism-sampled). 'signal' hides them; 'all' selects a never-match sentinel so the !~ filter becomes a no-op → raw firehose. Paired with $noisename for undecomposed families (defect #1). Loki ANCHORS label-filter regexes, so each term is wrapped `(.*\\.)?(…)` to also catch the dotted-suffix form (host.process.sampled → event_action `process.sampled`); a bare alternation leaks those.",
+        "query": "signal : (.*\\.)?(heartbeat|sampled|tick|read|autotune-gauge|parallelism-sampled), all : zzz_never_zzz",
         "options": [
           {
             "text": "signal",
-            "value": "heartbeat|sampled|tick|read|autotune-gauge|parallelism-sampled",
+            "value": "(.*\\.)?(heartbeat|sampled|tick|read|autotune-gauge|parallelism-sampled)",
             "selected": true
           },
           {
@@ -101,19 +101,19 @@
         "multi": false,
         "current": {
           "text": "signal",
-          "value": "heartbeat|sampled|tick|read|autotune-gauge|parallelism-sampled"
+          "value": "(.*\\.)?(heartbeat|sampled|tick|read|autotune-gauge|parallelism-sampled)"
         }
       },
       {
         "name": "noisename",
         "label": "noise floor (name)",
         "type": "custom",
-        "description": "Second noise clause on event_name for legacy / undecomposed families that carry NO event_action — broker.daemon.heartbeat, observability.forward_lag / forward_failed (defect #1). 'all' = never-match sentinel (no-op).",
-        "query": "signal : broker\\.daemon\\.heartbeat|observability\\.forward, all : zzz_never_zzz",
+        "description": "Second noise clause on event_name for legacy / undecomposed families that carry NO event_action — broker.daemon.heartbeat, observability.forward_lag / forward_failed (defect #1). 'all' = never-match sentinel (no-op). Loki ANCHORS label-filter regexes and these names carry a `catalyst.` prefix + `_lag`/`_failed` suffix, so each term is wrapped `.*…*` — a bare alternation matches zero lines and suppresses nothing.",
+        "query": "signal : .*broker\\.daemon\\.heartbeat.*|.*observability\\.forward.*, all : zzz_never_zzz",
         "options": [
           {
             "text": "signal",
-            "value": "broker\\.daemon\\.heartbeat|observability\\.forward",
+            "value": ".*broker\\.daemon\\.heartbeat.*|.*observability\\.forward.*",
             "selected": true
           },
           {
@@ -126,7 +126,7 @@
         "multi": false,
         "current": {
           "text": "signal",
-          "value": "broker\\.daemon\\.heartbeat|observability\\.forward"
+          "value": ".*broker\\.daemon\\.heartbeat.*|.*observability\\.forward.*"
         }
       },
       {

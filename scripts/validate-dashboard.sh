@@ -345,6 +345,14 @@ jq -e '[.panels[]|select(.title=="Events / min by node")|.targets[].expr|select(
 # last-seen table groups by entity/action
 jq -e '[.panels[]|select(.title=="Last Seen by Entity / Action")|.targets[].expr|select(test("sum by \\([^)]*event_entity") and test("count_over_time"))]|length>0' "$EVENTS" >/dev/null 2>&1 \
   && pass "last-seen groups by entity/action" || fail "last-seen query shape wrong"
+# --- OTL-63 review: Loki ANCHORS label-filter regexes, so an unwrapped noise
+# alternation silently suppresses nothing. Every non-sentinel $noise/$noisename
+# option must carry an explicit `.*` wrap. Verified live: unwrapped, the tail
+# leaked ~700 noise events/hr (42% of the "clean" tail).
+for v in noise noisename; do
+  jq -e --arg v "$v" '[.templating.list[]|select(.name==$v)|.options[]|select(.value!="zzz_never_zzz")|.value|select(test("\\.\\*")|not)]|length==0' "$EVENTS" >/dev/null 2>&1 \
+    && pass "\$$v terms are wildcard-wrapped (Loki anchors regex)" || fail "\$$v has an unwrapped term — Loki anchors, so it suppresses nothing"
+done
 
 # --- single pass/fail gate (moved here from mid-script so all checks run) ---
 if [ "$FAIL" -ne 0 ]; then
