@@ -183,5 +183,42 @@
       }
     ]
   },
-  "panels": []
+  "panels": [
+    {
+      "id": 2,
+      "type": "logs",
+      "title": "Event Tail",
+      "description": "Newest-first decoded tail: [host] service · entity/action (label) | body. The $noise + $noisename floor hides the ~75% heartbeat/sample/tick/read noise (both clauses are needed — undecomposed families like broker.daemon.heartbeat carry no event_action, defect #1). Set $noise/$noisename to 'all' for the raw firehose. Empty labels render with no dangling separator (defect #3); undecomposed events fall back to event_name.",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "{service_name=~\"${service:pipe}\"} | log_file_name=\"\" | catalyst_node_class=\"worker\" | host_name=~\"${node:pipe}\" | event_action!~\"${noise}\" | event_name!~\"${noisename}\" | severity_number>=${minsev} | linear_key=~\"${ticket}\" |= \"${search}\" | line_format `[{{ .host_name }}] {{ .service_name }} · {{ if .event_entity }}{{ .event_entity }}/{{ .event_action }}{{ else }}{{ .event_name }}{{ end }}{{ if .event_label }} ({{ .event_label }}){{ end }} | {{ __line__ }}`",
+          "refId": "A",
+          "queryType": "range"
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "showLabels": false,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": false,
+        "enableLogDetails": true,
+        "dedupStrategy": "none",
+        "sortOrder": "Descending"
+      },
+      "gridPos": {
+        "h": 16,
+        "w": 24,
+        "x": 0,
+        "y": 1
+      }
+    }
+  ]
 }

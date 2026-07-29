@@ -331,6 +331,13 @@ for t in "Event Tail" "Events / min by node" "Last Seen by Entity / Action"; do
   jq -e --arg t "$t" '[..|objects|select(.title==$t)]|length>0' "$EVENTS" >/dev/null 2>&1 \
     && pass "events panel present: $t" || fail "events panel missing: $t"
 done
+# --- OTL-63 Phase 2: the tail + noise floor ---
+# tail panel is a logs panel, Descending, with details
+jq -e '[.panels[]|select(.title=="Event Tail")|select(.type=="logs" and .options.sortOrder=="Descending" and .options.enableLogDetails==true)]|length==1' "$EVENTS" >/dev/null 2>&1 \
+  && pass "Event Tail is a descending logs panel with details" || fail "Event Tail panel shape wrong"
+# noise floor: tail expr carries BOTH event_action!~ and event_name!~ (defect #1)
+jq -e '[.panels[]|select(.title=="Event Tail")|.targets[].expr|select(test("event_action!~") and test("event_name!~"))]|length>0' "$EVENTS" >/dev/null 2>&1 \
+  && pass "tail has paired action+name noise filters" || fail "tail missing paired noise filter (defect #1)"
 
 # --- single pass/fail gate (moved here from mid-script so all checks run) ---
 if [ "$FAIL" -ne 0 ]; then
