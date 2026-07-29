@@ -185,6 +185,139 @@
   },
   "panels": [
     {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Events / min by node",
+      "description": "Non-noise event rate per worker (shares the tail's $noise + $noisename floor). A node flat at zero = that worker is emitting no real work — the 'is anything happening' signal (Gherkin scenario 3).",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "sum by (host_name) (count_over_time({service_name=~\"${service:pipe}\"} | log_file_name=\"\" | catalyst_node_class=\"worker\" | host_name=~\"${node:pipe}\" | event_action!~\"${noise}\" | event_name!~\"${noisename}\" [$__interval]))",
+          "legendFormat": "{{host_name}}",
+          "refId": "A",
+          "queryType": "range",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "bars",
+            "lineWidth": 2,
+            "fillOpacity": 70,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            },
+            "pointSize": 5
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "calcs": ["lastNotNull", "sum"]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 16,
+        "x": 0,
+        "y": 1
+      }
+    },
+    {
+      "id": 4,
+      "type": "table",
+      "title": "Last Seen by Entity / Action",
+      "description": "Count per entity/action over the window. A stopped family stays a present-but-stale/low row rather than vanishing, so 'nothing is happening' is legible when the window ≥ the silence gap (Gherkin scenario 3). Groups on low-cardinality event_entity (~22) × event_action (~30).",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "sum by (event_entity, event_action) (count_over_time({service_name=~\"${service:pipe}\"} | log_file_name=\"\" | catalyst_node_class=\"worker\" | host_name=~\"${node:pipe}\" [$__range]))",
+          "refId": "A",
+          "queryType": "instant",
+          "instant": true
+        }
+      ],
+      "transformations": [
+        {
+          "id": "labelsToFields",
+          "options": {}
+        },
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "event_entity": "entity",
+              "event_action": "action",
+              "Value": "count",
+              "Value #A": "count"
+            },
+            "excludeByName": {
+              "Time": true
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true
+          },
+          "noValue": "—"
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "sortBy": [
+          {
+            "displayName": "count",
+            "desc": true
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 16,
+        "y": 1
+      }
+    },
+    {
       "id": 2,
       "type": "logs",
       "title": "Event Tail",
@@ -217,7 +350,7 @@
         "h": 16,
         "w": 24,
         "x": 0,
-        "y": 1
+        "y": 7
       }
     }
   ]

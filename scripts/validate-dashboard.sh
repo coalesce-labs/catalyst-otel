@@ -338,6 +338,13 @@ jq -e '[.panels[]|select(.title=="Event Tail")|select(.type=="logs" and .options
 # noise floor: tail expr carries BOTH event_action!~ and event_name!~ (defect #1)
 jq -e '[.panels[]|select(.title=="Event Tail")|.targets[].expr|select(test("event_action!~") and test("event_name!~"))]|length>0' "$EVENTS" >/dev/null 2>&1 \
   && pass "tail has paired action+name noise filters" || fail "tail missing paired noise filter (defect #1)"
+# --- OTL-63 Phase 3: orientation strip + last-seen ---
+# events/min uses the wrapped sum by()(count_over_time()) form, no bare grouping
+jq -e '[.panels[]|select(.title=="Events / min by node")|.targets[].expr|select(test("sum by \\([^)]*host_name") and test("count_over_time"))]|length>0' "$EVENTS" >/dev/null 2>&1 \
+  && pass "events/min uses sum by()(count_over_time())" || fail "events/min query shape wrong"
+# last-seen table groups by entity/action
+jq -e '[.panels[]|select(.title=="Last Seen by Entity / Action")|.targets[].expr|select(test("sum by \\([^)]*event_entity") and test("count_over_time"))]|length>0' "$EVENTS" >/dev/null 2>&1 \
+  && pass "last-seen groups by entity/action" || fail "last-seen query shape wrong"
 
 # --- single pass/fail gate (moved here from mid-script so all checks run) ---
 if [ "$FAIL" -ne 0 ]; then
