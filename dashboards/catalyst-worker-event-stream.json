@@ -174,7 +174,7 @@
         "name": "ticket",
         "label": "ticket",
         "type": "textbox",
-        "description": "Filter to a single Linear key via | linear_key=~\"...\" (regex). Empty = no-op (matches all).",
+        "description": "Filter to a Linear key via | linear_key=~\".*<ticket>.*\" (substring/regex). Wrapped in .*….* so empty = a true no-op that matches every value INCLUDING absent linear_key — Loki anchors regex label filters (^(?:…)$), so a bare =~\"\" would match ONLY empty/absent keys and hide every ticketed event. Empty = all.",
         "query": "",
         "current": {
           "text": "",
@@ -332,7 +332,7 @@
             "type": "loki",
             "uid": "loki"
           },
-          "expr": "{service_name=~\"${service:pipe}\"} | log_file_name=\"\" | catalyst_node_class=\"worker\" | host_name=~\"${node:pipe}\" | event_action!~\"${noise}\" | event_name!~\"${noisename}\" | severity_number>=${minsev} | linear_key=~\"${ticket}\" |= \"${search}\" | line_format `[{{ .host_name }}] {{ .service_name }} · {{ if .event_entity }}{{ .event_entity }}/{{ .event_action }}{{ else }}{{ .event_name }}{{ end }}{{ if .event_label }} ({{ .event_label }}){{ end }} | {{ __line__ }}`",
+          "expr": "{service_name=~\"${service:pipe}\"} | log_file_name=\"\" | catalyst_node_class=\"worker\" | host_name=~\"${node:pipe}\" | event_action!~\"${noise}\" | event_name!~\"${noisename}\" | severity_number>=${minsev} | linear_key=~\".*${ticket}.*\" |= \"${search}\" | line_format `[{{ .host_name }}] {{ .service_name }} · {{ if .event_entity }}{{ .event_entity }}/{{ .event_action }}{{ else }}{{ .event_name }}{{ end }}{{ if .event_label }} ({{ .event_label }}){{ end }} | {{ __line__ }}`",
           "refId": "A",
           "queryType": "range"
         }
