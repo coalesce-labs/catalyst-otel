@@ -327,7 +327,7 @@ jq -e '[..|objects|select(.targets?)|.targets[]?.expr|select(test("count_over_ti
 jq -e '[..|objects|select(.datasource?.uid=="loki")|.targets[]?.expr|select(test("increase\\("))]|length==0' "$EVENTS" >/dev/null 2>&1 \
   && pass "events Loki targets avoid increase()" || fail "events Loki target uses increase()"
 # required named panels (filled in Phase 2/3)
-for t in "Event Tail" "Events / min by node" "Last Seen by Entity / Action"; do
+for t in "Event Tail" 'Events / min — $node' "Last Seen by Entity / Action"; do
   jq -e --arg t "$t" '[..|objects|select(.title==$t)]|length>0' "$EVENTS" >/dev/null 2>&1 \
     && pass "events panel present: $t" || fail "events panel missing: $t"
 done
@@ -339,12 +339,24 @@ jq -e '[.panels[]|select(.title=="Event Tail")|select(.type=="logs" and .options
 jq -e '[.panels[]|select(.title=="Event Tail")|.targets[].expr|select(test("event_action!~") and test("event_name!~"))]|length>0' "$EVENTS" >/dev/null 2>&1 \
   && pass "tail has paired action+name noise filters" || fail "tail missing paired noise filter (defect #1)"
 # --- OTL-63 Phase 3: orientation strip + last-seen ---
-# events/min uses the wrapped sum by()(count_over_time()) form, no bare grouping
-jq -e '[.panels[]|select(.title=="Events / min by node")|.targets[].expr|select(test("sum by \\([^)]*host_name") and test("count_over_time"))]|length>0' "$EVENTS" >/dev/null 2>&1 \
-  && pass "events/min uses sum by()(count_over_time())" || fail "events/min query shape wrong"
-# last-seen table groups by entity/action
-jq -e '[.panels[]|select(.title=="Last Seen by Entity / Action")|.targets[].expr|select(test("sum by \\([^)]*event_entity") and test("count_over_time"))]|length>0' "$EVENTS" >/dev/null 2>&1 \
-  && pass "last-seen groups by entity/action" || fail "last-seen query shape wrong"
+# events/min: fixed [1m] window (NOT $__interval — that is not a per-minute rate),
+# repeated over $node, and `or vector(0)` so a SILENT node reads 0 instead of
+# vanishing (Loki emits no sample for an absent series). OTL-63 review P2 x3.
+jq -e '[.panels[]|select(.title=="Events / min — $node")|.targets[].expr|select(test("count_over_time") and test("\\[1m\\]") and test("or vector\\(0\\)"))]|length>0' "$EVENTS" >/dev/null 2>&1 \
+  && pass "events/min is per-minute with a vector(0) zero-floor" || fail "events/min must use [1m] and `or vector(0)`"
+jq -e '[.panels[]|select(.title=="Events / min — $node")|select(.repeat=="node")]|length==1' "$EVENTS" >/dev/null 2>&1 \
+  && pass "events/min repeats per node" || fail "events/min must repeat over \$node so each worker gets its own zero-floor"
+jq -e '[.panels[]|select(.title=="Events / min — $node")|.targets[].expr|select(test("\\[\\$__interval\\]"))]|length==0' "$EVENTS" >/dev/null 2>&1 \
+  && pass "events/min avoids [\$__interval]" || fail "events/min uses [\$__interval] — not a per-minute rate"
+# last-seen must compute a REAL wall-clock via max_over_time(unwrap observed_timestamp),
+# NOT count_over_time — a count says THAT a family fired in the window, never WHEN,
+# so it cannot deliver the stopped-family signal the panel is named for. OTL-63 review P2.
+jq -e '[.panels[]|select(.title=="Last Seen by Entity / Action")|.targets[].expr|select(test("max by \\([^)]*event_entity") and test("max_over_time") and test("unwrap observed_timestamp"))]|length>0' "$EVENTS" >/dev/null 2>&1 \
+  && pass "last-seen computes a real timestamp (unwrap observed_timestamp)" || fail "last-seen must use max_over_time(unwrap observed_timestamp), not a count"
+jq -e '[.panels[]|select(.title=="Last Seen by Entity / Action")|.targets[].expr|select(test("count_over_time"))]|length==0' "$EVENTS" >/dev/null 2>&1 \
+  && pass "last-seen is not a count table" || fail "last-seen still uses count_over_time"
+jq -e '[.panels[]|select(.title=="Last Seen by Entity / Action")|.fieldConfig.overrides[]?.properties[]?|select(.id=="unit" and .value=="dateTimeFromNow")]|length>0' "$EVENTS" >/dev/null 2>&1 \
+  && pass "last-seen renders as time-ago" || fail "last-seen needs unit dateTimeFromNow"
 # --- OTL-63 review: Loki ANCHORS label-filter regexes, so an unwrapped noise
 # alternation silently suppresses nothing. Every non-sentinel $noise/$noisename
 # option must carry an explicit `.*` wrap. Verified live: unwrapped, the tail
@@ -353,6 +365,22 @@ for v in noise noisename; do
   jq -e --arg v "$v" '[.templating.list[]|select(.name==$v)|.options[]|select(.value!="zzz_never_zzz")|.value|select(test("\\.\\*")|not)]|length==0' "$EVENTS" >/dev/null 2>&1 \
     && pass "\$$v terms are wildcard-wrapped (Loki anchors regex)" || fail "\$$v has an unwrapped term — Loki anchors, so it suppresses nothing"
 done
+
+# --- OTL-63 review: the noise floor must never suppress a FAILURE ---
+# catalyst.linear.read{result=failed} decomposes to event_action=read, and
+# catalyst.observability.forward_failed matched the old forward.* name term, so the
+# floor was hiding an ERROR-severity signal (190/hr) and the documented read-path
+# failure signal (12/hr). Every noise clause carries an `or severity_number>=13`
+# escape hatch, and $noisename suppresses forward_LAG only. NOTE: the hatch is
+# >=17 (ERROR), NOT >=13 (WARN) — autotune-gauge and parallelism-sampled are
+# emitted at WARN (239+240/hr), so a WARN hatch readmits 479/hr of pure metronome.
+# Failed reads are WARN, so they are exempted explicitly by linear_read_result.
+jq -e '[..|objects|select(.datasource?.uid=="loki")|.targets[]?.expr|select(test("event_action!~"))|select(test("or severity_number>=17")|not)]|length==0' "$EVENTS" >/dev/null 2>&1 \
+  && pass "noise floor exempts ERROR + failed reads (failures never suppressed)" || fail "a noise-filtered target lacks the `or severity_number>=17` escape hatch"
+jq -e '[.templating.list[]|select(.name=="noisename")|.options[]|.value|select(test("forward_failed"))]|length==0' "$EVENTS" >/dev/null 2>&1 \
+  && pass "noisename does not suppress forward_failed" || fail "noisename suppresses forward_failed (the stack-blind signal)"
+jq -e '[.templating.list[]|select(.name=="node")|select(.allValue==".*")]|length==1' "$EVENTS" >/dev/null 2>&1 \
+  && pass "node allValue is .* (retains hostless events)" || fail "node allValue must be .* not .+"
 
 # --- single pass/fail gate (moved here from mid-script so all checks run) ---
 if [ "$FAIL" -ne 0 ]; then

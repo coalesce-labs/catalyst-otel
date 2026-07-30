@@ -36,7 +36,7 @@
         "name": "node",
         "label": "node",
         "type": "custom",
-        "description": "Worker host filter (host_name). Default = a single node so mirrored webhook events (catalyst.github / catalyst.linear emit on BOTH minis) show once, not twice — defect #2. Widen to All (.+) for a fleet-wide tail.",
+        "description": "Worker host filter (host_name). Default = a single node so mirrored webhook events (catalyst.github / catalyst.linear emit on BOTH minis) show once, not twice — defect #2. Widen to All (.*) for a fleet-wide tail — .* not .+ so an event with absent/empty host_name is retained rather than silently dropped during a host-identity or ingestion fault (no such events exist on the worker-classed stream today, but .* costs nothing and fails safe).",
         "query": "mini,mini-2",
         "options": [
           {
@@ -52,7 +52,7 @@
         ],
         "includeAll": true,
         "multi": true,
-        "allValue": ".+",
+        "allValue": ".*",
         "current": {
           "text": ["mini-2"],
           "value": ["mini-2"]
@@ -109,11 +109,11 @@
         "label": "noise floor (name)",
         "type": "custom",
         "description": "Second noise clause on event_name for legacy / undecomposed families that carry NO event_action — broker.daemon.heartbeat, observability.forward_lag / forward_failed (defect #1). 'all' = never-match sentinel (no-op). Loki ANCHORS label-filter regexes and these names carry a `catalyst.` prefix + `_lag`/`_failed` suffix, so each term is wrapped `.*…*` — a bare alternation matches zero lines and suppresses nothing.",
-        "query": "signal : .*broker\\.daemon\\.heartbeat.*|.*observability\\.forward.*, all : zzz_never_zzz",
+        "query": "signal : .*broker\\.daemon\\.heartbeat.*|.*observability\\.forward_lag.*, all : zzz_never_zzz",
         "options": [
           {
             "text": "signal",
-            "value": ".*broker\\.daemon\\.heartbeat.*|.*observability\\.forward.*",
+            "value": ".*broker\\.daemon\\.heartbeat.*|.*observability\\.forward_lag.*",
             "selected": true
           },
           {
@@ -126,7 +126,7 @@
         "multi": false,
         "current": {
           "text": "signal",
-          "value": ".*broker\\.daemon\\.heartbeat.*|.*observability\\.forward.*"
+          "value": ".*broker\\.daemon\\.heartbeat.*|.*observability\\.forward_lag.*"
         }
       },
       {
@@ -187,8 +187,10 @@
     {
       "id": 3,
       "type": "timeseries",
-      "title": "Events / min by node",
-      "description": "Non-noise event rate per worker (shares the tail's $noise + $noisename floor). A node flat at zero = that worker is emitting no real work — the 'is anything happening' signal (Gherkin scenario 3).",
+      "title": "Events / min — $node",
+      "description": "Non-noise events per MINUTE for this worker (shares the tail's $noise + $noisename floor). Fixed [1m] window, NOT [$__interval] — $__interval tracks the time range, so an interval-windowed count is not a per-minute rate and the same underlying rate would change magnitude under a panel titled 'per min'. Panel REPEATS over $node and the query is a scalar `sum(...) or vector(0)`: Loki emits no sample at all for a silent node (it cannot assert an absent-but-expected series), so a `sum by (host_name)` graph makes a dead worker VANISH rather than read zero. `or vector(0)` forces the 0 line, which is what makes 'node flat at zero' (Gherkin scenario 3) actually observable.",
+      "repeat": "node",
+      "repeatDirection": "h",
       "datasource": {
         "type": "loki",
         "uid": "loki"
@@ -199,8 +201,8 @@
             "type": "loki",
             "uid": "loki"
           },
-          "expr": "sum by (host_name) (count_over_time({service_name=~\"${service:pipe}\"} | log_file_name=\"\" | catalyst_node_class=\"worker\" | host_name=~\"${node:pipe}\" | event_action!~\"${noise}\" | event_name!~\"${noisename}\" [$__interval]))",
-          "legendFormat": "{{host_name}}",
+          "expr": "sum (count_over_time({service_name=~\"${service:pipe}\"} | log_file_name=\"\" | catalyst_node_class=\"worker\" | host_name=~\"$node\" | event_action!~`${noise}` or severity_number>=17 or linear_read_result=\"failed\" | event_name!~`${noisename}` or severity_number>=17 or linear_read_result=\"failed\" [1m])) or vector(0)",
+          "legendFormat": "$node",
           "refId": "A",
           "queryType": "range",
           "range": true
@@ -250,7 +252,7 @@
       "id": 4,
       "type": "table",
       "title": "Last Seen by Entity / Action",
-      "description": "Count per entity/action over the window. Shares the tail's noise floor ($noise/$noisename) so the visible rows are real families, not the metronome — unfiltered, ticket/tick, linear/read and the heartbeats occupy every row above the fold. Suppressing them costs no stopped-signal coverage: noise families never stop emitting, so they can never be the stopped signal this panel exists to surface. A stopped REAL family stays a present-but-stale/low row rather than vanishing, so 'nothing is happening' is legible when the window ≥ the silence gap (Gherkin scenario 3). Set $noise/$noisename to 'all' to see the suppressed families here too. Groups on low-cardinality event_entity (~22) × event_action (~30).",
+      "description": "TRUE last-seen wall-clock per entity/action — `max_over_time(| unwrap observed_timestamp)` (epoch ns) / 1e6 → epoch ms, rendered as time-ago. A plain count_over_time cannot do this: it says only THAT a family fired in the window, not WHEN, so a family that fired once at the very start is indistinguishable from one firing now. Sorted OLDEST-FIRST, so the family that went quiet is the top row — that is the stopped-signal read (Gherkin scenario 3). Shares the tail's noise floor ($noise/$noisename) so the rows are real families, not the metronome; noise families never stop emitting, so suppressing them costs no stopped-signal coverage. Set $noise/$noisename to 'all' to include them. Caveat inherent to Loki: a family silent for LONGER than the dashboard range has no sample at all and drops out entirely — widen the range to see it.",
       "datasource": {
         "type": "loki",
         "uid": "loki"
@@ -261,7 +263,7 @@
             "type": "loki",
             "uid": "loki"
           },
-          "expr": "sum by (event_entity, event_action) (count_over_time({service_name=~\"${service:pipe}\"} | log_file_name=\"\" | catalyst_node_class=\"worker\" | host_name=~\"${node:pipe}\" | event_action!~\"${noise}\" | event_name!~\"${noisename}\" [$__range]))",
+          "expr": "max by (event_entity, event_action) (max_over_time({service_name=~\"${service:pipe}\"} | log_file_name=\"\" | catalyst_node_class=\"worker\" | host_name=~\"${node:pipe}\" | event_action!~`${noise}` or severity_number>=17 or linear_read_result=\"failed\" | event_name!~`${noisename}` or severity_number>=17 or linear_read_result=\"failed\" | unwrap observed_timestamp | __error__=\"\" [$__range])) / 1000000",
           "refId": "A",
           "queryType": "instant",
           "instant": true
@@ -282,8 +284,8 @@
             "renameByName": {
               "event_entity": "entity",
               "event_action": "action",
-              "Value": "count",
-              "Value #A": "count"
+              "Value": "last seen",
+              "Value #A": "last seen"
             },
             "excludeByName": {
               "Time": true
@@ -299,14 +301,27 @@
           },
           "noValue": "—"
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "last seen"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "dateTimeFromNow"
+              }
+            ]
+          }
+        ]
       },
       "options": {
         "showHeader": true,
         "sortBy": [
           {
-            "displayName": "count",
-            "desc": true
+            "displayName": "last seen",
+            "desc": false
           }
         ]
       },
@@ -332,7 +347,7 @@
             "type": "loki",
             "uid": "loki"
           },
-          "expr": "{service_name=~\"${service:pipe}\"} | log_file_name=\"\" | catalyst_node_class=\"worker\" | host_name=~\"${node:pipe}\" | event_action!~\"${noise}\" | event_name!~\"${noisename}\" | severity_number>=${minsev} | linear_key=~\".*${ticket}.*\" |= \"${search}\" | line_format `[{{ .host_name }}] {{ .service_name }} · {{ if .event_entity }}{{ .event_entity }}/{{ .event_action }}{{ else }}{{ .event_name }}{{ end }}{{ if .event_label }} ({{ .event_label }}){{ end }} | {{ __line__ }}`",
+          "expr": "{service_name=~\"${service:pipe}\"} | log_file_name=\"\" | catalyst_node_class=\"worker\" | host_name=~\"${node:pipe}\" | event_action!~`${noise}` or severity_number>=17 or linear_read_result=\"failed\" | event_name!~`${noisename}` or severity_number>=17 or linear_read_result=\"failed\" | severity_number>=${minsev} | linear_key=~\".*${ticket}.*\" |= \"${search}\" | line_format `[{{ .host_name }}] {{ .service_name }} · {{ if .event_entity }}{{ .event_entity }}/{{ .event_action }}{{ else }}{{ .event_name }}{{ end }}{{ if .event_label }} ({{ .event_label }}){{ end }} | {{ __line__ }}`",
           "refId": "A",
           "queryType": "range"
         }
