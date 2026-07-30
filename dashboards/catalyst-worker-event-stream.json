@@ -250,7 +250,7 @@
       "id": 4,
       "type": "table",
       "title": "Last Seen by Entity / Action",
-      "description": "Count per entity/action over the window. A stopped family stays a present-but-stale/low row rather than vanishing, so 'nothing is happening' is legible when the window ≥ the silence gap (Gherkin scenario 3). Groups on low-cardinality event_entity (~22) × event_action (~30).",
+      "description": "Count per entity/action over the window. Shares the tail's noise floor ($noise/$noisename) so the visible rows are real families, not the metronome — unfiltered, ticket/tick, linear/read and the heartbeats occupy every row above the fold. Suppressing them costs no stopped-signal coverage: noise families never stop emitting, so they can never be the stopped signal this panel exists to surface. A stopped REAL family stays a present-but-stale/low row rather than vanishing, so 'nothing is happening' is legible when the window ≥ the silence gap (Gherkin scenario 3). Set $noise/$noisename to 'all' to see the suppressed families here too. Groups on low-cardinality event_entity (~22) × event_action (~30).",
       "datasource": {
         "type": "loki",
         "uid": "loki"
@@ -261,7 +261,7 @@
             "type": "loki",
             "uid": "loki"
           },
-          "expr": "sum by (event_entity, event_action) (count_over_time({service_name=~\"${service:pipe}\"} | log_file_name=\"\" | catalyst_node_class=\"worker\" | host_name=~\"${node:pipe}\" [$__range]))",
+          "expr": "sum by (event_entity, event_action) (count_over_time({service_name=~\"${service:pipe}\"} | log_file_name=\"\" | catalyst_node_class=\"worker\" | host_name=~\"${node:pipe}\" | event_action!~\"${noise}\" | event_name!~\"${noisename}\" [$__range]))",
           "refId": "A",
           "queryType": "instant",
           "instant": true
