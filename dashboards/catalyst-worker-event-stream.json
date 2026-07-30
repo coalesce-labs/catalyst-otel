@@ -1,0 +1,372 @@
+{
+  "uid": "catalyst-worker-event-stream",
+  "title": "Catalyst — Worker Event Stream Tail",
+  "description": "Loki-only forensic tail of the worker (mini/mini-2) event stream: a decoded, filterable live read of whether the fleet is working or wedged, without ssh. Distinct from the aggregate views (control-loop-live, scheduler-health, ticket-lifecycle) and from the pino-log tail (fleet-daemon-logs). The noise floor ($noise + $noisename) is the primary control — a naive tail is ~75% heartbeats/samples/ticks/reads.",
+  "tags": ["catalyst", "events", "fleet", "forensic"],
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "refresh": "30s",
+  "timezone": "browser",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "links": [],
+  "templating": {
+    "list": [
+      {
+        "name": "node",
+        "label": "node",
+        "type": "custom",
+        "description": "Worker host filter (host_name). Default = a single node so mirrored webhook events (catalyst.github / catalyst.linear emit on BOTH minis) show once, not twice — defect #2. Widen to All (.*) for a fleet-wide tail — .* not .+ so an event with absent/empty host_name is retained rather than silently dropped during a host-identity or ingestion fault (no such events exist on the worker-classed stream today, but .* costs nothing and fails safe).",
+        "query": "mini,mini-2",
+        "options": [
+          {
+            "text": "mini",
+            "value": "mini",
+            "selected": false
+          },
+          {
+            "text": "mini-2",
+            "value": "mini-2",
+            "selected": true
+          }
+        ],
+        "includeAll": true,
+        "multi": true,
+        "allValue": ".*",
+        "current": {
+          "text": ["mini-2"],
+          "value": ["mini-2"]
+        }
+      },
+      {
+        "name": "service",
+        "label": "service",
+        "type": "query",
+        "datasource": {
+          "type": "loki",
+          "uid": "loki"
+        },
+        "query": "label_values(service_name)",
+        "definition": "label_values(service_name)",
+        "regex": "/^catalyst\\..+/",
+        "includeAll": true,
+        "multi": true,
+        "allValue": "catalyst..+",
+        "current": {
+          "text": ["All"],
+          "value": ["$__all"]
+        },
+        "refresh": 2,
+        "sort": 1
+      },
+      {
+        "name": "noise",
+        "label": "noise floor (action)",
+        "type": "custom",
+        "description": "Suppresses the ~75% event_action noise floor (heartbeat / sampled / tick / read / autotune-gauge / parallelism-sampled). 'signal' hides them; 'all' selects a never-match sentinel so the !~ filter becomes a no-op → raw firehose. Paired with $noisename for undecomposed families (defect #1). Loki ANCHORS label-filter regexes, so each term is wrapped `(.*\\.)?(…)` to also catch the dotted-suffix form (host.process.sampled → event_action `process.sampled`); a bare alternation leaks those.",
+        "query": "signal : (.*\\.)?(heartbeat|sampled|tick|read|autotune-gauge|parallelism-sampled), all : zzz_never_zzz",
+        "options": [
+          {
+            "text": "signal",
+            "value": "(.*\\.)?(heartbeat|sampled|tick|read|autotune-gauge|parallelism-sampled)",
+            "selected": true
+          },
+          {
+            "text": "all",
+            "value": "zzz_never_zzz",
+            "selected": false
+          }
+        ],
+        "includeAll": false,
+        "multi": false,
+        "current": {
+          "text": "signal",
+          "value": "(.*\\.)?(heartbeat|sampled|tick|read|autotune-gauge|parallelism-sampled)"
+        }
+      },
+      {
+        "name": "noisename",
+        "label": "noise floor (name)",
+        "type": "custom",
+        "description": "Second noise clause on event_name for legacy / undecomposed families that carry NO event_action — broker.daemon.heartbeat, observability.forward_lag / forward_failed (defect #1). 'all' = never-match sentinel (no-op). Loki ANCHORS label-filter regexes and these names carry a `catalyst.` prefix + `_lag`/`_failed` suffix, so each term is wrapped `.*…*` — a bare alternation matches zero lines and suppresses nothing.",
+        "query": "signal : .*broker\\.daemon\\.heartbeat.*|.*observability\\.forward_lag.*, all : zzz_never_zzz",
+        "options": [
+          {
+            "text": "signal",
+            "value": ".*broker\\.daemon\\.heartbeat.*|.*observability\\.forward_lag.*",
+            "selected": true
+          },
+          {
+            "text": "all",
+            "value": "zzz_never_zzz",
+            "selected": false
+          }
+        ],
+        "includeAll": false,
+        "multi": false,
+        "current": {
+          "text": "signal",
+          "value": ".*broker\\.daemon\\.heartbeat.*|.*observability\\.forward_lag.*"
+        }
+      },
+      {
+        "name": "minsev",
+        "label": "min severity",
+        "type": "custom",
+        "description": "Floors the tail on numeric severity_number (INFO=9, WARN=13, ERROR=17). all=1 keeps everything; warn+ hides INFO; errors shows only ERROR.",
+        "query": "all : 1, warn+ : 13, errors : 17",
+        "options": [
+          {
+            "text": "all",
+            "value": "1",
+            "selected": true
+          },
+          {
+            "text": "warn+",
+            "value": "13",
+            "selected": false
+          },
+          {
+            "text": "errors",
+            "value": "17",
+            "selected": false
+          }
+        ],
+        "includeAll": false,
+        "multi": false,
+        "current": {
+          "text": "all",
+          "value": "1"
+        }
+      },
+      {
+        "name": "search",
+        "label": "search",
+        "type": "textbox",
+        "description": "Plain-text substring filter over the event body (|= \"...\"). No regex / backslashes. Empty = all.",
+        "query": "",
+        "current": {
+          "text": "",
+          "value": ""
+        }
+      },
+      {
+        "name": "ticket",
+        "label": "ticket",
+        "type": "textbox",
+        "description": "Filter to a Linear key via | linear_key=~\".*<ticket>.*\" (substring/regex). Wrapped in .*….* so empty = a true no-op that matches every value INCLUDING absent linear_key — Loki anchors regex label filters (^(?:…)$), so a bare =~\"\" would match ONLY empty/absent keys and hide every ticketed event. Empty = all.",
+        "query": "",
+        "current": {
+          "text": "",
+          "value": ""
+        }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Events / min — $node",
+      "description": "Non-noise events per MINUTE for this worker (shares the tail's $noise + $noisename floor). Fixed [1m] window, NOT [$__interval] — $__interval tracks the time range, so an interval-windowed count is not a per-minute rate and the same underlying rate would change magnitude under a panel titled 'per min'. Panel REPEATS over $node and the query is a scalar `sum(...) or vector(0)`: Loki emits no sample at all for a silent node (it cannot assert an absent-but-expected series), so a `sum by (host_name)` graph makes a dead worker VANISH rather than read zero. `or vector(0)` forces the 0 line, which is what makes 'node flat at zero' (Gherkin scenario 3) actually observable.",
+      "repeat": "node",
+      "repeatDirection": "h",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "sum (count_over_time({service_name=~\"${service:pipe}\"} | log_file_name=\"\" | catalyst_node_class=\"worker\" | host_name=~\"$node\" | event_action!~`${noise}` or severity_number>=17 or linear_read_result=\"failed\" | event_name!~`${noisename}` or severity_number>=17 or linear_read_result=\"failed\" [1m])) or vector(0)",
+          "legendFormat": "$node",
+          "refId": "A",
+          "queryType": "range",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "bars",
+            "lineWidth": 2,
+            "fillOpacity": 70,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            },
+            "pointSize": 5
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "calcs": ["lastNotNull", "sum"]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 16,
+        "x": 0,
+        "y": 1
+      }
+    },
+    {
+      "id": 4,
+      "type": "table",
+      "title": "Last Seen by Entity / Action",
+      "description": "TRUE last-seen wall-clock per entity/action — `max_over_time(| unwrap observed_timestamp)` (epoch ns) / 1e6 → epoch ms, rendered as time-ago. A plain count_over_time cannot do this: it says only THAT a family fired in the window, not WHEN, so a family that fired once at the very start is indistinguishable from one firing now. Sorted OLDEST-FIRST, so the family that went quiet is the top row — that is the stopped-signal read (Gherkin scenario 3). Shares the tail's noise floor ($noise/$noisename) so the rows are real families, not the metronome; noise families never stop emitting, so suppressing them costs no stopped-signal coverage. Set $noise/$noisename to 'all' to include them. Caveat inherent to Loki: a family silent for LONGER than the dashboard range has no sample at all and drops out entirely — widen the range to see it.",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "max by (event_entity, event_action) (max_over_time({service_name=~\"${service:pipe}\"} | log_file_name=\"\" | catalyst_node_class=\"worker\" | host_name=~\"${node:pipe}\" | event_action!~`${noise}` or severity_number>=17 or linear_read_result=\"failed\" | event_name!~`${noisename}` or severity_number>=17 or linear_read_result=\"failed\" | unwrap observed_timestamp | __error__=\"\" [$__range])) / 1000000",
+          "refId": "A",
+          "queryType": "instant",
+          "instant": true
+        }
+      ],
+      "transformations": [
+        {
+          "id": "labelsToFields",
+          "options": {}
+        },
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "event_entity": "entity",
+              "event_action": "action",
+              "Value": "last seen",
+              "Value #A": "last seen"
+            },
+            "excludeByName": {
+              "Time": true
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true
+          },
+          "noValue": "—"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "last seen"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "dateTimeFromNow"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "sortBy": [
+          {
+            "displayName": "last seen",
+            "desc": false
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 16,
+        "y": 1
+      }
+    },
+    {
+      "id": 2,
+      "type": "logs",
+      "title": "Event Tail",
+      "description": "Newest-first decoded tail: [host] service · entity/action (label) | body. The $noise + $noisename floor hides the ~75% heartbeat/sample/tick/read noise (both clauses are needed — undecomposed families like broker.daemon.heartbeat carry no event_action, defect #1). Set $noise/$noisename to 'all' for the raw firehose. Empty labels render with no dangling separator (defect #3); undecomposed events fall back to event_name.",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "{service_name=~\"${service:pipe}\"} | log_file_name=\"\" | catalyst_node_class=\"worker\" | host_name=~\"${node:pipe}\" | event_action!~`${noise}` or severity_number>=17 or linear_read_result=\"failed\" | event_name!~`${noisename}` or severity_number>=17 or linear_read_result=\"failed\" | severity_number>=${minsev} | linear_key=~\".*${ticket}.*\" |= \"${search}\" | line_format `[{{ .host_name }}] {{ .service_name }} · {{ if .event_entity }}{{ .event_entity }}/{{ .event_action }}{{ else }}{{ .event_name }}{{ end }}{{ if .event_label }} ({{ .event_label }}){{ end }} | {{ __line__ }}`",
+          "refId": "A",
+          "queryType": "range"
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "showLabels": false,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": false,
+        "enableLogDetails": true,
+        "dedupStrategy": "none",
+        "sortOrder": "Descending"
+      },
+      "gridPos": {
+        "h": 16,
+        "w": 24,
+        "x": 0,
+        "y": 7
+      }
+    }
+  ]
+}
