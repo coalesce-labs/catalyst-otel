@@ -1,0 +1,202 @@
+apiVersion: 1
+
+# OTL-5 Fleet Ops alert rules. Grafana-MANAGED, evaluated on the otel-stack
+# host. Three rules covering the primary fleet-ops failure modes:
+#   1. stuck-at-floor — Prometheus: eligible work queued but scheduler is at
+#      the autotune floor (effective == 1). Hardcoded floor = 1 (Finding 11;
+#      the min-slot floor is not a metric — edit threshold if fleet changes).
+#   2. reap-leak — Loki: reap-requested events persistently exceed reap-complete
+#      events over a 15m window (conservative threshold: >10; tune in-file).
+#   3. needs-human aging — Loki: phase.advance.held events sustained over 30m
+#      (any non-zero held = a worker waiting for a human decision).
+#
+# Routing: no receiver named → root notification policy (catalyst-pager).
+# catalyst-pager is VISIBLE-but-silent until CATALYST_ALERT_WEBHOOK_URL is set
+# (consistent with scheduler-health-rules.yaml).
+#
+# noDataState/execErrState = OK: a gap or query error must NOT raise — these
+# are advisory operational signals, not survivability alerts. Matches the
+# scheduler-health convention.
+groups:
+  - orgId: 1
+    name: catalyst-fleet-ops
+    folder: Catalyst Alerts
+    interval: 1m
+    rules:
+      - uid: catalyst_fleet_stuck_at_floor
+        title: Fleet stuck at autotune floor (eligible work > 0, effective == 1)
+        condition: C
+        for: 10m
+        noDataState: OK
+        execErrState: OK
+        labels:
+          team: catalyst
+          signal: fleet_stuck_at_floor
+          severity: warning
+        annotations:
+          summary: 'Scheduler eligible work > 0 but effective parallelism is at the floor (1)'
+          description: >
+            catalyst_scheduler_eligible_work > 0 while
+            catalyst_scheduler_max_parallel_effective == 1 for 10m.
+            The fleet is not dispatching available work — autotune may have
+            floor-clamped due to load/memory pressure, or the scheduler is
+            wedged. Check the Queue/Capacity panels on the Fleet Ops dashboard.
+            Threshold: floor = 1 (hardcoded; edit rule if fleet min changes).
+          __dashboardUid__: catalyst-fleet-ops
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: prometheus
+            model:
+              datasource: { type: prometheus, uid: prometheus }
+              editorMode: code
+              instant: true
+              range: false
+              refId: A
+              expr: catalyst_scheduler_eligible_work > 0 and catalyst_scheduler_max_parallel_effective == 1
+          - refId: B
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              expression: A
+              reducer: last
+              datasource: { type: __expr__, uid: __expr__ }
+          - refId: C
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              refId: C
+              expression: B
+              datasource: { type: __expr__, uid: __expr__ }
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+
+      - uid: catalyst_fleet_reap_leak
+        title: Reap leak — requested persistently exceeds complete
+        condition: C
+        for: 15m
+        noDataState: OK
+        execErrState: OK
+        labels:
+          team: catalyst
+          signal: fleet_reap_leak
+          severity: warning
+        annotations:
+          summary: 'Reap-requested count exceeds reap-complete by >10 over 15m'
+          description: >
+            sum(count_over_time(reap-requested [15m])) minus
+            sum(count_over_time(reap-complete [15m])) > 10, sustained 15m.
+            Workers are being flagged for reap but the reap-complete handshake
+            is not following. Check the Reap & Memory panels on the Fleet Ops
+            dashboard for which reap types are leaking.
+            Threshold: >10 (conservative starting point; tune in-file).
+          __dashboardUid__: catalyst-fleet-ops
+        data:
+          - refId: A
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: loki
+            model:
+              datasource: { type: loki, uid: loki }
+              editorMode: code
+              queryType: instant
+              instant: true
+              range: false
+              refId: A
+              expr: sum(count_over_time({service_name="catalyst.execution-core"} | event_name=~".+reap-requested" [15m]))
+          - refId: B
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: loki
+            model:
+              datasource: { type: loki, uid: loki }
+              editorMode: code
+              queryType: instant
+              instant: true
+              range: false
+              refId: B
+              expr: sum(count_over_time({service_name="catalyst.execution-core"} | event_name=~".+reap-complete" [15m]))
+          - refId: D
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: math
+              refId: D
+              expression: "$A - $B"
+              datasource: { type: __expr__, uid: __expr__ }
+          - refId: E
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: E
+              expression: D
+              reducer: last
+              datasource: { type: __expr__, uid: __expr__ }
+          - refId: C
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              refId: C
+              expression: E
+              datasource: { type: __expr__, uid: __expr__ }
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [10]
+
+      - uid: catalyst_fleet_needs_human_aging
+        title: Needs-human tickets aging (held > 30m)
+        condition: C
+        for: 30m
+        noDataState: OK
+        execErrState: OK
+        labels:
+          team: catalyst
+          signal: fleet_needs_human_aging
+          severity: warning
+        annotations:
+          summary: 'phase.advance.held events sustained > 30m — a worker is waiting for human input'
+          description: >
+            sum(count_over_time(phase.advance.held.* [30m])) > 0, sustained 30m.
+            One or more workers have been held at a needs-human gate for an
+            extended period. Check the Fleet Event Log or the scheduler-health
+            dashboard for the ticket(s) involved.
+          __dashboardUid__: catalyst-fleet-ops
+        data:
+          - refId: A
+            relativeTimeRange: { from: 1800, to: 0 }
+            datasourceUid: loki
+            model:
+              datasource: { type: loki, uid: loki }
+              editorMode: code
+              queryType: instant
+              instant: true
+              range: false
+              refId: A
+              expr: sum(count_over_time({service_name="catalyst.execution-core"} | event_name=~"phase\\.advance\\.held\\..+" [30m]))
+          - refId: B
+            relativeTimeRange: { from: 1800, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              expression: A
+              reducer: last
+              datasource: { type: __expr__, uid: __expr__ }
+          - refId: C
+            relativeTimeRange: { from: 1800, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              refId: C
+              expression: B
+              datasource: { type: __expr__, uid: __expr__ }
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
