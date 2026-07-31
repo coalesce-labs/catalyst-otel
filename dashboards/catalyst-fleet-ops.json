@@ -1,0 +1,737 @@
+{
+  "uid": "catalyst-fleet-ops",
+  "title": "Catalyst — Fleet Ops",
+  "description": "Fleet operations / AIops surface for the Catalyst orchestrator: worker lifecycle, queue/capacity, reap health, pipeline throughput, Loki forensics, and alerts. OTL-5.",
+  "tags": ["catalyst", "fleet", "ops"],
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "refresh": "30s",
+  "timezone": "browser",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "links": [],
+  "templating": {
+    "list": [
+      {
+        "name": "node",
+        "label": "node",
+        "type": "custom",
+        "description": "Filters panels on host_name. 'All' = .* (keeps every event, incl. those with empty host_name). A specific node matches the canonical short name exactly.",
+        "query": "mini,mini-2,laptop",
+        "options": [
+          {
+            "text": "mini",
+            "value": "mini",
+            "selected": false
+          },
+          {
+            "text": "mini-2",
+            "value": "mini-2",
+            "selected": false
+          },
+          {
+            "text": "laptop",
+            "value": "laptop",
+            "selected": false
+          }
+        ],
+        "includeAll": true,
+        "multi": true,
+        "allValue": ".*",
+        "current": {
+          "text": ["All"],
+          "value": ["$__all"]
+        }
+      },
+      {
+        "name": "service",
+        "label": "service",
+        "type": "query",
+        "datasource": {
+          "type": "loki",
+          "uid": "loki"
+        },
+        "query": "label_values(service_name)",
+        "definition": "label_values(service_name)",
+        "regex": "/^catalyst\\..+/",
+        "includeAll": true,
+        "multi": true,
+        "allValue": "catalyst..+",
+        "current": {
+          "text": ["All"],
+          "value": ["$__all"]
+        },
+        "refresh": 2,
+        "sort": 1
+      },
+      {
+        "name": "ev",
+        "label": "event filter",
+        "type": "textbox",
+        "description": "Free-text filter over log lines (|= \"...\"). Empty = all.",
+        "query": "",
+        "current": {
+          "text": "",
+          "value": ""
+        }
+      },
+      {
+        "name": "sev",
+        "label": "severity",
+        "type": "custom",
+        "description": "Severity filter for the Fleet Event Log. Default WARN|ERROR; 'all' shows everything.",
+        "query": "WARN|ERROR : WARN|ERROR, all : .+",
+        "options": [
+          {
+            "text": "WARN|ERROR",
+            "value": "WARN|ERROR",
+            "selected": true
+          },
+          {
+            "text": "all",
+            "value": ".+",
+            "selected": false
+          }
+        ],
+        "includeAll": false,
+        "multi": false,
+        "current": {
+          "text": "WARN|ERROR",
+          "value": "WARN|ERROR"
+        }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "row",
+      "title": "Queue / Capacity",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Effective vs Target Slots",
+      "description": "Scheduler autotune: effective parallelism cap vs operator-configured target. Divergence = autotune is constraining the fleet (load/memory pressure).",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "refId": "A",
+          "expr": "catalyst_scheduler_max_parallel_effective{host_name=~\"$node\"}",
+          "legendFormat": "effective · {{host_name}}",
+          "editorMode": "code",
+          "instant": false,
+          "range": true
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "refId": "B",
+          "expr": "catalyst_scheduler_max_parallel_target{host_name=~\"$node\"}",
+          "legendFormat": "target · {{host_name}}",
+          "editorMode": "code",
+          "instant": false,
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": ["lastNotNull"]
+        },
+        "tooltip": { "mode": "multi" }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 1 }
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Running vs Queued Workers",
+      "description": "Active bg workers vs eligible work waiting. A rising eligible-work line with flat running workers = dispatch backlog.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "refId": "A",
+          "expr": "catalyst_scheduler_running_workers{host_name=~\"$node\"}",
+          "legendFormat": "running · {{host_name}}",
+          "editorMode": "code",
+          "instant": false,
+          "range": true
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "refId": "B",
+          "expr": "catalyst_scheduler_bg_count{host_name=~\"$node\"}",
+          "legendFormat": "bg jobs · {{host_name}}",
+          "editorMode": "code",
+          "instant": false,
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": ["lastNotNull"]
+        },
+        "tooltip": { "mode": "multi" }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 1 }
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Load per Core",
+      "description": "Scheduler load-per-core gauge. Threshold at 1.0 = fully loaded; autotune depresses effective slots above this.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "refId": "A",
+          "expr": "catalyst_scheduler_load_per_core{host_name=~\"$node\"}",
+          "legendFormat": "load/core · {{host_name}}",
+          "editorMode": "code",
+          "instant": false,
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "thresholdsStyle": { "mode": "line" }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 0.8 },
+              { "color": "red", "value": 1.0 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": ["lastNotNull"]
+        },
+        "tooltip": { "mode": "multi" }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 9 }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Eligible Work Waiting",
+      "description": "Tickets eligible for dispatch but not yet dispatched. Sustained >0 with free slots = scheduler logic gap.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "refId": "A",
+          "expr": "catalyst_scheduler_eligible_work{host_name=~\"$node\"}",
+          "legendFormat": "eligible · {{host_name}}",
+          "editorMode": "code",
+          "instant": false,
+          "range": true
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "refId": "B",
+          "expr": "catalyst_scheduler_free_slots{host_name=~\"$node\"}",
+          "legendFormat": "free slots · {{host_name}}",
+          "editorMode": "code",
+          "instant": false,
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": ["lastNotNull"]
+        },
+        "tooltip": { "mode": "multi" }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 9 }
+    },
+    {
+      "id": 6,
+      "type": "row",
+      "title": "Pipeline Throughput",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 17 }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Dispatch Outcomes",
+      "description": "Rate of dispatch events by outcome (event_action). Gives a per-interval view of how many new workers the scheduler is starting vs deferring.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "refId": "A",
+          "expr": "sum by (event_action) (increase(catalyst_dispatch_total{host_name=~\"$node\"}[$__rate_interval]))",
+          "legendFormat": "{{event_action}}",
+          "editorMode": "code",
+          "instant": false,
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": ["sum"]
+        },
+        "tooltip": { "mode": "multi" }
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 18 }
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Phase Complete / Failed",
+      "description": "Phase-level completion and failure events per interval. A rising failed band warrants investigation across the fleet.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "refId": "A",
+          "expr": "sum(increase(catalyst_event_total{event_entity=\"phase\",event_action=~\"complete|failed\"}[$__rate_interval])) by (event_action)",
+          "legendFormat": "{{event_action}}",
+          "editorMode": "code",
+          "instant": false,
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": ["sum"]
+        },
+        "tooltip": { "mode": "multi" }
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 18 }
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Pipeline Completion Cadence",
+      "description": "ticket.completion.declared events over the dashboard range — the canonical proxy for merge cadence (flat-normalized PR-merged events are not Prometheus-retained; Finding 10).",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "refId": "A",
+          "expr": "increase(catalyst_event_total{event_entity=\"ticket\",event_action=\"completion.declared\"}[$__range])",
+          "legendFormat": "completions",
+          "editorMode": "code",
+          "instant": false,
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "bars",
+            "lineWidth": 1,
+            "fillOpacity": 70,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": ["sum"]
+        },
+        "tooltip": { "mode": "multi" }
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 18 }
+    },
+    {
+      "id": 10,
+      "type": "row",
+      "title": "Fleet Health",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 26 }
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Node Liveness (recent heartbeats)",
+      "description": "count_over_time of node.heartbeat events per rate interval. Zero = the daemon on that node has stopped emitting (Loki cannot assert absent; a recent-window count is the proxy). Drop toward 0 = dead daemon signal.",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "refId": "A",
+          "expr": "sum by (host_name) (count_over_time({service_name=\"catalyst.execution-core\"} | event_name=\"node.heartbeat\" | host_name=~\"$node\" [$__rate_interval]))",
+          "legendFormat": "{{host_name}}",
+          "queryType": "range",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": ["lastNotNull"]
+        },
+        "tooltip": { "mode": "multi" }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 27 }
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "Worker Transitions",
+      "description": "Rate of worker.transition events per interval by host. A quiet line = no workers are progressing through phases.",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "refId": "A",
+          "expr": "sum by (host_name) (count_over_time({service_name=\"catalyst.execution-core\"} | event_name=~\"worker\\.transition\\..+\" | host_name=~\"$node\" [$__rate_interval]))",
+          "legendFormat": "{{host_name}}",
+          "queryType": "range",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": ["lastNotNull"]
+        },
+        "tooltip": { "mode": "multi" }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 27 }
+    },
+    {
+      "id": 13,
+      "type": "timeseries",
+      "title": "Held / Needs-Human",
+      "description": "phase.advance.held events per interval. Any non-zero rate means a worker is waiting for a human decision. Investigate the oldest held worker on the scheduler-health dashboard.",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "refId": "A",
+          "expr": "sum by (host_name) (count_over_time({service_name=\"catalyst.execution-core\"} | event_name=~\"phase\\.advance\\.held\\..+\" | host_name=~\"$node\" [$__rate_interval]))",
+          "legendFormat": "{{host_name}}",
+          "queryType": "range",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": ["lastNotNull"]
+        },
+        "tooltip": { "mode": "multi" }
+      },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 35 }
+    },
+    {
+      "id": 14,
+      "type": "row",
+      "title": "Reap & Memory",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 43 }
+    },
+    {
+      "id": 15,
+      "type": "timeseries",
+      "title": "Reap Requested vs Complete",
+      "description": "Reap events via Loki count_over_time on event_name (reap events take the flat normalization path — not in catalyst_event_total; Finding 3). A persistent gap between requested and complete = reap leak.",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "refId": "A",
+          "expr": "sum(count_over_time({service_name=\"catalyst.execution-core\"} | event_name=~\".+reap-requested\" | host_name=~\"$node\" [$__rate_interval]))",
+          "legendFormat": "reap-requested",
+          "queryType": "range",
+          "range": true
+        },
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "refId": "B",
+          "expr": "sum(count_over_time({service_name=\"catalyst.execution-core\"} | event_name=~\".+reap-complete\" | host_name=~\"$node\" [$__rate_interval]))",
+          "legendFormat": "reap-complete",
+          "queryType": "range",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": ["sum"]
+        },
+        "tooltip": { "mode": "multi" }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 44 }
+    },
+    {
+      "id": 16,
+      "type": "table",
+      "title": "Reap Leak by Type",
+      "description": "Top reap-requested event types by volume over the dashboard range. Types with no matching reap-complete are the leak candidates.",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "refId": "A",
+          "expr": "topk(25, sum by (event_name) (count_over_time({service_name=\"catalyst.execution-core\"} | event_name=~\".+reap-requested\" | host_name=~\"$node\" [$__range])))",
+          "queryType": "instant",
+          "instant": true
+        }
+      ],
+      "transformations": [
+        { "id": "labelsToFields", "options": {} },
+        { "id": "merge", "options": {} },
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "event_name": "reap type",
+              "Value": "count",
+              "Value #A": "count"
+            },
+            "excludeByName": { "Time": true }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "align": "auto", "filterable": true },
+          "noValue": "—"
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "sortBy": [{ "displayName": "count", "desc": true }]
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 44 }
+    },
+    {
+      "id": 17,
+      "type": "timeseries",
+      "title": "Memory Pressure (warn / killed)",
+      "description": "worker.memory.warn and worker.memory.killed occurrence rate (Loki count_over_time; per-worker RSS-MB is in body.payload and not Prometheus-retained — Finding 5).",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "refId": "A",
+          "expr": "sum by (event_name) (count_over_time({service_name=\"catalyst.execution-core\"} | event_name=~\"worker\\.memory\\.warn|worker\\.memory\\.killed\" | host_name=~\"$node\" [$__rate_interval]))",
+          "legendFormat": "{{event_name}}",
+          "queryType": "range",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": ["sum"]
+        },
+        "tooltip": { "mode": "multi" }
+      },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 52 }
+    },
+    {
+      "id": 18,
+      "type": "row",
+      "title": "Forensic Report",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 60 }
+    },
+    {
+      "id": 19,
+      "type": "logs",
+      "title": "Fleet Event Log",
+      "description": "Fleet-wide filterable event timeline for incident forensics. Multi-node, unlike the OTL-63 per-worker tail. Use $ev to filter by text substring, $sev for severity (default WARN|ERROR). Expand a row for structured fields.",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "refId": "A",
+          "expr": "{service_name=\"catalyst.execution-core\"} | event_name=~\".+\" | host_name=~\"$node\" |= \"$ev\" | severity_text=~\"$sev\" | line_format `[{{ if .host_name }}{{ .host_name }}{{ else }}—{{ end }}] {{ .event_name }}{{ if .event_label }} ({{ .event_label }}){{ end }}`",
+          "queryType": "range"
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "showLabels": false,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": false,
+        "enableLogDetails": true,
+        "dedupStrategy": "none",
+        "sortOrder": "Descending"
+      },
+      "gridPos": { "h": 16, "w": 24, "x": 0, "y": 61 }
+    }
+  ]
+}

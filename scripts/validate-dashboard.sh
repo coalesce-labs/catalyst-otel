@@ -7,6 +7,7 @@ DASH="dashboards/unified-dashboard.json"
 HOSTS="dashboards/catalyst-fleet-hosts.json"   # OTL-21: Fleet & Hosts split out of $DASH
 CODEX="dashboards/codex-usage.json"            # OTL-53: net-new Codex Usage dashboard
 EVENTS="dashboards/catalyst-worker-event-stream.json"  # OTL-63: Loki-only forensic event tail
+FLEETOPS="dashboards/catalyst-fleet-ops.json"          # OTL-5: fleet-ops / aiops dashboard
 COLLECTOR="collector-config.yaml"
 FAIL=0
 
@@ -381,6 +382,72 @@ jq -e '[.templating.list[]|select(.name=="noisename")|.options[]|.value|select(t
   && pass "noisename does not suppress forward_failed" || fail "noisename suppresses forward_failed (the stack-blind signal)"
 jq -e '[.templating.list[]|select(.name=="node")|select(.allValue==".*")]|length==1' "$EVENTS" >/dev/null 2>&1 \
   && pass "node allValue is .* (retains hostless events)" || fail "node allValue must be .* not .+"
+
+# =============================================================================
+# OTL-5: Fleet Ops dashboard ($FLEETOPS) — structural + content assertions.
+# Mirrors the $EVENTS block. Accumulates into $FAIL.
+# =============================================================================
+
+# --- Phase 1: skeleton ---
+[ -f "$FLEETOPS" ] && jq empty "$FLEETOPS" 2>/dev/null \
+  && pass "fleet-ops dashboard JSON valid" || fail "fleet-ops dashboard missing/invalid ($FLEETOPS)"
+
+DUPF=$(jq '[..|objects|select(has("id") and has("gridPos"))|.id]|(length) as $n|(unique|length) as $u|$n-$u' "$FLEETOPS" 2>/dev/null || echo 1)
+[ "${DUPF:-1}" -eq 0 ] && pass "fleet-ops panel IDs unique" || fail "fleet-ops duplicate panel IDs (${DUPF:-?})"
+
+BADF=$(jq '[..|objects|select(.datasource?.uid)|.datasource.uid]|map(select(.!="prometheus" and .!="loki" and .!="-- Grafana --" and (startswith("$")|not)))|length' "$FLEETOPS" 2>/dev/null || echo 1)
+[ "${BADF:-1}" -eq 0 ] && pass "fleet-ops datasource UIDs known" || fail "fleet-ops unknown datasource UIDs (${BADF:-?})"
+
+[ "$(jq -r '.uid//empty' "$FLEETOPS" 2>/dev/null)" = "catalyst-fleet-ops" ] \
+  && pass "fleet-ops uid ok" || fail "fleet-ops uid must be catalyst-fleet-ops"
+
+for v in node service; do
+  jq -e --arg v "$v" '[.templating.list[]|select(.name==$v)]|length>0' "$FLEETOPS" >/dev/null 2>&1 \
+    && pass "fleet-ops has \$$v var" || fail "fleet-ops missing \$$v template var"
+done
+jq -e '[.templating.list[]|select(.name=="node")|select(.allValue==".*")]|length==1' "$FLEETOPS" >/dev/null 2>&1 \
+  && pass "fleet-ops node allValue==.*" || fail "fleet-ops node allValue must be .*"
+
+# --- Phase 2: Prometheus panels ---
+for t in "Effective vs Target Slots" "Running vs Queued Workers" "Load per Core" \
+         "Eligible Work Waiting" "Dispatch Outcomes" "Phase Complete / Failed" \
+         "Pipeline Completion Cadence"; do
+  jq -e --arg t "$t" '[..|objects|select(.title==$t)]|length>0' "$FLEETOPS" >/dev/null 2>&1 \
+    && pass "fleet-ops panel '$t' present" || fail "fleet-ops missing panel '$t'"
+done
+jq -e '[..|objects|select(.title=="Effective vs Target Slots")|.targets[].expr|select(test("catalyst_scheduler_max_parallel_(effective|target)"))]|length>=2' "$FLEETOPS" >/dev/null 2>&1 \
+  && pass "fleet-ops slots panel uses scheduler gauges" || fail "fleet-ops slots panel missing scheduler gauges"
+
+# --- Phase 3: Loki panels + idiom guards ---
+for t in "Node Liveness (recent heartbeats)" "Worker Transitions" "Held / Needs-Human" \
+         "Reap Requested vs Complete" "Reap Leak by Type" "Memory Pressure (warn / killed)"; do
+  jq -e --arg t "$t" '[..|objects|select(.title==$t)]|length>0' "$FLEETOPS" >/dev/null 2>&1 \
+    && pass "fleet-ops panel '$t' present" || fail "fleet-ops missing panel '$t'"
+done
+jq -e '[..|objects|select(.title=="Reap Requested vs Complete")|.targets[].expr|select(test("event_name=~\".+reap-(requested|complete)\"") and test("count_over_time"))]|length>=2' "$FLEETOPS" >/dev/null 2>&1 \
+  && pass "fleet-ops reap panel uses Loki count_over_time on event_name" || fail "fleet-ops reap panel wrong source"
+jq -e '[..|objects|select(.datasource?.uid=="loki")|.targets[]?.expr|select(test("\\|\\s*json") or test("increase\\("))]|length==0' "$FLEETOPS" >/dev/null 2>&1 \
+  && pass "fleet-ops Loki targets avoid |json and increase()" || fail "fleet-ops Loki targets use |json or increase()"
+
+# --- Phase 4: Forensic log report ---
+jq -e '[.panels[]|.. |objects|select(.title=="Fleet Event Log")|select(.type=="logs")]|length==1' "$FLEETOPS" >/dev/null 2>&1 \
+  && pass "fleet-ops has a logs-type 'Fleet Event Log'" || fail "fleet-ops missing logs-type 'Fleet Event Log'"
+for v in ev sev; do
+  jq -e --arg v "$v" '[.templating.list[]|select(.name==$v)]|length>0' "$FLEETOPS" >/dev/null 2>&1 \
+    && pass "fleet-ops has \$$v var" || fail "fleet-ops missing \$$v template var"
+done
+
+# --- Phase 5: Alert file ---
+FLEETALERTS="provisioning/alerting/fleet-ops-rules.yaml"
+if [ -f "$FLEETALERTS" ] && command -v yq >/dev/null 2>&1; then
+  yq -e '.groups[0].rules|length>=3' "$FLEETALERTS" >/dev/null 2>&1 \
+    && pass "fleet-ops alerts define >=3 rules" || fail "fleet-ops alerts missing rules ($FLEETALERTS)"
+elif [ -f "$FLEETALERTS" ]; then
+  grep -q "catalyst_fleet_" "$FLEETALERTS" \
+    && pass "fleet-ops alerts file present (yq absent — grep fallback)" || fail "fleet-ops alerts file malformed"
+else
+  fail "fleet-ops alerts file missing ($FLEETALERTS)"
+fi
 
 # --- single pass/fail gate (moved here from mid-script so all checks run) ---
 if [ "$FAIL" -ne 0 ]; then
