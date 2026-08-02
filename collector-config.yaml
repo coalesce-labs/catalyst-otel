@@ -388,19 +388,30 @@ exporters:
     endpoint: http://otel-loki:3100/otlp
 
   # ---------------------------------------------------------------------------
-  # Fan-out exporters (CTL-812 / OTL-1). ENABLED 2026-06-07 — env vars live in
-  # /home/rozich/otel-stack/.env (gitignored). To DISABLE a destination,
-  # re-comment its block AND remove it from the pipeline exporters lists
-  # below. The OTel Collector validates EVERY declared
-  # exporter at startup (not only the ones in a pipeline), and the otlphttp
-  # factory rejects an empty endpoint — so leaving otlp_http/dash0 declared
-  # with endpoint: ${env:DASH0_OTLP_ENDPOINT} would crash-loop the collector
-  # with "at least one endpoint must be specified" until DASH0_OTLP_ENDPOINT
-  # is set. To enable fan-out: (1) uncomment the destination block(s) below,
-  # (2) set the matching env vars (see docker-compose.yml otel-collector
-  # environment passthrough), and (3) uncomment the "enable fan-out" line under
-  # service.pipelines.logs.exporters. As-is, the collector boots with ZERO env
-  # vars set.
+  # Fan-out exporters (CTL-812 / OTL-1). Honeycomb ENABLED 2026-06-07 — env vars
+  # live in /home/rozich/otel-stack/.env (gitignored).
+  #
+  # Dash0 REMOVED FROM THE PUBLIC PIPELINES 2026-08-01 (OTL-64): the
+  # metrics/logs/traces pipelines below shipped fully unsampled logs+metrics
+  # that duplicated Loki/Prometheus with no alerting/tracing/automation
+  # workflow actually built on Dash0 — pure cost ($41.17/30d) for zero payoff.
+  #
+  # The otlp_http/dash0 EXPORTER BLOCK ITSELF STAYS DECLARED (uncommented) —
+  # do NOT re-comment it. The private overlay (otel-stack-private,
+  # docker-compose.override.yml + collector-config-private.yaml) merges a
+  # SECOND config at boot whose logs/cloudflare, traces/cloudflare_vendors,
+  # and metrics/cloudflare pipelines reference this SAME exporter id (map keys
+  # merge across the two --config files — see docker-compose.override.yml's
+  # merge-semantics comment). Fully commenting it out here crash-loops the
+  # collector with "references exporter \"otlp_http/dash0\" which is not
+  # configured" (hit live during the OTL-64 deploy, rolled back same-day).
+  # DASH0_OTLP_ENDPOINT/DASH0_AUTH_TOKEN must stay set in production for that
+  # reason too. If the Cloudflare→Dash0 leg is ever also cut, that is a
+  # private-repo change, not this file.
+  #
+  # To ADD Dash0 back to a public pipeline: append `otlp_http/dash0` to that
+  # pipeline's exporters list below (the block is already declared, no need to
+  # uncomment anything).
   #
   # PAYLOAD-PARITY INVARIANT (OTL-1 — the architectural rule of this file):
   # this collector runs processing/transforms (resource, transform/logs)
@@ -424,17 +435,21 @@ exporters:
       x-honeycomb-team: ${env:HONEYCOMB_API_KEY}
       x-honeycomb-dataset: ${env:HONEYCOMB_DATASET}
 
-  # Dash0 (logs). Endpoint and bearer token both come from env.
+  # Dash0. Endpoint and bearer token both come from env. STAYS DECLARED even
+  # though no PUBLIC pipeline below uses it anymore (OTL-64) — the private
+  # overlay's Cloudflare pipelines still reference this exporter id. See the
+  # fan-out header comment above before touching this block.
   otlp_http/dash0:
     endpoint: ${env:DASH0_OTLP_ENDPOINT}
     headers:
       Authorization: Bearer ${env:DASH0_AUTH_TOKEN}
 
   # OTL-25: Tempo (traces). STATIC endpoint — never env-driven. A declared
-  # exporter with an empty endpoint crash-loops the collector at boot (the
-  # reason the env-gated otlp_http/dash0 leg stays commented out of its pipeline
-  # when DASH0_* is unset). Tempo is in-cluster so plaintext gRPC with
-  # tls.insecure is correct; we reach it at the container name on otel-network.
+  # exporter with an empty endpoint crash-loops the collector at boot — the
+  # reason otlp_http/dash0 above stays declared with its env vars set in
+  # production (see the fan-out header comment) rather than being commented
+  # out. Tempo is in-cluster so plaintext gRPC with tls.insecure is correct;
+  # we reach it at the container name on otel-network.
   otlp/tempo:
     endpoint: otel-tempo:4317
     tls:
@@ -1178,20 +1193,28 @@ service:
   # exporter id to the pipeline below (and uncomment the env-gated exporter
   # block above + set its env vars). Defaults:
   #
-  #   signal   | destination(s)                      | change via
-  #   ---------|-------------------------------------|-------------------------
-  #   metrics  | prometheus (+ honeycomb, dash0)     | metrics.exporters list
-  #   logs     | otlp_http=Loki (+ honeycomb, dash0) | logs.exporters list
-  #   traces   | otlp/tempo (+ honeycomb, dash0)     | traces.exporters list
+  #   signal   | destination(s)          | change via
+  #   ---------|-------------------------|-------------------------
+  #   metrics  | prometheus (+ honeycomb) | metrics.exporters list
+  #   logs     | otlp_http=Loki (+ honeycomb) | logs.exporters list
+  #   traces   | otlp/tempo (+ honeycomb) | traces.exporters list
   #
-  # TRACES FAN OUT TO TEMPO + HONEYCOMB + DASH0 — enabled deliberately, and ONLY
-  # because this pipeline is POST-tail_sampling (keep errors + slow>1s + 20% of
-  # the rest, already wired below), so the per-span vendor bill is trimmed to the
-  # sampled stream rather than the full firehose. RULES that still hold:
+  # Dash0 REMOVED from all three PUBLIC pipelines 2026-08-01 (OTL-64) — it
+  # duplicated Loki/Prometheus/Tempo (paid for the same data twice) with no
+  # alerting, tracing workflow, or automation actually built on Dash0 to
+  # justify the $41.17/30d. The otlp_http/dash0 block above stays DECLARED
+  # (the private overlay's Cloudflare pipelines still use it) — re-enabling
+  # here is just appending `otlp_http/dash0` back to a pipeline's exporters.
+  #
+  # TRACES FAN OUT TO TEMPO + HONEYCOMB — and ONLY because this pipeline is
+  # POST-tail_sampling (keep errors + slow>1s + 20% of the rest, already wired
+  # below), so the per-span vendor bill is trimmed to the sampled stream rather
+  # than the full firehose. RULES that still hold:
   #   * Do NOT add a vendor trace leg to any pipeline that lacks tail_sampling
   #     ahead of it (e.g. never at 100% on a high-volume unsampled pipeline).
   #   * Never point a vendor leg at an empty/env-driven endpoint (crash-loops the
-  #     collector at boot) — DASH0_*/HONEYCOMB_* must be set in .env first.
+  #     collector at boot) — HONEYCOMB_* must be set in .env first (or DASH0_*
+  #     if re-enabling Dash0).
   #   * Loki still cannot ingest traces — never add otlp_http to traces.exporters.
   # ---------------------------------------------------------------------------
   pipelines:
@@ -1202,36 +1225,32 @@ service:
       # resource/strip_connector_iid drops the connector's per-run instance id.
       receivers: [otlp, count, signal_to_metrics]
       processors: [deltatocumulative, transform/connector_metric_fixup, resource, resource/strip_connector_iid]
-      # To fan metrics out to Honeycomb/Dash0 as well, append the SAME exporter
-      # ids here once their blocks are uncommented, e.g.:
+      # To fan metrics out to another vendor as well, append the SAME exporter
+      # id here, e.g.:
       #
       #   exporters: [prometheus, otlp_http/honeycomb, otlp_http/dash0]
       #
-      # (One exporter definition can serve both pipelines.)
+      # (One exporter definition can serve both pipelines.) Dash0 REMOVED
+      # 2026-08-01 (OTL-64) — see the forwarding table above.
       # OTL-54: `debug` REMOVED. It serialized every metric record to stdout,
       # and with Docker's json-file driver unrotated that produced a 314 GiB
       # container log (~12.7 GB/day). It is a troubleshooting tool, not a
       # production exporter — re-add it TEMPORARILY when debugging, then take it
       # back out. The exporter block itself stays DEFINED (the private
       # Cloudflare pipelines still reference it).
-      exporters: [prometheus, otlp_http/honeycomb, otlp_http/dash0]
+      exporters: [prometheus, otlp_http/honeycomb]
 
     logs:
       receivers: [otlp]
       # OTL-20: transform/metrics_normalize runs AFTER transform/logs so the
       # logs->metrics connectors (exporters below) see underscore-form keys.
       processors: [resource, transform/logs, transform/metrics_normalize, transform/scheduler_health_promote, transform/updater_promote]
-      # otlp_http = Loki (OTL-8 rename). To turn on the CTL-812 fan-out:
-      # (1) uncomment the matching exporter block above, (2) set the env vars in
-      # docker-compose.yml, and (3) replace the line below with the "enable
-      # fan-out" line. Keep otlp_http; add the new ones (do NOT re-add `debug` —
-      # OTL-54):
-      #
-      #   exporters: [otlp_http, otlp_http/honeycomb, otlp_http/dash0]
-      #
-      # (Enable only the destinations you have keys for — e.g. omit
-      # otlp_http/dash0 if DASH0_* is unset, and leave its exporter block
-      # commented so the empty endpoint can't fail validation.)
+      # otlp_http = Loki (OTL-8 rename). To turn on a vendor fan-out:
+      # (1) uncomment the matching exporter block above if not already, (2) set
+      # the env vars in docker-compose.yml, and (3) add its exporter id to the
+      # list below. Keep otlp_http; add the new ones (do NOT re-add `debug` —
+      # OTL-54). Dash0 REMOVED 2026-08-01 (OTL-64) — see the forwarding table
+      # above; its exporter block stays declared for the private overlay.
       #
       # OTL-20: count + signal_to_metrics are connector-exporters here — they
       # derive Prometheus metrics from these (post-transform) log records and
@@ -1241,12 +1260,13 @@ service:
       # OTL-54: `debug` REMOVED (see the metrics pipeline above). This was the
       # single largest contributor to the 314 GiB log — every catalyst log
       # record was serialized to stdout on top of being shipped to Loki.
-      exporters: [otlp_http, otlp_http/honeycomb, otlp_http/dash0, count, signal_to_metrics]
+      exporters: [otlp_http, otlp_http/honeycomb, count, signal_to_metrics]
 
     traces:
-      # OTL-25: spans -> Tempo + Honeycomb + Dash0 (see the forwarding table
-      # above). NO transform/logs here — that is a logs-only Loki-shaping step,
-      # wrong for traces. `resource` stamps environment=production; `tail_sampling`
+      # OTL-25: spans -> Tempo + Honeycomb (Dash0 removed 2026-08-01, OTL-64 —
+      # see the forwarding table above). NO transform/logs here — that is a
+      # logs-only Loki-shaping step, wrong for traces. `resource` stamps
+      # environment=production; `tail_sampling`
       # keeps slow ticks (>1s) + errors and samples the rest, and the vendor legs
       # sit AFTER it so they only bill for the sampled stream. One pipeline per
       # signal (OTL-1). Runs healthy-but-empty until the daemons emit spans.
@@ -1259,4 +1279,4 @@ service:
       # here is dominated by codex-app-server emitting Rust h2 HTTP/2 library
       # internals (one span per frame op) — serializing that to stdout as well
       # was pure waste.
-      exporters: [otlp/tempo, otlp_http/honeycomb, otlp_http/dash0]
+      exporters: [otlp/tempo, otlp_http/honeycomb]
