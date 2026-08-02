@@ -389,21 +389,29 @@ exporters:
 
   # ---------------------------------------------------------------------------
   # Fan-out exporters (CTL-812 / OTL-1). Honeycomb ENABLED 2026-06-07 — env vars
-  # live in /home/rozich/otel-stack/.env (gitignored). Dash0 DISABLED 2026-08-01
-  # (OTL-64): logs+metrics shipped fully unsampled and duplicated Loki/Prometheus
-  # with no alerting/tracing/automation workflow actually built on it — pure
-  # cost ($41.17/30d) for zero payoff. To DISABLE a destination, re-comment its
-  # block AND remove it from the pipeline exporters lists below. The OTel
-  # Collector validates EVERY declared exporter at startup (not only the ones in
-  # a pipeline), and the otlphttp factory rejects an empty endpoint — so leaving
-  # otlp_http/dash0 declared with endpoint: ${env:DASH0_OTLP_ENDPOINT} would
-  # crash-loop the collector with "at least one endpoint must be specified" once
-  # DASH0_OTLP_ENDPOINT is unset — hence its block is commented out below rather
-  # than left declared-but-unused. To enable fan-out: (1) uncomment the
-  # destination block(s) below, (2) set the matching env vars (see
-  # docker-compose.yml otel-collector environment passthrough), and (3) add the
-  # exporter id back to the relevant pipeline(s)' exporters list. As-is, the
-  # collector boots with ZERO Dash0 env vars required.
+  # live in /home/rozich/otel-stack/.env (gitignored).
+  #
+  # Dash0 REMOVED FROM THE PUBLIC PIPELINES 2026-08-01 (OTL-64): the
+  # metrics/logs/traces pipelines below shipped fully unsampled logs+metrics
+  # that duplicated Loki/Prometheus with no alerting/tracing/automation
+  # workflow actually built on Dash0 — pure cost ($41.17/30d) for zero payoff.
+  #
+  # The otlp_http/dash0 EXPORTER BLOCK ITSELF STAYS DECLARED (uncommented) —
+  # do NOT re-comment it. The private overlay (otel-stack-private,
+  # docker-compose.override.yml + collector-config-private.yaml) merges a
+  # SECOND config at boot whose logs/cloudflare, traces/cloudflare_vendors,
+  # and metrics/cloudflare pipelines reference this SAME exporter id (map keys
+  # merge across the two --config files — see docker-compose.override.yml's
+  # merge-semantics comment). Fully commenting it out here crash-loops the
+  # collector with "references exporter \"otlp_http/dash0\" which is not
+  # configured" (hit live during the OTL-64 deploy, rolled back same-day).
+  # DASH0_OTLP_ENDPOINT/DASH0_AUTH_TOKEN must stay set in production for that
+  # reason too. If the Cloudflare→Dash0 leg is ever also cut, that is a
+  # private-repo change, not this file.
+  #
+  # To ADD Dash0 back to a public pipeline: append `otlp_http/dash0` to that
+  # pipeline's exporters list below (the block is already declared, no need to
+  # uncomment anything).
   #
   # PAYLOAD-PARITY INVARIANT (OTL-1 — the architectural rule of this file):
   # this collector runs processing/transforms (resource, transform/logs)
@@ -427,22 +435,21 @@ exporters:
       x-honeycomb-team: ${env:HONEYCOMB_API_KEY}
       x-honeycomb-dataset: ${env:HONEYCOMB_DATASET}
 
-  # Dash0 (logs). Endpoint and bearer token both come from env.
-  # DISABLED 2026-08-01 (OTL-64) — commented out, not just dropped from the
-  # pipeline exporters lists, so an empty/unset DASH0_OTLP_ENDPOINT can never
-  # crash-loop the collector. Re-enable by uncommenting this block AND adding
-  # otlp_http/dash0 back to the desired pipeline(s)' exporters list.
-  # otlp_http/dash0:
-  #   endpoint: ${env:DASH0_OTLP_ENDPOINT}
-  #   headers:
-  #     Authorization: Bearer ${env:DASH0_AUTH_TOKEN}
+  # Dash0. Endpoint and bearer token both come from env. STAYS DECLARED even
+  # though no PUBLIC pipeline below uses it anymore (OTL-64) — the private
+  # overlay's Cloudflare pipelines still reference this exporter id. See the
+  # fan-out header comment above before touching this block.
+  otlp_http/dash0:
+    endpoint: ${env:DASH0_OTLP_ENDPOINT}
+    headers:
+      Authorization: Bearer ${env:DASH0_AUTH_TOKEN}
 
   # OTL-25: Tempo (traces). STATIC endpoint — never env-driven. A declared
-  # exporter with an empty endpoint crash-loops the collector at boot (the
-  # reason the env-gated otlp_http/dash0 block above stays fully commented out
-  # rather than declared-but-unreferenced). Tempo is in-cluster so plaintext
-  # gRPC with tls.insecure is correct; we reach it at the container name on
-  # otel-network.
+  # exporter with an empty endpoint crash-loops the collector at boot — the
+  # reason otlp_http/dash0 above stays declared with its env vars set in
+  # production (see the fan-out header comment) rather than being commented
+  # out. Tempo is in-cluster so plaintext gRPC with tls.insecure is correct;
+  # we reach it at the container name on otel-network.
   otlp/tempo:
     endpoint: otel-tempo:4317
     tls:
@@ -1192,10 +1199,12 @@ service:
   #   logs     | otlp_http=Loki (+ honeycomb) | logs.exporters list
   #   traces   | otlp/tempo (+ honeycomb) | traces.exporters list
   #
-  # Dash0 REMOVED from all three pipelines 2026-08-01 (OTL-64) — it duplicated
-  # Loki/Prometheus/Tempo (paid for the same data twice) with no alerting,
-  # tracing workflow, or automation actually built on Dash0 to justify the
-  # $41.17/30d. See the commented-out otlp_http/dash0 block above to re-enable.
+  # Dash0 REMOVED from all three PUBLIC pipelines 2026-08-01 (OTL-64) — it
+  # duplicated Loki/Prometheus/Tempo (paid for the same data twice) with no
+  # alerting, tracing workflow, or automation actually built on Dash0 to
+  # justify the $41.17/30d. The otlp_http/dash0 block above stays DECLARED
+  # (the private overlay's Cloudflare pipelines still use it) — re-enabling
+  # here is just appending `otlp_http/dash0` back to a pipeline's exporters.
   #
   # TRACES FAN OUT TO TEMPO + HONEYCOMB — and ONLY because this pipeline is
   # POST-tail_sampling (keep errors + slow>1s + 20% of the rest, already wired
@@ -1217,7 +1226,7 @@ service:
       receivers: [otlp, count, signal_to_metrics]
       processors: [deltatocumulative, transform/connector_metric_fixup, resource, resource/strip_connector_iid]
       # To fan metrics out to another vendor as well, append the SAME exporter
-      # id here once its block is uncommented, e.g.:
+      # id here, e.g.:
       #
       #   exporters: [prometheus, otlp_http/honeycomb, otlp_http/dash0]
       #
@@ -1237,12 +1246,11 @@ service:
       # logs->metrics connectors (exporters below) see underscore-form keys.
       processors: [resource, transform/logs, transform/metrics_normalize, transform/scheduler_health_promote, transform/updater_promote]
       # otlp_http = Loki (OTL-8 rename). To turn on a vendor fan-out:
-      # (1) uncomment the matching exporter block above, (2) set the env vars in
-      # docker-compose.yml, and (3) add its exporter id to the list below. Keep
-      # otlp_http; add the new ones (do NOT re-add `debug` — OTL-54). Dash0
-      # REMOVED 2026-08-01 (OTL-64) — see the forwarding table above; its
-      # exporter block stays commented so an unset DASH0_OTLP_ENDPOINT can't
-      # crash-loop the collector.
+      # (1) uncomment the matching exporter block above if not already, (2) set
+      # the env vars in docker-compose.yml, and (3) add its exporter id to the
+      # list below. Keep otlp_http; add the new ones (do NOT re-add `debug` —
+      # OTL-54). Dash0 REMOVED 2026-08-01 (OTL-64) — see the forwarding table
+      # above; its exporter block stays declared for the private overlay.
       #
       # OTL-20: count + signal_to_metrics are connector-exporters here — they
       # derive Prometheus metrics from these (post-transform) log records and
