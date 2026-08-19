@@ -43,6 +43,7 @@ groups:
             wedged. Check the Queue/Capacity panels on the Fleet Ops dashboard.
             Threshold: floor = 1 (hardcoded; edit rule if fleet min changes).
           __dashboardUid__: catalyst-fleet-ops
+          __panelId__: '1'
         data:
           - refId: A
             relativeTimeRange: { from: 600, to: 0 }
@@ -96,6 +97,7 @@ groups:
             dashboard for which reap types are leaking.
             Threshold: >10 (conservative starting point; tune in-file).
           __dashboardUid__: catalyst-fleet-ops
+          __panelId__: '15'
         data:
           - refId: A
             relativeTimeRange: { from: 900, to: 0 }
@@ -167,6 +169,7 @@ groups:
             extended period. Check the Fleet Event Log or the scheduler-health
             dashboard for the ticket(s) involved.
           __dashboardUid__: catalyst-fleet-ops
+          __panelId__: '13'
         data:
           - refId: A
             relativeTimeRange: { from: 1800, to: 0 }
