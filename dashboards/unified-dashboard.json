@@ -15,7 +15,7 @@
       }
     ]
   },
-  "description": "Unified Claude Code observability — cost, tokens, tools, projects, tickets, and Catalyst orchestration",
+  "description": "Unified Claude Code observability — cost, tokens, tools, repos, tickets, and Catalyst orchestration",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
@@ -1557,7 +1557,7 @@
         },
         {
           "id": 37,
-          "title": "Token Burn by Project (Top 10)",
+          "title": "Token Burn by Repo (Top 10)",
           "type": "timeseries",
           "gridPos": {
             "h": 7,
@@ -1690,7 +1690,7 @@
               "sort": "desc"
             }
           },
-          "description": "Top 10 projects by token burn per time bucket (width = Grafana $__rate_interval). Excludes sessions with no project attached."
+          "description": "Top 10 repos by token burn per time bucket (width = Grafana $__rate_interval). Excludes sessions with no repo attached."
         },
         {
           "id": 18,
@@ -1841,6 +1841,7 @@
               "expr": "sort_desc(topk(10, sum by (linear_key) (count_over_time({service_name=~\"claude-code.*\"} |= \"claude_code.tool_result\" | linear_key=~\".+\" | project=~\"$project\" | branch=~\"$branch\" | hostname=~\"$hostname\" [$__range]))))",
               "legendFormat": "{{linear_key}}",
               "instant": true,
+              "format": "table",
               "refId": "A"
             }
           ],
@@ -1861,8 +1862,19 @@
             },
             "overrides": []
           },
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true
+                }
+              }
+            }
+          ],
           "options": {
             "orientation": "horizontal",
+            "xField": "linear_key",
             "showValue": "always",
             "barWidth": 0.8,
             "stacking": "none",
@@ -1937,7 +1949,7 @@
         },
         {
           "id": 21,
-          "title": "Cost by Project (Top 10)",
+          "title": "Cost by Repo (Top 10)",
           "type": "barchart",
           "gridPos": {
             "h": 8,
@@ -2002,7 +2014,7 @@
         },
         {
           "id": 22,
-          "title": "Tokens by Project (Top 10)",
+          "title": "Tokens by Repo (Top 10)",
           "type": "barchart",
           "gridPos": {
             "h": 8,
@@ -2067,7 +2079,7 @@
         },
         {
           "id": 23,
-          "title": "Tool Calls by Project (Top 10)",
+          "title": "Tool Calls by Repo (Top 10)",
           "type": "barchart",
           "gridPos": {
             "h": 8,
@@ -2084,6 +2096,7 @@
               "expr": "sort_desc(topk(10, sum by (project) (count_over_time({service_name=~\"claude-code.*\"} |= \"claude_code.tool_result\" | project=~\"$project\" | branch=~\"$branch\" | hostname=~\"$hostname\" [$__range]))))",
               "legendFormat": "{{project}}",
               "instant": true,
+              "format": "table",
               "refId": "A"
             }
           ],
@@ -2104,8 +2117,19 @@
             },
             "overrides": []
           },
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true
+                }
+              }
+            }
+          ],
           "options": {
             "orientation": "horizontal",
+            "xField": "project",
             "showValue": "always",
             "barWidth": 0.8,
             "stacking": "none",
@@ -2120,8 +2144,8 @@
         },
         {
           "id": 35,
-          "title": "Unique Projects",
-          "description": "Total distinct project values in the selected time range. Bars above show top 10.",
+          "title": "Unique Repos",
+          "description": "Total distinct repo values in the selected time range. Bars above show top 10.",
           "type": "stat",
           "gridPos": {
             "h": 8,
@@ -2337,6 +2361,7 @@
               "expr": "sum by (catalyst_role) (increase(claude_code_cost_usage_USD_total{job=\"otel-collector\",catalyst_role=~\".+\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range]))",
               "legendFormat": "{{catalyst_role}}",
               "instant": true,
+              "format": "table",
               "refId": "A"
             }
           ],
@@ -2357,8 +2382,19 @@
             },
             "overrides": []
           },
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true
+                }
+              }
+            }
+          ],
           "options": {
             "orientation": "horizontal",
+            "xField": "catalyst_role",
             "showValue": "always",
             "barWidth": 0.8,
             "stacking": "none",
@@ -2390,6 +2426,7 @@
               "expr": "sort_desc(sum by (task_type) (increase(claude_code_cost_usage_USD_total{job=\"otel-collector\",task_type=~\".+\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range])))",
               "legendFormat": "{{task_type}}",
               "instant": true,
+              "format": "table",
               "refId": "A"
             }
           ],
@@ -2410,8 +2447,19 @@
             },
             "overrides": []
           },
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true
+                }
+              }
+            }
+          ],
           "options": {
             "orientation": "horizontal",
+            "xField": "task_type",
             "showValue": "always",
             "barWidth": 0.8,
             "stacking": "none",
@@ -2443,6 +2491,7 @@
               "expr": "sort_desc(sum by (task_type) (increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",task_type=~\".+\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range])))",
               "legendFormat": "{{task_type}}",
               "instant": true,
+              "format": "table",
               "refId": "A"
             }
           ],
@@ -2463,8 +2512,19 @@
             },
             "overrides": []
           },
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true
+                }
+              }
+            }
+          ],
           "options": {
             "orientation": "horizontal",
+            "xField": "task_type",
             "showValue": "always",
             "barWidth": 0.8,
             "stacking": "none",
@@ -2496,6 +2556,7 @@
               "expr": "sort_desc(sum by (catalyst_dispatch_mode) (increase(claude_code_cost_usage_USD_total{job=\"otel-collector\",catalyst_dispatch_mode=~\".+\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range])))",
               "legendFormat": "{{catalyst_dispatch_mode}}",
               "instant": true,
+              "format": "table",
               "refId": "A"
             }
           ],
@@ -2516,8 +2577,19 @@
             },
             "overrides": []
           },
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true
+                }
+              }
+            }
+          ],
           "options": {
             "orientation": "horizontal",
+            "xField": "catalyst_dispatch_mode",
             "showValue": "always",
             "barWidth": 0.8,
             "stacking": "none",
@@ -2917,7 +2989,8 @@
               "instant": true,
               "range": false,
               "refId": "A",
-              "legendFormat": "{{tool_name}}"
+              "legendFormat": "{{tool_name}}",
+              "format": "table"
             }
           ],
           "fieldConfig": {
@@ -3043,8 +3116,19 @@
               }
             ]
           },
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true
+                }
+              }
+            }
+          ],
           "options": {
             "orientation": "horizontal",
+            "xField": "tool_name",
             "barRadius": 0.1,
             "barWidth": 0.8,
             "fullHighlight": false,
@@ -4434,6 +4518,7 @@
               "expr": "sort_desc(topk(10, sum by (task_type) (count_over_time({service_name=~\"claude-code.*\"} |= \"claude_code.tool_result\" | task_type=~\".+\" | project=~\"$project\" | branch=~\"$branch\" | hostname=~\"$hostname\" [$__range]))))",
               "legendFormat": "{{task_type}}",
               "instant": true,
+              "format": "table",
               "refId": "A"
             }
           ],
@@ -4454,8 +4539,19 @@
             },
             "overrides": []
           },
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true
+                }
+              }
+            }
+          ],
           "options": {
             "orientation": "horizontal",
+            "xField": "task_type",
             "showValue": "always",
             "barWidth": 0.8,
             "stacking": "none",
@@ -4606,6 +4702,7 @@
         },
         "definition": "label_values(claude_code_cost_usage_USD_total, project)",
         "includeAll": true,
+        "label": "Repo",
         "multi": true,
         "name": "project",
         "query": {
