@@ -203,8 +203,10 @@ groups:
       #   catalyst#3721 in the catalyst repo); this rule makes a re-break visible
       #   in the stack instead of waiting for a human to spot a "No Data" panel.
       #   Presence-over-absence: healthy/idle => numerator empty => empty vector
-      #   => noData => OK. Volume floor (>=5 series) avoids paging on a lone
-      #   interactive session. LogQL not needed — native connector counter.
+      #   => noData => OK. Volume floor (>=5 distinct session_id) avoids paging
+      #   on a lone interactive session — counting sessions, not the metric's
+      #   high-cardinality series (type x model), so one 2-model session cannot
+      #   clear the floor on its own. LogQL not needed — native connector counter.
       - uid: claude_code_attribution_missing
         title: Claude Code telemetry attribution missing (majority of series lack linear_key)
         condition: C
@@ -219,7 +221,8 @@ groups:
           summary: '>50% of live claude_code_* series carry no linear_key for 15m — per-ticket attribution lost'
           description: >
             The unattributed fraction of live claude_code_token_usage_tokens_total
-            series is above 50% for 15m (volume floor >=5 series). This is the
+            series is above 50% for 15m (volume floor >=5 distinct session_id).
+            This is the
             OTL-67 failure mode: SDK-dispatched workers emitting claude_code_*
             metrics with only host_name/session_id/type and no linear_key/project/
             branch (settings.json OTEL_RESOURCE_ATTRIBUTES pin winning over the
@@ -245,7 +248,7 @@ groups:
                   scalar(count(claude_code_token_usage_tokens_total))
                 )
                 and on()
-                (count(claude_code_token_usage_tokens_total) >= 5)
+                (count(count by (session_id) (claude_code_token_usage_tokens_total)) >= 5)
           - refId: B
             relativeTimeRange: { from: 300, to: 0 }
             datasourceUid: __expr__
