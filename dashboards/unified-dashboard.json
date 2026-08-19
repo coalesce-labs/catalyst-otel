@@ -2195,7 +2195,7 @@
           "targets": [
             {
               "expr": "topk(10, sum by (session_id, project, branch, linear_key) (rate(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__interval])))",
-              "legendFormat": "{{project}}/{{branch}} ({{linear_key}})",
+              "legendFormat": "{{session_id}}",
               "refId": "A",
               "interval": "$bucket"
             }
@@ -2270,7 +2270,7 @@
           "targets": [
             {
               "expr": "topk(10, sum by (session_id, project, branch, linear_key) (increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range])))",
-              "legendFormat": "{{project}}/{{branch}} ({{linear_key}})",
+              "legendFormat": "{{session_id}}",
               "instant": true,
               "refId": "A",
               "format": "table"
