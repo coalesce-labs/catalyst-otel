@@ -449,6 +449,49 @@ else
   fail "fleet-ops alerts file missing ($FLEETALERTS)"
 fi
 
+# --- Phase 5b: OTL-67 attribution-health guard (presence-over-absence) ---
+TIERB="provisioning/alerting/tier-b-alerts.yaml"
+if [ -f "$TIERB" ] && command -v yq >/dev/null 2>&1; then
+  yq -e '.groups[].rules[] | select(.uid=="claude_code_attribution_missing")' "$TIERB" >/dev/null 2>&1 \
+    && pass "attribution-health rule present" \
+    || fail "attribution-health rule missing ($TIERB)"
+  # presence-over-absence invariants: must NOT fire on quiet/idle fleet
+  yq -e '.groups[].rules[] | select(.uid=="claude_code_attribution_missing")
+         | select(.noDataState=="OK" and .execErrState=="OK" and .condition=="C")' \
+        "$TIERB" >/dev/null 2>&1 \
+    && pass "attribution-health rule is noData/execErr OK, condition C" \
+    || fail "attribution-health rule must be noData/execErr OK with condition C"
+  # threshold must be a 'gt' (fire on presence of a HIGH unattributed ratio)
+  yq -e '.groups[].rules[] | select(.uid=="claude_code_attribution_missing")
+         | .data[] | select(.refId=="C") | .model.conditions[0].evaluator.type == "gt"' \
+        "$TIERB" >/dev/null 2>&1 \
+    && pass "attribution-health threshold is gt" \
+    || fail "attribution-health threshold must be gt"
+elif [ -f "$TIERB" ]; then
+  grep -q 'claude_code_attribution_missing' "$TIERB" \
+    && pass "attribution-health rule present (yq absent — grep fallback)" \
+    || fail "attribution-health rule missing (grep fallback)"
+else
+  fail "tier-b alerts file missing ($TIERB)"
+fi
+
+# --- OTL-67: attribution-health panel exists in unified dashboard ---
+HAS_ATTRIB_PANEL=$(jq '[.. | objects | select(.title? == "Attribution Health")] | length' "$DASH")
+[ "${HAS_ATTRIB_PANEL:-0}" -ge 1 ] \
+  && pass "attribution-health panel present" \
+  || fail "attribution-health panel missing in $DASH"
+jq -e '[.. | objects | select(.targets?) | .targets[]?.expr | select(test("linear_key=\"\""))] | length > 0' "$DASH" >/dev/null 2>&1 \
+  && pass "attribution-health panel queries linear_key=\"\"" \
+  || fail "attribution-health panel query missing linear_key filter"
+
+# --- OTL-67: runbook + data-dictionary cross-link ---
+[ -f docs/runbook-otl-67-attribution.md ] \
+  && pass "OTL-67 attribution runbook present" \
+  || fail "docs/runbook-otl-67-attribution.md missing"
+grep -q 'runbook-otl-67-attribution' docs/data-dictionary.md \
+  && pass "data-dictionary links the OTL-67 runbook" \
+  || fail "data-dictionary missing OTL-67 runbook link"
+
 # --- single pass/fail gate (moved here from mid-script so all checks run) ---
 if [ "$FAIL" -ne 0 ]; then
   echo ""

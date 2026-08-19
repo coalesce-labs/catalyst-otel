@@ -15,7 +15,7 @@
       }
     ]
   },
-  "description": "Unified Claude Code observability \u2014 cost, tokens, tools, projects, tickets, and Catalyst orchestration",
+  "description": "Unified Claude Code observability — cost, tokens, tools, projects, tickets, and Catalyst orchestration",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
@@ -25,7 +25,7 @@
   "panels": [
     {
       "type": "row",
-      "title": "\u2460 Spend & Tokens",
+      "title": "① Spend & Tokens",
       "collapsed": false,
       "gridPos": {
         "h": 1,
@@ -746,7 +746,7 @@
     },
     {
       "type": "row",
-      "title": "\u21b3 Cumulative (running totals)",
+      "title": "↳ Cumulative (running totals)",
       "collapsed": true,
       "gridPos": {
         "h": 1,
@@ -1035,7 +1035,7 @@
     },
     {
       "type": "row",
-      "title": "\u2461 Attribution",
+      "title": "② Attribution",
       "collapsed": true,
       "gridPos": {
         "h": 1,
@@ -2529,12 +2529,78 @@
               "mode": "single"
             }
           }
+        },
+        {
+          "id": 208,
+          "title": "Attribution Health",
+          "type": "timeseries",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 24,
+            "x": 0,
+            "y": 104
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "editorMode": "code",
+              "expr": "count(claude_code_token_usage_tokens_total{linear_key=\"\"})\n/ scalar(count(claude_code_token_usage_tokens_total))",
+              "legendFormat": "unattributed fraction",
+              "instant": false,
+              "range": true
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "min": 0,
+              "max": 1,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "red",
+                    "value": 0.5
+                  }
+                ]
+              },
+              "custom": {
+                "thresholdsStyle": {
+                  "mode": "area"
+                }
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "tooltip": {
+              "mode": "single",
+              "sort": "none"
+            },
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            }
+          },
+          "description": "OTL-67: Fraction of live claude_code_* series with no linear_key. Above 0.5 for 15m triggers the claude_code_attribution_missing alert. Healthy: 0 (all series attributed). See docs/runbook-otl-67-attribution.md."
         }
       ]
     },
     {
       "type": "row",
-      "title": "\u2462 Observability",
+      "title": "③ Observability",
       "collapsed": true,
       "gridPos": {
         "h": 1,
@@ -3155,7 +3221,7 @@
     },
     {
       "type": "row",
-      "title": "\u2463 Code & Velocity",
+      "title": "④ Code & Velocity",
       "collapsed": true,
       "gridPos": {
         "h": 1,
@@ -3436,7 +3502,7 @@
     },
     {
       "type": "row",
-      "title": "\u2465 Limits & Quotas",
+      "title": "⑥ Limits & Quotas",
       "collapsed": true,
       "gridPos": {
         "h": 1,
@@ -3774,7 +3840,7 @@
         },
         {
           "id": 52,
-          "title": "Account Rate Limits \u2014 $account",
+          "title": "Account Rate Limits — $account",
           "type": "timeseries",
           "gridPos": {
             "h": 8,
@@ -4147,7 +4213,7 @@
     },
     {
       "type": "row",
-      "title": "\u2466 Logs & Debug",
+      "title": "⑦ Logs & Debug",
       "collapsed": true,
       "gridPos": {
         "h": 1,
@@ -4414,7 +4480,7 @@
           },
           "options": {
             "mode": "markdown",
-            "content": "### Hierarchical Execution (Coming Soon)\n\nExecution-graph, Gantt, and treemap views are **blocked** pending CTL emission of:\n`subagent_id`, `workflow_stage`, `parentSpanId`, `query_source`\n(none currently emitted \u2014 see [research 2026-06-04-OTL-3](thoughts/shared/research/2026-06-04-OTL-3-catalyst-execution-telemetry-dashboard.md)).\n\n**Intended queries once attributes are emitted:**\n\n```promql\n# Treemap cost by (linear_key \u2192 task_type \u2192 subagent_id)\nsum by (linear_key, task_type, subagent_id) (increase(claude_code_cost_usage_USD_total{subagent_id=~\".+\"}[$__range]))\n```\n\n```logql\n# Subagent-vs-main split via query_source\nsum by (query_source) (count_over_time({service_name=~\"claude-code.*\"} | query_source=~\".+\" [$__range]))\n\n# Gantt approximation by workflow_stage (min/max timestamps per stage)\ncount_over_time({service_name=~\"claude-code.*\"} | workflow_stage=~\".+\" [$__range])\n```\n\n_Blocked attributes not emitted: `subagent_id`, `workflow_stage`, `parentSpanId`, `query_source` \u2014 open a CTL emission ticket to unblock._"
+            "content": "### Hierarchical Execution (Coming Soon)\n\nExecution-graph, Gantt, and treemap views are **blocked** pending CTL emission of:\n`subagent_id`, `workflow_stage`, `parentSpanId`, `query_source`\n(none currently emitted — see [research 2026-06-04-OTL-3](thoughts/shared/research/2026-06-04-OTL-3-catalyst-execution-telemetry-dashboard.md)).\n\n**Intended queries once attributes are emitted:**\n\n```promql\n# Treemap cost by (linear_key → task_type → subagent_id)\nsum by (linear_key, task_type, subagent_id) (increase(claude_code_cost_usage_USD_total{subagent_id=~\".+\"}[$__range]))\n```\n\n```logql\n# Subagent-vs-main split via query_source\nsum by (query_source) (count_over_time({service_name=~\"claude-code.*\"} | query_source=~\".+\" [$__range]))\n\n# Gantt approximation by workflow_stage (min/max timestamps per stage)\ncount_over_time({service_name=~\"claude-code.*\"} | workflow_stage=~\".+\" [$__range])\n```\n\n_Blocked attributes not emitted: `subagent_id`, `workflow_stage`, `parentSpanId`, `query_source` — open a CTL emission ticket to unblock._"
           }
         },
         {
@@ -4429,7 +4495,7 @@
           },
           "options": {
             "mode": "markdown",
-            "content": "### Process by Role (CTL-1228, Forthcoming)\n\n**Reserved for execution-core/monitor/broker/agent/claude/trunk CPU+mem + catalyst-vs-host proportion**\n\nPlanned visualization components:\n- Per-process CPU and memory usage (execution-core, monitor, broker, agent, claude, trunk)\n- Resource allocation breakdown by role\n- Catalyst vs. host machine resource split\n- Time series trends for capacity planning\n\n_Status: Not yet implemented \u2014 awaiting instrumentation of process-level metrics via OTel resource.process.* and custom catalyst.process_role attributes._"
+            "content": "### Process by Role (CTL-1228, Forthcoming)\n\n**Reserved for execution-core/monitor/broker/agent/claude/trunk CPU+mem + catalyst-vs-host proportion**\n\nPlanned visualization components:\n- Per-process CPU and memory usage (execution-core, monitor, broker, agent, claude, trunk)\n- Resource allocation breakdown by role\n- Catalyst vs. host machine resource split\n- Time series trends for capacity planning\n\n_Status: Not yet implemented — awaiting instrumentation of process-level metrics via OTel resource.process.* and custom catalyst.process_role attributes._"
           },
           "fieldConfig": {
             "defaults": {}
@@ -4471,7 +4537,7 @@
         "name": "bucket",
         "label": "Bucket",
         "type": "interval",
-        "description": "Bucket width for the rate/volume timeseries (floor 1m \u2248 4\u00d7 the 15s scrape; default 5m).",
+        "description": "Bucket width for the rate/volume timeseries (floor 1m ≈ 4× the 15s scrape; default 5m).",
         "datasource": null,
         "query": "1m,5m,15m,30m,1h,6h,1d",
         "auto": true,
@@ -4631,7 +4697,7 @@
         "name": "account",
         "type": "custom",
         "label": "Account",
-        "description": "Accounts to render rate-limit small-multiples for. account_email is Loki structured metadata, so it can't be auto-discovered \u2014 add new accounts here.",
+        "description": "Accounts to render rate-limit small-multiples for. account_email is Loki structured metadata, so it can't be auto-discovered — add new accounts here.",
         "query": "ryan@getadva.ai",
         "includeAll": true,
         "allValue": ".*",
