@@ -5111,7 +5111,7 @@
         {
           "id": "joinByField",
           "options": {
-            "byField": "model_family",
+            "byField": "model_family\\type",
             "mode": "outer"
           }
         },
@@ -5119,7 +5119,7 @@
           "id": "organize",
           "options": {
             "indexByName": {
-              "model_family": 0,
+              "model_family\\type": 0,
               "input": 1,
               "cacheCreation": 2,
               "cacheRead": 3,
@@ -5130,7 +5130,7 @@
               "output share": 8
             },
             "renameByName": {
-              "model_family": "Model",
+              "model_family\\type": "Model",
               "cacheCreation": "cache write",
               "cacheRead": "cache hit (read)"
             }
@@ -5184,11 +5184,12 @@
                 }
               },
               {
-                "id": "custom.tooltip",
-                "value": {
-                  "field": "input share",
-                  "placement": "auto"
-                }
+                "id": "custom.tooltip.field",
+                "value": "input share"
+              },
+              {
+                "id": "custom.tooltip.placement",
+                "value": "auto"
               }
             ]
           },
@@ -5206,11 +5207,12 @@
                 }
               },
               {
-                "id": "custom.tooltip",
-                "value": {
-                  "field": "cache write share",
-                  "placement": "auto"
-                }
+                "id": "custom.tooltip.field",
+                "value": "cache write share"
+              },
+              {
+                "id": "custom.tooltip.placement",
+                "value": "auto"
               }
             ]
           },
@@ -5228,11 +5230,12 @@
                 }
               },
               {
-                "id": "custom.tooltip",
-                "value": {
-                  "field": "cache hit share",
-                  "placement": "auto"
-                }
+                "id": "custom.tooltip.field",
+                "value": "cache hit share"
+              },
+              {
+                "id": "custom.tooltip.placement",
+                "value": "auto"
               }
             ]
           },
@@ -5250,11 +5253,12 @@
                 }
               },
               {
-                "id": "custom.tooltip",
-                "value": {
-                  "field": "output share",
-                  "placement": "auto"
-                }
+                "id": "custom.tooltip.field",
+                "value": "output share"
+              },
+              {
+                "id": "custom.tooltip.placement",
+                "value": "auto"
               }
             ]
           },
@@ -5265,20 +5269,16 @@
             },
             "properties": [
               {
-                "id": "custom.hideFrom",
-                "value": {
-                  "viz": true,
-                  "legend": false,
-                  "tooltip": false
-                }
-              },
-              {
                 "id": "unit",
                 "value": "percent"
               },
               {
                 "id": "decimals",
                 "value": 1
+              },
+              {
+                "id": "custom.hideFrom.viz",
+                "value": true
               }
             ]
           },
@@ -5289,20 +5289,16 @@
             },
             "properties": [
               {
-                "id": "custom.hideFrom",
-                "value": {
-                  "viz": true,
-                  "legend": false,
-                  "tooltip": false
-                }
-              },
-              {
                 "id": "unit",
                 "value": "percent"
               },
               {
                 "id": "decimals",
                 "value": 1
+              },
+              {
+                "id": "custom.hideFrom.viz",
+                "value": true
               }
             ]
           },
@@ -5313,20 +5309,16 @@
             },
             "properties": [
               {
-                "id": "custom.hideFrom",
-                "value": {
-                  "viz": true,
-                  "legend": false,
-                  "tooltip": false
-                }
-              },
-              {
                 "id": "unit",
                 "value": "percent"
               },
               {
                 "id": "decimals",
                 "value": 1
+              },
+              {
+                "id": "custom.hideFrom.viz",
+                "value": true
               }
             ]
           },
@@ -5337,20 +5329,16 @@
             },
             "properties": [
               {
-                "id": "custom.hideFrom",
-                "value": {
-                  "viz": true,
-                  "legend": false,
-                  "tooltip": false
-                }
-              },
-              {
                 "id": "unit",
                 "value": "percent"
               },
               {
                 "id": "decimals",
                 "value": 1
+              },
+              {
+                "id": "custom.hideFrom.viz",
+                "value": true
               }
             ]
           }
@@ -5696,7 +5684,7 @@
         {
           "id": "joinByField",
           "options": {
-            "byField": "model_family",
+            "byField": "model_family\\type",
             "mode": "outer"
           }
         },
@@ -5704,7 +5692,7 @@
           "id": "organize",
           "options": {
             "indexByName": {
-              "model_family": 0,
+              "model_family\\type": 0,
               "input": 1,
               "cacheCreation": 2,
               "cacheRead": 3,
@@ -5715,7 +5703,7 @@
               "output share": 8
             },
             "renameByName": {
-              "model_family": "Model",
+              "model_family\\type": "Model",
               "cacheCreation": "cache write",
               "cacheRead": "cache hit (read)"
             }
@@ -5769,11 +5757,12 @@
                 }
               },
               {
-                "id": "custom.tooltip",
-                "value": {
-                  "field": "input share",
-                  "placement": "auto"
-                }
+                "id": "custom.tooltip.field",
+                "value": "input share"
+              },
+              {
+                "id": "custom.tooltip.placement",
+                "value": "auto"
               }
             ]
           },
@@ -5791,11 +5780,12 @@
                 }
               },
               {
-                "id": "custom.tooltip",
-                "value": {
-                  "field": "cache write share",
-                  "placement": "auto"
-                }
+                "id": "custom.tooltip.field",
+                "value": "cache write share"
+              },
+              {
+                "id": "custom.tooltip.placement",
+                "value": "auto"
               }
             ]
           },
@@ -5813,11 +5803,12 @@
                 }
               },
               {
-                "id": "custom.tooltip",
-                "value": {
-                  "field": "cache hit share",
-                  "placement": "auto"
-                }
+                "id": "custom.tooltip.field",
+                "value": "cache hit share"
+              },
+              {
+                "id": "custom.tooltip.placement",
+                "value": "auto"
               }
             ]
           },
@@ -5835,11 +5826,12 @@
                 }
               },
               {
-                "id": "custom.tooltip",
-                "value": {
-                  "field": "output share",
-                  "placement": "auto"
-                }
+                "id": "custom.tooltip.field",
+                "value": "output share"
+              },
+              {
+                "id": "custom.tooltip.placement",
+                "value": "auto"
               }
             ]
           },
@@ -5850,20 +5842,16 @@
             },
             "properties": [
               {
-                "id": "custom.hideFrom",
-                "value": {
-                  "viz": true,
-                  "legend": false,
-                  "tooltip": false
-                }
-              },
-              {
                 "id": "unit",
                 "value": "percent"
               },
               {
                 "id": "decimals",
                 "value": 1
+              },
+              {
+                "id": "custom.hideFrom.viz",
+                "value": true
               }
             ]
           },
@@ -5874,20 +5862,16 @@
             },
             "properties": [
               {
-                "id": "custom.hideFrom",
-                "value": {
-                  "viz": true,
-                  "legend": false,
-                  "tooltip": false
-                }
-              },
-              {
                 "id": "unit",
                 "value": "percent"
               },
               {
                 "id": "decimals",
                 "value": 1
+              },
+              {
+                "id": "custom.hideFrom.viz",
+                "value": true
               }
             ]
           },
@@ -5898,20 +5882,16 @@
             },
             "properties": [
               {
-                "id": "custom.hideFrom",
-                "value": {
-                  "viz": true,
-                  "legend": false,
-                  "tooltip": false
-                }
-              },
-              {
                 "id": "unit",
                 "value": "percent"
               },
               {
                 "id": "decimals",
                 "value": 1
+              },
+              {
+                "id": "custom.hideFrom.viz",
+                "value": true
               }
             ]
           },
@@ -5922,20 +5902,16 @@
             },
             "properties": [
               {
-                "id": "custom.hideFrom",
-                "value": {
-                  "viz": true,
-                  "legend": false,
-                  "tooltip": false
-                }
-              },
-              {
                 "id": "unit",
                 "value": "percent"
               },
               {
                 "id": "decimals",
                 "value": 1
+              },
+              {
+                "id": "custom.hideFrom.viz",
+                "value": true
               }
             ]
           }

@@ -199,9 +199,10 @@ if jq -e '
             | .options.valueField] | index($value_field) != null)
       and ([.transformations[] | select(.id=="groupingToMatrix" and .filter.options=="/^(?:B|merge-B(?:-B)*)$/")
             | .options.valueField] | index("share") != null)
-      and ([.transformations[] | select(.id=="organize" and .options.indexByName.model_family==0)
+      and any(.transformations[]; .id=="joinByField" and .options.byField=="model_family\\type" and .options.mode=="outer")
+      and ([.transformations[] | select(.id=="organize" and .options.indexByName["model_family\\type"]==0)
             | .options.indexByName]
-           | index({"model_family":0,"input":1,"cacheCreation":2,"cacheRead":3,"output":4,
+           | index({"model_family\\type":0,"input":1,"cacheCreation":2,"cacheRead":3,"output":4,
                     "input share":5,"cache write share":6,"cache hit share":7,"output share":8}) != null)
       and .fieldConfig.defaults.fieldMinMax==false
       and (.fieldConfig.defaults | has("min") | not)
@@ -214,10 +215,11 @@ if jq -e '
              | any($panel.fieldConfig.overrides[];
                    .matcher.options==$column.value and
                    any(.properties[]; .id=="custom.cellOptions" and .value=={"type":"color-background","mode":"gradient"}) and
-                   any(.properties[]; .id=="custom.tooltip" and .value.field==$column.share))
+                   any(.properties[]; .id=="custom.tooltip.field" and .value==$column.share) and
+                   any(.properties[]; .id=="custom.tooltip.placement" and .value=="auto"))
                and any($panel.fieldConfig.overrides[];
                        .matcher.options==$column.share and
-                       any(.properties[]; .id=="custom.hideFrom" and .value.viz==true) and
+                       any(.properties[]; .id=="custom.hideFrom.viz" and .value==true) and
                        any(.properties[]; .id=="unit" and .value=="percent"))));
   matrix_ready("Tokens by Model × Token Type"; "tokens")
   and matrix_ready("Spend by Model × Token Type"; "spend")
