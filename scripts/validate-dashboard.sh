@@ -135,7 +135,7 @@ EOF
                          and .type=="table"
                          and .gridPos=={"h":8,"w":12,"x":$x,"y":47}
                          and .fieldConfig.defaults.unit==$unit
-                         and (.targets | length)==1
+                         and (.targets | length)==4
                          and .targets[0].instant==true
                          and .targets[0].range==false
                          and .targets[0].format=="table"
@@ -154,6 +154,78 @@ EOF
     fail "OTL-71 model x token-type matrix misconfigured: $title"
   fi
 done
+
+# Matrix comparisons must remain stable across refreshes. Rows use hidden
+# family/version keys, columns use the desired token lifecycle order, and every
+# nominal cell exposes its share of the complete matrix as a percentage tooltip.
+if jq -e '
+  def matrix_ready($title; $value_field):
+    .panels[]
+    | select(.title==$title)
+    | . as $panel
+    | (.targets | map(.refId)) == ["A", "B", "C", "D"]
+      and (.targets[0].expr | contains("family_rank") and contains("version_major") and contains("version_minor"))
+      and (.targets[1].expr | contains(" * 100") and contains("scalar(clamp_min("))
+      and all(.targets[0:2][];
+              (.expr | contains("max without (type)")) and
+              (["input", "cacheCreation", "cacheRead", "output"]
+               | all(. as $type | any($panel.targets[0:2][]; .expr | contains("\"type\", \"" + $type + "\"")))))
+      and (["input share", "cache write share", "cache hit share", "output share"]
+           | all(. as $type | $panel.targets[1].expr | contains("\"type\", \"" + $type + "\"")))
+      and (.targets[2].expr | startswith("label_replace(min(") and contains("\"config\", \"min\""))
+      and (.targets[3].expr | startswith("label_replace(max(") and contains("\"config\", \"max\""))
+      and all(.targets[2:4][]; (.hide // false) == false)
+      and ([.transformations[]
+            | select(.id=="sortBy" and .filter.id=="byRefId" and .filter.options=="/^(?:A|merge-A(?:-A)*)$/")
+            | .options.sort]
+           == [[{"field":"version_minor","desc":true}],
+               [{"field":"version_major","desc":true}],
+               [{"field":"family_rank","desc":false}]])
+      and any(.transformations[];
+              .id=="convertFieldType" and .filter.id=="byRefId" and .filter.options=="/^(?:A|merge-A(?:-A)*)$/"
+              and .options.conversions==[
+                {"targetField":"family_rank","destinationType":"number"},
+                {"targetField":"version_major","destinationType":"number"},
+                {"targetField":"version_minor","destinationType":"number"}
+              ])
+      and any(.transformations[];
+              .id=="configFromData" and .options.configRefId=="merge-C-D"
+              and .options.applyTo=={"id":"byName","options":"Value"}
+              and .options.mappings==[
+                {"fieldName":"min","handlerKey":"min","reducerId":"min"},
+                {"fieldName":"max","handlerKey":"max","reducerId":"max"}
+              ])
+      and ([.transformations[] | select(.id=="groupingToMatrix" and .filter.options=="/^(?:A|merge-A(?:-A)*)$/")
+            | .options.valueField] | index($value_field) != null)
+      and ([.transformations[] | select(.id=="groupingToMatrix" and .filter.options=="/^(?:B|merge-B(?:-B)*)$/")
+            | .options.valueField] | index("share") != null)
+      and ([.transformations[] | select(.id=="organize" and .options.indexByName.model_family==0)
+            | .options.indexByName]
+           | index({"model_family":0,"input":1,"cacheCreation":2,"cacheRead":3,"output":4,
+                    "input share":5,"cache write share":6,"cache hit share":7,"output share":8}) != null)
+      and .fieldConfig.defaults.fieldMinMax==false
+      and (.fieldConfig.defaults | has("min") | not)
+      and .fieldConfig.defaults.color.mode=="continuous-BlYlRd"
+      and ([{"value":"input","share":"input share"},
+            {"value":"cache write","share":"cache write share"},
+            {"value":"cache hit (read)","share":"cache hit share"},
+            {"value":"output","share":"output share"}]
+           | all(. as $column
+             | any($panel.fieldConfig.overrides[];
+                   .matcher.options==$column.value and
+                   any(.properties[]; .id=="custom.cellOptions" and .value=={"type":"color-background","mode":"gradient"}) and
+                   any(.properties[]; .id=="custom.tooltip" and .value.field==$column.share))
+               and any($panel.fieldConfig.overrides[];
+                       .matcher.options==$column.share and
+                       any(.properties[]; .id=="custom.hideFrom" and .value.viz==true) and
+                       any(.properties[]; .id=="unit" and .value=="percent"))));
+  matrix_ready("Tokens by Model × Token Type"; "tokens")
+  and matrix_ready("Spend by Model × Token Type"; "spend")
+' "$DASH" >/dev/null; then
+  pass "OTL-71 matrices have deterministic axes, global gradients, and whole-matrix share tooltips"
+else
+  fail "OTL-71 matrix comparison behavior is incomplete"
+fi
 
 # --- dashboard: required new Prometheus phase panels present ---
 for t in "Cost by Phase" "Tokens by Phase" "Sessions by Exec Context"; do
