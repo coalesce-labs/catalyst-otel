@@ -200,13 +200,28 @@ if jq -e '
       and ([.transformations[] | select(.id=="groupingToMatrix" and .filter.options=="/^(?:B|merge-B(?:-B)*)$/")
             | .options.valueField] | index("share") != null)
       and any(.transformations[]; .id=="joinByField" and .options.byField=="model_family\\type" and .options.mode=="outer")
+      and any(.transformations[];
+              .id=="calculateField"
+              and .options.mode=="reduceRow"
+              and .options.alias=="Total"
+              and .options.replaceFields==false
+              and .options.reduce=={"include":["input","cacheCreation","cacheRead","output"],"reducer":"sum"})
+      and (.transformations | map(.id)
+           | index("configFromData") < index("calculateField")
+             and index("joinByField") < index("calculateField")
+             and index("calculateField") < rindex("organize"))
       and ([.transformations[] | select(.id=="organize" and .options.indexByName["model_family\\type"]==0)
             | .options.indexByName]
-           | index({"model_family\\type":0,"input":1,"cacheCreation":2,"cacheRead":3,"output":4,
-                    "input share":5,"cache write share":6,"cache hit share":7,"output share":8}) != null)
+           | index({"model_family\\type":0,"input":1,"cacheCreation":2,"cacheRead":3,"output":4,"Total":5,
+                    "input share":6,"cache write share":7,"cache hit share":8,"output share":9}) != null)
       and .fieldConfig.defaults.fieldMinMax==false
       and (.fieldConfig.defaults | has("min") | not)
       and .fieldConfig.defaults.color.mode=="continuous-BlYlRd"
+      and .fieldConfig.defaults.custom.cellOptions=={"type":"auto"}
+      and ([.fieldConfig.overrides[]
+            | select(any(.properties[]; .id=="custom.cellOptions"))
+            | .matcher.options] | sort
+           == (["input","cache write","cache hit (read)","output"] | sort))
       and ([{"value":"input","share":"input share"},
             {"value":"cache write","share":"cache write share"},
             {"value":"cache hit (read)","share":"cache hit share"},
@@ -220,11 +235,18 @@ if jq -e '
                and any($panel.fieldConfig.overrides[];
                        .matcher.options==$column.share and
                        any(.properties[]; .id=="custom.hideFrom.viz" and .value==true) and
-                       any(.properties[]; .id=="unit" and .value=="percent"))));
+                       any(.properties[]; .id=="unit" and .value=="percent"))))
+      and (["input","cache write","cache hit (read)","output","Total"]
+           | all(. as $field
+             | any($panel.fieldConfig.overrides[];
+                   .matcher.options==$field and
+                   any(.properties[]; .id=="custom.footer.reducers" and .value==["sum"]))))
+      and all($panel.fieldConfig.overrides[] | select(.matcher.options=="Total");
+              all(.properties[]; .id!="custom.cellOptions"));
   matrix_ready("Tokens by Model × Token Type"; "tokens")
   and matrix_ready("Spend by Model × Token Type"; "spend")
 ' "$DASH" >/dev/null; then
-  pass "OTL-71 matrices have deterministic axes, global gradients, and whole-matrix share tooltips"
+  pass "OTL-71 matrices have deterministic axes, isolated gradients, share tooltips, and uncolored totals"
 else
   fail "OTL-71 matrix comparison behavior is incomplete"
 fi

@@ -5116,6 +5116,23 @@
           }
         },
         {
+          "id": "calculateField",
+          "options": {
+            "mode": "reduceRow",
+            "reduce": {
+              "include": [
+                "input",
+                "cacheCreation",
+                "cacheRead",
+                "output"
+              ],
+              "reducer": "sum"
+            },
+            "replaceFields": false,
+            "alias": "Total"
+          }
+        },
+        {
           "id": "organize",
           "options": {
             "indexByName": {
@@ -5124,10 +5141,11 @@
               "cacheCreation": 2,
               "cacheRead": 3,
               "output": 4,
-              "input share": 5,
-              "cache write share": 6,
-              "cache hit share": 7,
-              "output share": 8
+              "Total": 5,
+              "input share": 6,
+              "cache write share": 7,
+              "cache hit share": 8,
+              "output share": 9
             },
             "renameByName": {
               "model_family\\type": "Model",
@@ -5190,6 +5208,12 @@
               {
                 "id": "custom.tooltip.placement",
                 "value": "auto"
+              },
+              {
+                "id": "custom.footer.reducers",
+                "value": [
+                  "sum"
+                ]
               }
             ]
           },
@@ -5213,6 +5237,12 @@
               {
                 "id": "custom.tooltip.placement",
                 "value": "auto"
+              },
+              {
+                "id": "custom.footer.reducers",
+                "value": [
+                  "sum"
+                ]
               }
             ]
           },
@@ -5236,6 +5266,12 @@
               {
                 "id": "custom.tooltip.placement",
                 "value": "auto"
+              },
+              {
+                "id": "custom.footer.reducers",
+                "value": [
+                  "sum"
+                ]
               }
             ]
           },
@@ -5259,6 +5295,12 @@
               {
                 "id": "custom.tooltip.placement",
                 "value": "auto"
+              },
+              {
+                "id": "custom.footer.reducers",
+                "value": [
+                  "sum"
+                ]
               }
             ]
           },
@@ -5339,6 +5381,20 @@
               {
                 "id": "custom.hideFrom.viz",
                 "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Total"
+            },
+            "properties": [
+              {
+                "id": "custom.footer.reducers",
+                "value": [
+                  "sum"
+                ]
               }
             ]
           }
@@ -5689,6 +5745,23 @@
           }
         },
         {
+          "id": "calculateField",
+          "options": {
+            "mode": "reduceRow",
+            "reduce": {
+              "include": [
+                "input",
+                "cacheCreation",
+                "cacheRead",
+                "output"
+              ],
+              "reducer": "sum"
+            },
+            "replaceFields": false,
+            "alias": "Total"
+          }
+        },
+        {
           "id": "organize",
           "options": {
             "indexByName": {
@@ -5697,10 +5770,11 @@
               "cacheCreation": 2,
               "cacheRead": 3,
               "output": 4,
-              "input share": 5,
-              "cache write share": 6,
-              "cache hit share": 7,
-              "output share": 8
+              "Total": 5,
+              "input share": 6,
+              "cache write share": 7,
+              "cache hit share": 8,
+              "output share": 9
             },
             "renameByName": {
               "model_family\\type": "Model",
@@ -5763,6 +5837,12 @@
               {
                 "id": "custom.tooltip.placement",
                 "value": "auto"
+              },
+              {
+                "id": "custom.footer.reducers",
+                "value": [
+                  "sum"
+                ]
               }
             ]
           },
@@ -5786,6 +5866,12 @@
               {
                 "id": "custom.tooltip.placement",
                 "value": "auto"
+              },
+              {
+                "id": "custom.footer.reducers",
+                "value": [
+                  "sum"
+                ]
               }
             ]
           },
@@ -5809,6 +5895,12 @@
               {
                 "id": "custom.tooltip.placement",
                 "value": "auto"
+              },
+              {
+                "id": "custom.footer.reducers",
+                "value": [
+                  "sum"
+                ]
               }
             ]
           },
@@ -5832,6 +5924,12 @@
               {
                 "id": "custom.tooltip.placement",
                 "value": "auto"
+              },
+              {
+                "id": "custom.footer.reducers",
+                "value": [
+                  "sum"
+                ]
               }
             ]
           },
@@ -5912,6 +6010,20 @@
               {
                 "id": "custom.hideFrom.viz",
                 "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Total"
+            },
+            "properties": [
+              {
+                "id": "custom.footer.reducers",
+                "value": [
+                  "sum"
+                ]
               }
             ]
           }
