@@ -59,6 +59,102 @@ else
   fail "unknown datasource UIDs (count: $BAD)"
 fi
 
+# --- OTL-71: spend/token economics panels are paired by dimension, followed by
+#     model x token-type matrices. Exact grid assertions catch order, overlap,
+#     and first-section placement regressions. ---
+ECON_TITLES='["Spend by Host","Tokens by Host","Spend by Model","Tokens by Model","Spend by Type","Tokens by Type","Tokens by Model × Token Type","Spend by Model × Token Type"]'
+ECON_LAYOUT='[
+  {"title":"Spend by Host","gridPos":{"h":7,"w":24,"x":0,"y":5}},
+  {"title":"Tokens by Host","gridPos":{"h":7,"w":24,"x":0,"y":12}},
+  {"title":"Spend by Model","gridPos":{"h":7,"w":24,"x":0,"y":19}},
+  {"title":"Tokens by Model","gridPos":{"h":7,"w":24,"x":0,"y":26}},
+  {"title":"Spend by Type","gridPos":{"h":7,"w":24,"x":0,"y":33}},
+  {"title":"Tokens by Type","gridPos":{"h":7,"w":24,"x":0,"y":40}},
+  {"title":"Tokens by Model × Token Type","gridPos":{"h":8,"w":12,"x":0,"y":47}},
+  {"title":"Spend by Model × Token Type","gridPos":{"h":8,"w":12,"x":12,"y":47}}
+]'
+if jq -e --argjson titles "$ECON_TITLES" '
+  [.panels[] | select(.title as $t | $titles | index($t)) | .title] as $present
+  | ($titles - $present) | length == 0
+' "$DASH" >/dev/null; then
+  pass "OTL-71 spend/token economics panels are present"
+else
+  fail "OTL-71 spend/token economics panel missing"
+fi
+
+if jq -e --argjson layout "$ECON_LAYOUT" '
+  ($layout | map(.title)) as $titles
+  | [.panels[] | select(.title as $t | $titles | index($t)) | {title, gridPos}]
+  | sort_by(.gridPos.y, .gridPos.x) == $layout
+' "$DASH" >/dev/null; then
+  pass "OTL-71 spend/token panels have the paired first-section layout"
+else
+  fail "OTL-71 spend/token panel layout is wrong"
+fi
+
+# Tokens by Model must use the native token counter. Spend by Type must allocate
+# native model spend using model+type token weights (input=1, output=5,
+# cacheRead=.1, cacheCreation=2) rather than introducing a second cost source.
+if jq -e '[.panels[] | select(.title=="Tokens by Model") | .targets[].expr
+          | select(test("claude_code_token_usage_tokens_total") and test("model"))]
+         | length > 0' "$DASH" >/dev/null; then
+  pass "OTL-71 Tokens by Model uses native model-attributed tokens"
+else
+  fail "OTL-71 Tokens by Model query is missing native model attribution"
+fi
+
+if jq -e '
+  def complete_allocation($window):
+    contains("claude_code_cost_usage_USD_total")
+    and contains("claude_code_token_usage_tokens_total")
+    and contains("type=\"input\"")
+    and test("type=\\\"output\\\".*\\* 5")
+    and test("type=\\\"cacheRead\\\".*\\* 0\\.1")
+    and test("type=\\\"cacheCreation\\\".*\\* 2")
+    and contains("on (model) group_left")
+    and contains("clamp_min(")
+    and contains(", 1e-12)")
+    and contains($window);
+  ([.panels[] | select(.title=="Spend by Type") | .targets[].expr
+    | select(complete_allocation("[$__interval]"))] | length > 0)
+  and
+  ([.panels[] | select(.title=="Spend by Model × Token Type") | .targets[].expr
+    | select(complete_allocation("[$__range]"))] | length > 0)
+' "$DASH" >/dev/null; then
+  pass "OTL-71 spend panels allocate native model spend with complete weighted proportions"
+else
+  fail "OTL-71 spend allocation query is incomplete"
+fi
+
+for matrix_spec in "Tokens by Model × Token Type|tokens|short|0" "Spend by Model × Token Type|spend|currencyUSD|12"; do
+  IFS='|' read -r title value_field unit x <<EOF
+$matrix_spec
+EOF
+  if jq -e --arg title "$title" --arg value_field "$value_field" --arg unit "$unit" --argjson x "$x" '
+    [.panels[] | select(.title==$title
+                         and .type=="table"
+                         and .gridPos=={"h":8,"w":12,"x":$x,"y":47}
+                         and .fieldConfig.defaults.unit==$unit
+                         and (.targets | length)==1
+                         and .targets[0].instant==true
+                         and .targets[0].range==false
+                         and .targets[0].format=="table"
+                         and (.targets[0].expr | contains("claude_code_token_usage_tokens_total"))
+                         and (.targets[0].expr | contains("[$__range]")))
+     | .transformations[]
+     | select(.id=="groupingToMatrix"
+              and .options.rowField=="model_family"
+              and .options.columnField=="type"
+              and .options.valueField==$value_field
+              and .options.emptyValue=="zero")]
+    | length == 1
+  ' "$DASH" >/dev/null; then
+    pass "OTL-71 matrix configured: $title"
+  else
+    fail "OTL-71 model x token-type matrix misconfigured: $title"
+  fi
+done
+
 # --- dashboard: required new Prometheus phase panels present ---
 for t in "Cost by Phase" "Tokens by Phase" "Sessions by Exec Context"; do
   COUNT=$(jq --arg t "$t" '[.. | objects | select(.title==$t)] | length' "$DASH")
