@@ -357,6 +357,42 @@ processors:
         probabilistic:
           sampling_percentage: 20
 
+  # CTL-1731: bound every export to Loki so one request can never exceed Loki's
+  # 4 MiB gRPC receive limit. This is the fix for a 19-day logs outage
+  # (2026-08-03 → 2026-08-22) in which NOTHING reached Loki from the host fleet.
+  #
+  # The chain, as measured on 2026-08-23:
+  #   1. The logs pipeline had NO batch processor, and `otlp_http` (Loki) does no
+  #      batching of its own, so one receive was forwarded to Loki 1:1.
+  #   2. `otel-forward` on each host drains its WHOLE buffer into a single POST,
+  #      so any backlog produces enormous single requests — measured 8241 records
+  #      / 5,154,713 bytes, with bodies up to 7.16 MB.
+  #   3. Loki refused every one of them, two ways:
+  #        503 ResourceExhausted — "grpc: received message larger than max
+  #            (7130780 vs. 4194304)"   ← server.grpc_server_max_recv_msg_size
+  #        429 — "ingestion rate limit exceeded for user fake
+  #            (limit: 4194304 bytes/sec)"   ← limits_config.ingestion_rate_mb: 4
+  #   4. The exporter retried (29–43 s backoffs), its consumers blocked, the
+  #      sending queue filled, and the OTLP RECEIVER then returned 503 to every
+  #      producer. That receiver-level 503 is what the hosts recorded as
+  #      "OTLP HTTP 503" — which is why a small probe still got 200 (it fits in a
+  #      queue gap) while real traffic never did. The endpoint was never down.
+  #
+  # `send_batch_max_size` is a HARD splitter: no batch leaves this processor with
+  # more records, so a slow/backlogged producer can no longer synthesize a request
+  # Loki must refuse. At the measured ~625 B/record, 1000 records ≈ 0.8 MB — a ~5x
+  # margin under the 4 MiB ceiling that still holds if mean record size triples.
+  #
+  # Deliberately NOT raising Loki's limits instead: steady-state fleet volume is
+  # ~4 KB/s (two hosts, ~154 MB/day each), three orders of magnitude under the
+  # 4 MB/s ingestion cap. The cap was only ever breached by unbounded batches, so
+  # bounding the batch is the smaller and more durable change — and it protects
+  # Loki from every producer, not just this one.
+  batch/loki:
+    send_batch_size: 500
+    send_batch_max_size: 1000
+    timeout: 5s
+
 exporters:
   prometheus:
     endpoint: "0.0.0.0:8889"
@@ -1244,7 +1280,11 @@ service:
       receivers: [otlp]
       # OTL-20: transform/metrics_normalize runs AFTER transform/logs so the
       # logs->metrics connectors (exporters below) see underscore-form keys.
-      processors: [resource, transform/logs, transform/metrics_normalize, transform/scheduler_health_promote, transform/updater_promote]
+      # CTL-1731: batch/loki is LAST on purpose — it must see the final record
+      # shape, and every exporter/connector on this pipeline benefits from the
+      # size bound. Without it a single receive went to Loki whole and was
+      # refused for exceeding the 4 MiB gRPC limit; see the processor's comment.
+      processors: [resource, transform/logs, transform/metrics_normalize, transform/scheduler_health_promote, transform/updater_promote, batch/loki]
       # otlp_http = Loki (OTL-8 rename). To turn on a vendor fan-out:
       # (1) uncomment the matching exporter block above if not already, (2) set
       # the env vars in docker-compose.yml, and (3) add its exporter id to the
