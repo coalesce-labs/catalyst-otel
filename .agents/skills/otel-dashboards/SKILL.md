@@ -30,6 +30,57 @@ Loki events (body `|= "codex.tool_result"` under `{service_name=~"codex.*"}`; at
 - **Sparse-event KPIs** (Turns, Tool Calls, Threads, event logs) use Loki `count_over_time`, **not** Prometheus `increase()` — native `codex_*` counters expire at `metric_expiration:15m`, so a short/idle session keeps only its first sample and `increase()` reads zero. Turns = `codex.turn_ttft`; Tool Calls = `codex.tool_result`; Threads = `codex.conversation_starts`.
 - The **Tokens** KPI has no per-event Loki source, so it uses the Prometheus `codex_turn_token_usage_sum` histogram, filtered by `model` only (it carries `token_type`+`model`, never `originator`/`host_name`).
 
+## Relay workers (and future Cloudflare container runners) — attribution schema
+
+The mini execution-core daemons are **retired**. Work runs as **laptop relay workers** — one
+`claude -p` per ticket, dispatched by `~/catalyst/comms/coord/relay-dispatch.sh` — and later as
+**Cloudflare container runners**. Both are ordinary Claude Code sessions, so they emit the SAME
+`claude_code_*` metrics and `claude_code.*` Loki events as an interactive session. The only thing
+that separates them is what the dispatcher stamps on the OTel **resource**.
+
+**A series is a relay worker iff it carries `catalyst_ticket`.** Interactive sessions never set one.
+That is the discriminator every panel in `dashboards/catalyst-relay-workers.json` (UID
+`catalyst-relay-workers`) uses.
+
+Semconv-first field list — real OpenTelemetry fields wherever one exists, namespaced customs only
+for the two genuinely Catalyst-specific dimensions:
+
+| resource attribute | label | who stamps it | why this field |
+| -- | -- | -- | -- |
+| `service.name` | `service_name` | dispatcher | semconv. **Currently loses** to `OTEL_SERVICE_NAME` in `~/.claude/settings.json` — see the trap below. |
+| `service.instance.id` | `service_instance_id` | dispatcher / runner | semconv: WHICH instance produced the record (one worker, one container). Prefer over a custom `worker.id`. |
+| `app.entrypoint` | `app_entrypoint` | Claude Code itself | needs `OTEL_METRICS_INCLUDE_ENTRYPOINT=1`. The relay-vs-interactive split that costs no custom attribute. |
+| `session.id` | `session_id` | Claude Code itself | already emitted; one relay worker = one session. |
+| `catalyst.ticket` | `catalyst_ticket` | dispatcher | **custom** — no semconv field means "unit of work". |
+| `catalyst.phase` | `catalyst_phase` | dispatcher | **custom** — research/plan/implement/validate/pr/merge. |
+| `cloud.provider` / `cloud.platform` / `cloud.region` | `cloud_*` | container runner only | semconv. Absent on laptop relays, so `cloud_platform` cleanly separates the two runtimes. |
+| `container.id` | `container_id` | container runner only | semconv. |
+
+**Prometheus gets these for free; Loki does NOT.** The `prometheus` exporter sets
+`resource_to_telemetry_conversion: enabled`, which promotes *any* resource attribute to a label
+(dots → underscores). `transform/logs` is an **allowlist**, so each attribute needs an explicit
+`set(attributes["x"], resource.attributes["x.y"])` copy or it never becomes Loki structured
+metadata. Both halves are wired in `collector-config.yaml`.
+
+⚠️ **THE TRAP THAT COST THIS SIGNAL ENTIRELY (measured 2026-08-24).** `~/.claude/settings.json` has
+an `env` block, and it applies to **every** Claude Code session on the box — including one launched
+as `env OTEL_...=... claude -p`. It sets `OTEL_SERVICE_NAME`, `OTEL_RESOURCE_ATTRIBUTES`,
+`OTEL_EXPORTER_OTLP_ENDPOINT` and `OTEL_EXPORTER_OTLP_PROTOCOL`, so the dispatcher's values were
+silently discarded: relay session `e68e2e6f` (ticket CTC-178, 15:48–16:00 UTC) delivered **420 log
+records** that carried `service_name="claude-code"`, `host_name="laptop"` and **no ticket at all**.
+The data was never lost — it was anonymous. A per-invocation override has to win over user settings
+(e.g. `claude --settings <file>`), or the keys must come out of `~/.claude/settings.json`.
+
+The same block is why laptop sessions carry **no** `project` / `branch` / `linear_key`: its
+`OTEL_RESOURCE_ATTRIBUTES=host.name=laptop` **replaces** (does not merge with) the richer set that
+`use_otel_context` exports from direnv. `mini` / `mini-2` have no such block and do carry `project`.
+
+**`host_name` is emitter-set, not derived here.** There is no collector-side hostname mapping table
+— the laptop reads `laptop` because that string is hardcoded in `~/.claude/settings.json`, while the
+separate `hostname` label comes from direnv's `hostname -s` (`Ryans-MacBook-Pro-2`). Two labels, two
+sources, same machine. `transform/metrics_normalize` strips a trailing `.local` from `host_name`
+(CTL-812 parity with `hostname`); it does no other rewriting.
+
 ## Loki: structured metadata, NOT stream labels — critical gotcha
 
 Only `service_name`, `service_namespace`, `__stream_shard__` are Loki **stream labels**. Every other OTel attribute — `event_name`, `event_action`, `event_entity`, `tool_name`, `success`, `status_code`, `model`, `host_name`, `scheduler_*`, … — is **structured metadata**, not a stream label. `event_name` is the short form (`tool_result`); the body carries the full `claude_code.tool_result`.
