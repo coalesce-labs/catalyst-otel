@@ -225,3 +225,26 @@ groups:
           sum by (provider, account, model) (max_over_time(ai:cost_usd:sum{provider="anthropic"}[7d]))
           / on (provider, account) group_left
             ai_subscription_limit_used_percent{provider="anthropic", window="7d"}
+
+  # ---------------------------------------------------------------------
+  # OTL Task E (wired 2026-08-24): relay-phase COMPLETIONS, the denominator
+  # for "$ per COMPLETED phase" -- distinct from the phase RUN counts on
+  # dashboards/ai-usage.json's "Phase Throughput & Unit Economics" row
+  # (session/conversation-started counts, which include failed/re-dispatched
+  # runs). ai_phase_completion_total is the new count-connector metric in
+  # collector-config.yaml, fed by ~/catalyst/comms/coord/relay-phase-event.sh
+  # (the coordinator, once per verified relay report). First real event
+  # verified live 2026-08-24 (linear_key=CTC-970... wait CTC-977, phase=
+  # research, provider=openai, outcome=done, service_name=relay-coordinator).
+  # Same recording pattern as ai:tool_calls:sum above (bare cumulative sum,
+  # no increase()/rate() at record time) -- downstream panels apply
+  # max_over_time(...[$__range]) per the OTL-75 per-session-counter
+  # convention, kept consistent even though this is an occurrence counter
+  # rather than a per-session gauge-like counter, so every ai:* series in
+  # this file is queried the same way regardless of its underlying shape.
+  - name: ai-canonical-phase-completions
+    interval: 1m
+    rules:
+      - record: ai:phase_completions:sum
+        expr: |
+          sum by (phase, provider, model, outcome, account) (ai_phase_completion_total)

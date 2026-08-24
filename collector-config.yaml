@@ -657,6 +657,32 @@ connectors:
           - key: host_name
             default_value: unknown
 
+      # ----- OTL Task E (Ryan-directed via the AI Usage phase-economics design
+      # note, wired 2026-08-24): relay-phase terminal outcomes -----
+      # Emitted by the coordinator (~/catalyst/comms/coord/relay-phase-event.sh)
+      # once per VERIFIED relay report -- the "$ per COMPLETED phase" panels
+      # need this because a session can't tell DONE from FAILED on its own.
+      # First real event verified live 2026-08-24 (CTC-977/research/done,
+      # service_name=relay-coordinator). LOW-CARD ONLY, matching this file's
+      # existing connector cardinality rule (see the header comment on this
+      # `count:` connector) -- deliberately NO linear_key/project here, even
+      # though the source event carries both: ticket-level $-per-phase-run
+      # breakdowns already exist via the ai:cost_usd:sum / ai:tokens:sum
+      # RECORDING RULES (native metrics, not this connector), so this counter
+      # only needs to answer "how many phases of type X completed with
+      # outcome Y" in aggregate.
+      ai_phase_completion_total:
+        description: "Relay phase terminal outcomes (done/failed/blocked) by phase/provider/model/account — denominator for \"$ per COMPLETED phase\" (as opposed to per-RUN, which counts failures/re-dispatches too)"
+        conditions:
+          - 'attributes["event_name"] == "relay.phase.completed"'
+        attributes:
+          - key: phase
+          - key: provider
+          - key: model
+          - key: outcome
+          - key: account
+            default_value: unknown
+
   # Numeric gauges from event fields. Values are strings in transit -> Double() cast.
   # Do NOT set `error_mode: ignore` here — in otelcol 0.154.0 it suppresses ALL
   # gauge output. The default already handles a bad Double() cast safely: the
