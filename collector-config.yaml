@@ -73,45 +73,6 @@ processors:
           # phase-agent-dispatch only when CATALYST_DISPATCH_MODE is set, so this
           # set() is a no-op (error_mode: ignore) until the catalyst emit side ships.
           - set(attributes["catalyst_dispatch_mode"], resource.attributes["catalyst.dispatch_mode"])
-          # -------------------------------------------------------------------
-          # Relay-worker + container-runner attribution.
-          #
-          # The mini execution-core daemons are retired: work now runs as laptop
-          # RELAY workers (one `claude -p` per ticket) and, later, as Cloudflare
-          # container runners. Both stamp their identity on the OTel RESOURCE.
-          #
-          # Prometheus gets these for free — the `prometheus` exporter sets
-          # resource_to_telemetry_conversion: enabled, which promotes ANY resource
-          # attribute to a label (dots -> underscores). LOKI DOES NOT: this
-          # transform is an ALLOWLIST, so without the copies below a relay session
-          # is indistinguishable from an interactive one in every log query.
-          # (Measured 2026-08-24: relay session e68e2e6f for CTC-178 delivered 420
-          # log records that were completely unattributable — service_name
-          # "claude-code", host_name "laptop", no ticket.)
-          #
-          # SEMCONV FIRST: where OpenTelemetry already defines a field, use it
-          # instead of inventing a custom. Only the two genuinely Catalyst-specific
-          # dimensions stay namespaced customs (catalyst.ticket / catalyst.phase).
-          #
-          # Every statement is a no-op under error_mode: ignore until the emit side
-          # stamps the attribute, so this is safe to land before the dispatcher.
-          #
-          # semconv service.instance.id — WHICH instance of the service produced
-          # this record: one relay worker, one container, one interactive CLI.
-          - set(attributes["service_instance_id"], resource.attributes["service.instance.id"])
-          # Claude Code's own entrypoint marker (needs OTEL_METRICS_INCLUDE_ENTRYPOINT=1).
-          # This is the RELAY-vs-INTERACTIVE discriminator that costs no custom attribute.
-          - set(attributes["app_entrypoint"], resource.attributes["app.entrypoint"])
-          # Catalyst customs: the unit of work, and the step of the relay ladder
-          # (research/plan/implement/validate/pr/merge).
-          - set(attributes["catalyst_ticket"], resource.attributes["catalyst.ticket"])
-          - set(attributes["catalyst_phase"], resource.attributes["catalyst.phase"])
-          # semconv cloud.* / container.* — stamped only by the future Cloudflare
-          # container runners; absent (and therefore no-op) for laptop relay workers.
-          - set(attributes["cloud_provider"], resource.attributes["cloud.provider"])
-          - set(attributes["cloud_platform"], resource.attributes["cloud.platform"])
-          - set(attributes["cloud_region"], resource.attributes["cloud.region"])
-          - set(attributes["container_id"], resource.attributes["container.id"])
           # Account-level rate-limit usage (CTL-787): account.ratelimit.sampled event
           # (service.name=catalyst.execution-core) carries 5h/7d subscription usage % labeled by
           # account email. LOG-RECORD attributes (numeric/string) -> source is attributes[...],
@@ -200,14 +161,6 @@ processors:
           # host_name, so without this copy EVERY datapoint is dropped for a
           # missing grouping key. Source it from the resource, not the log record.
           - set(attributes["host_name"], resource.attributes["host.name"]) where resource.attributes["host.name"] != nil
-          # CTL-812 parity: `hostname` (the direnv attribute) already gets its
-          # macOS-appended ".local" stripped in transform/logs. host_name did not,
-          # so a single machine could still split into two series via THIS copy.
-          # NOTE: host_name is EMITTER-SET, not derived here — the laptop's
-          # "laptop" value is hardcoded in ~/.claude/settings.json
-          # (OTEL_RESOURCE_ATTRIBUTES=host.name=laptop). There is no collector-side
-          # hostname mapping table; do not go looking for one.
-          - replace_pattern(attributes["host_name"], "\\.local$", "")
           # catalyst emits catalyst.ticket.type (all dots), not catalyst.ticket_type.
           - set(attributes["catalyst_ticket_type"], attributes["catalyst.ticket.type"]) where attributes["catalyst.ticket.type"] != nil
           # recovery decision/board-scan enums + invariant gauge
