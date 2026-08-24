@@ -1,0 +1,119 @@
+groups:
+  # ---------------------------------------------------------------------
+  # OTL: canonical cross-provider AI usage metrics (Ryan-directed, 2026-08-24).
+  #
+  # Goal: one label schema across the Claude Code feed (claude_code_*, native
+  # SDK-exported metrics with full resource-attribute promotion) and the Codex
+  # feed (codex_*, native metrics from BOTH codex_exec headless relay workers
+  # and Codex_Desktop/codex-app-server), rolled up to provider/model/account/
+  # project/ticket/phase/token_type/cost.
+  #
+  # EVIDENCE (verified live against the otel-stack Prometheus 2026-08-24, see
+  # the OTL PR description for the full attribute-validation table):
+  #   - claude_code_token_usage_tokens_total / claude_code_cost_usage_USD_total
+  #     (native) carry model, type (token_type), project, branch, linear_key,
+  #     task_type, catalyst_orchestration, host_name, user_email/user_account_id
+  #     -- FULL ticket + account attribution -- for any session where the
+  #     launcher's OTEL_RESOURCE_ATTRIBUTES survived (12496/22220 series over
+  #     7d carried linear_key; the launcher-trap gap documented in
+  #     otel-dashboards SKILL.md/CLAUDE_OBSERVABILITY.md still applies to the
+  #     rest).
+  #   - claude_code_tool_result_total (collector `count` connector, OTL-21)
+  #     ALSO carries project/branch/linear_key/task_type live today --
+  #     resource_to_telemetry_conversion promotes them same as the native
+  #     metrics. This CONTRADICTS the connector's own inline comment in
+  #     collector-config.yaml ("CANNOT be sliced by project/branch/host") --
+  #     that comment is stale docs, not current behavior; flagged separately,
+  #     not corrected here (out of this PR's scope -- verify before relying on
+  #     it elsewhere). It does NOT carry `model`.
+  #   - codex_tool_call_total / codex_thread_started_total /
+  #     codex_turn_ttft_duration_ms_* / codex_turn_ttfm_duration_ms_* are
+  #     native codex_exec (headless relay) metrics that DO carry model,
+  #     project, branch, linear_key, task_type, host_name (host_name="laptop").
+  #   - codex_turn_token_usage_sum / codex_conversation_turn_count_total /
+  #     codex_turn_e2e_duration_ms_* are Codex_Desktop / codex-app-server ONLY
+  #     -- codex_exec never emits them (0 series, confirmed via
+  #     `codex_conversation_turn_count_total{exported_job="codex_exec"}` and
+  #     `codex_turn_token_usage_sum{exported_job="codex_exec"}`). Headless
+  #     relay token volume by ticket exists ONLY in Loki (codex.sse_event
+  #     unwrap; see dashboards/codex-usage.json "Codex — Relay Attribution"
+  #     row) -- there is no Prometheus source for the ai:tokens:sum openai
+  #     leg to carry ticket/project dims. See the OTL PR gap list.
+  #   - Codex has NO cost telemetry at all (ChatGPT-subscription auth) and
+  #     this repo has no per-model price table to derive one from tokens --
+  #     ai:cost_usd:sum therefore has NO openai leg. Do not invent one.
+  #
+  # These rules RENAME/RELABEL already-native, already-scraped series into a
+  # shared name+label schema -- they do not introduce new label cardinality
+  # (unlike a NEW collector connector, which is the OTL-20/21 "keep ticket
+  # labels off connector metrics" cardinality rule; that rule does not apply
+  # here because we are not creating a new high-card series, we are grouping
+  # existing ones).
+  # ---------------------------------------------------------------------
+  - name: ai-canonical-tokens
+    interval: 1m
+    rules:
+      # provider=anthropic: native claude_code_* token counter. `type` is
+      # Claude's native label spelling; canonical dim is `token_type`.
+      - record: ai:tokens:sum
+        labels:
+          provider: anthropic
+        expr: |
+          label_replace(
+            sum by (model, type, project, branch, linear_key, task_type, catalyst_orchestration, user_email) (
+              claude_code_token_usage_tokens_total
+            ),
+            "token_type", "$1", "type", "(.*)"
+          )
+
+      # provider=openai: Codex_Desktop/app-server ONLY (see header note --
+      # codex_exec emits no token-usage metric at all). No project/branch/
+      # linear_key/task_type on this leg -- GAP, see PR description.
+      - record: ai:tokens:sum
+        labels:
+          provider: openai
+        expr: |
+          sum by (model, token_type) (codex_turn_token_usage_sum)
+
+  - name: ai-canonical-tool-calls
+    interval: 1m
+    rules:
+      # provider=anthropic: OTL-21 count-connector metric. No `model` label
+      # available on this connector metric (see header note).
+      - record: ai:tool_calls:sum
+        labels:
+          provider: anthropic
+        expr: |
+          sum by (tool_name, success, project, branch, linear_key, task_type, catalyst_orchestration) (
+            claude_code_tool_result_total
+          )
+
+      # provider=openai: native codex_exec metric -- full ticket dims. `tool`
+      # is Codex's native label spelling; canonical dim is `tool_name`.
+      - record: ai:tool_calls:sum
+        labels:
+          provider: openai
+        expr: |
+          label_replace(
+            sum by (tool, success, model, project, branch, linear_key, task_type, host_name) (
+              codex_tool_call_total
+            ),
+            "tool_name", "$1", "tool", "(.*)"
+          )
+
+  - name: ai-canonical-cost
+    interval: 1m
+    rules:
+      # provider=anthropic ONLY. No openai leg -- Codex has no cost telemetry
+      # and this repo has no per-model price table (do not invent one; see
+      # the OTL PR gap list for the proposed remediation).
+      - record: ai:cost_usd:sum
+        labels:
+          provider: anthropic
+        expr: |
+          label_replace(
+            sum by (model, project, branch, linear_key, task_type, catalyst_orchestration, user_email) (
+              claude_code_cost_usage_USD_total
+            ),
+            "account", "$1", "user_email", "(.*)"
+          )

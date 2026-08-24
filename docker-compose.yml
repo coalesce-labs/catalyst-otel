@@ -70,6 +70,9 @@ services:
       - --web.console.templates=/usr/share/prometheus/consoles
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      # Directory mount (not a single file) -- see the "single-file bind
+      # mounts go stale after git pull" gotcha in otel-stack-ops/SKILL.md.
+      - ./provisioning/prometheus:/etc/prometheus/rules:ro
       - "${OTEL_PROMETHEUS_DATA:-otel-prometheus-data}:/prometheus"
     ports:
       - "9098:9090"

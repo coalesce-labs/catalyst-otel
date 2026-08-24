@@ -1,6 +1,15 @@
 global:
   scrape_interval: 15s
 
+# OTL: canonical cross-provider AI recording rules (ai:tokens:sum /
+# ai:tool_calls:sum / ai:cost_usd:sum). Mounted as a directory (not a single
+# file) per the "single-file bind mounts go stale after git pull" gotcha in
+# .agents/skills/otel-stack-ops/SKILL.md. New rule files require
+# `docker compose restart otel-prometheus` (or `make restart`) -- this
+# directive alone does not take effect until the container is recreated.
+rule_files:
+  - /etc/prometheus/rules/*.yml
+
 scrape_configs:
   # Application telemetry the collector RE-EXPORTS (claude_code_*, catalyst_*).
   # This is the prometheus EXPORTER's endpoint — not the collector's own health.
