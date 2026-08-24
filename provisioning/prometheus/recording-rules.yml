@@ -1,6 +1,8 @@
 groups:
   # ---------------------------------------------------------------------
-  # OTL: canonical cross-provider AI usage metrics (Ryan-directed, 2026-08-24).
+  # OTL: canonical cross-provider AI usage metrics (Ryan-directed, 2026-08-24,
+  # extended 2026-08-24 with account/phase once the relay dispatcher started
+  # stamping them on both feeds).
   #
   # Goal: one label schema across the Claude Code feed (claude_code_*, native
   # SDK-exported metrics with full resource-attribute promotion) and the Codex
@@ -8,28 +10,32 @@ groups:
   # and Codex_Desktop/codex-app-server), rolled up to provider/model/account/
   # project/ticket/phase/token_type/cost.
   #
-  # EVIDENCE (verified live against the otel-stack Prometheus 2026-08-24, see
-  # the OTL PR description for the full attribute-validation table):
+  # EVIDENCE (verified live against the otel-stack Prometheus, see the OTL PR
+  # description for the full attribute-validation table):
   #   - claude_code_token_usage_tokens_total / claude_code_cost_usage_USD_total
   #     (native) carry model, type (token_type), project, branch, linear_key,
-  #     task_type, catalyst_orchestration, host_name, user_email/user_account_id
-  #     -- FULL ticket + account attribution -- for any session where the
-  #     launcher's OTEL_RESOURCE_ATTRIBUTES survived (12496/22220 series over
-  #     7d carried linear_key; the launcher-trap gap documented in
-  #     otel-dashboards SKILL.md/CLAUDE_OBSERVABILITY.md still applies to the
-  #     rest).
+  #     task_type, catalyst_orchestration, host_name, account, phase,
+  #     user_email/user_account_id -- FULL ticket + account attribution -- for
+  #     any session where the launcher's OTEL_RESOURCE_ATTRIBUTES survived
+  #     (12496/22220 series over 7d carried linear_key; the launcher-trap gap
+  #     documented in otel-dashboards SKILL.md/CLAUDE_OBSERVABILITY.md still
+  #     applies to the rest). `account` here is the fleet's per-rotation slot
+  #     (e.g. "acct6"), confirmed live 2026-08-24 -- the earlier gap ("only
+  #     user_email exists and is constant") is now closed; `phase` (e.g.
+  #     "implement", "validate") is also confirmed live.
   #   - claude_code_tool_result_total (collector `count` connector, OTL-21)
-  #     ALSO carries project/branch/linear_key/task_type live today --
-  #     resource_to_telemetry_conversion promotes them same as the native
-  #     metrics. This CONTRADICTS the connector's own inline comment in
+  #     ALSO carries project/branch/linear_key/task_type/account/phase live
+  #     today -- resource_to_telemetry_conversion promotes them same as the
+  #     native metrics. This CONTRADICTS the connector's own inline comment in
   #     collector-config.yaml ("CANNOT be sliced by project/branch/host") --
   #     that comment is stale docs, not current behavior; flagged separately,
-  #     not corrected here (out of this PR's scope -- verify before relying on
-  #     it elsewhere). It does NOT carry `model`.
+  #     not corrected here (out of this PR's scope). It does NOT carry `model`.
   #   - codex_tool_call_total / codex_thread_started_total /
   #     codex_turn_ttft_duration_ms_* / codex_turn_ttfm_duration_ms_* are
   #     native codex_exec (headless relay) metrics that DO carry model,
-  #     project, branch, linear_key, task_type, host_name (host_name="laptop").
+  #     project, branch, linear_key, task_type, host_name (host_name="laptop"),
+  #     account (e.g. "codex-641648d1", the ChatGPT account_id from
+  #     ~/.codex/auth.json), and phase -- all confirmed live 2026-08-24.
   #   - codex_turn_token_usage_sum / codex_conversation_turn_count_total /
   #     codex_turn_e2e_duration_ms_* are Codex_Desktop / codex-app-server ONLY
   #     -- codex_exec never emits them (0 series, confirmed via
@@ -37,11 +43,25 @@ groups:
   #     `codex_turn_token_usage_sum{exported_job="codex_exec"}`). Headless
   #     relay token volume by ticket exists ONLY in Loki (codex.sse_event
   #     unwrap; see dashboards/codex-usage.json "Codex — Relay Attribution"
-  #     row) -- there is no Prometheus source for the ai:tokens:sum openai
-  #     leg to carry ticket/project dims. See the OTL PR gap list.
-  #   - Codex has NO cost telemetry at all (ChatGPT-subscription auth) and
-  #     this repo has no per-model price table to derive one from tokens --
-  #     ai:cost_usd:sum therefore has NO openai leg. Do not invent one.
+  #     row and the new "Estimated Cost" row) -- there is no Prometheus source
+  #     for the ai:tokens:sum openai leg to carry ticket/project dims, and
+  #     therefore no way to compute a Prometheus-native ai:cost_usd:sum openai
+  #     leg either. See the OTL PR gap list (OTL-78 tracks a
+  #     logs-to-metrics connector to close this).
+  #   - Codex has NO real cost/credit telemetry anywhere: not in the OTLP feed
+  #     (grepped every structured-metadata key on codex_exec streams -- no
+  #     cost/dollar/usd/price/credit/balance/spend field exists), not in the
+  #     local ~/.codex/sessions/**/rollout-*.jsonl rate_limits.credits block
+  #     (has_credits:false, balance:"0", plan_type:"pro" on every session
+  #     checked), and the OpenAI platform Costs API is not even reachable from
+  #     this environment (~/.codex/auth.json has an empty OPENAI_API_KEY --
+  #     auth_mode is "chatgpt", i.e. ChatGPT Plan Pro subscription, no API key
+  #     configured at all). ai:cost_usd:sum therefore has NO real openai leg
+  #     -- do not invent one. An ESTIMATED-at-API-list-price figure exists as
+  #     Loki-only dashboard panels (never a recording rule under this metric
+  #     name, to keep "real" and "estimated" impossible to blend by accident)
+  #     -- see dashboards/codex-usage.json and dashboards/ai-usage.json, and
+  #     provisioning/prometheus/codex-price-table.md for the cited source.
   #
   # These rules RENAME/RELABEL already-native, already-scraped series into a
   # shared name+label schema -- they do not introduce new label cardinality
@@ -60,7 +80,7 @@ groups:
           provider: anthropic
         expr: |
           label_replace(
-            sum by (model, type, project, branch, linear_key, task_type, catalyst_orchestration, user_email) (
+            sum by (model, type, project, branch, linear_key, task_type, catalyst_orchestration, account, phase) (
               claude_code_token_usage_tokens_total
             ),
             "token_type", "$1", "type", "(.*)"
@@ -68,7 +88,8 @@ groups:
 
       # provider=openai: Codex_Desktop/app-server ONLY (see header note --
       # codex_exec emits no token-usage metric at all). No project/branch/
-      # linear_key/task_type on this leg -- GAP, see PR description.
+      # linear_key/task_type/account/phase on this leg -- GAP, see PR
+      # description (headless-by-ticket tokens live in Loki instead).
       - record: ai:tokens:sum
         labels:
           provider: openai
@@ -84,7 +105,7 @@ groups:
         labels:
           provider: anthropic
         expr: |
-          sum by (tool_name, success, project, branch, linear_key, task_type, catalyst_orchestration) (
+          sum by (tool_name, success, project, branch, linear_key, task_type, catalyst_orchestration, account, phase) (
             claude_code_tool_result_total
           )
 
@@ -95,7 +116,7 @@ groups:
           provider: openai
         expr: |
           label_replace(
-            sum by (tool, success, model, project, branch, linear_key, task_type, host_name) (
+            sum by (tool, success, model, project, branch, linear_key, task_type, host_name, account, phase) (
               codex_tool_call_total
             ),
             "tool_name", "$1", "tool", "(.*)"
@@ -104,16 +125,17 @@ groups:
   - name: ai-canonical-cost
     interval: 1m
     rules:
-      # provider=anthropic ONLY. No openai leg -- Codex has no cost telemetry
-      # and this repo has no per-model price table (do not invent one; see
-      # the OTL PR gap list for the proposed remediation).
+      # provider=anthropic ONLY -- REAL dollars, native cost counter. No
+      # openai leg here on purpose: Codex has no real cost telemetry (see
+      # header note) and this metric name is reserved for REAL dollars only,
+      # so a consumer can trust `ai:cost_usd:sum` without checking a flag.
+      # Codex's ESTIMATED-at-list-price figure lives only in dashboard
+      # panels (Loki-sourced, labeled "estimated" in every title), never
+      # under this recording-rule name.
       - record: ai:cost_usd:sum
         labels:
           provider: anthropic
         expr: |
-          label_replace(
-            sum by (model, project, branch, linear_key, task_type, catalyst_orchestration, user_email) (
-              claude_code_cost_usage_USD_total
-            ),
-            "account", "$1", "user_email", "(.*)"
+          sum by (model, project, branch, linear_key, task_type, catalyst_orchestration, account, phase) (
+            claude_code_cost_usage_USD_total
           )
