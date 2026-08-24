@@ -97,7 +97,8 @@ Laptop sessions export **grpc direct to the internal collector's `otlp` receiver
 there — that is where the `claude_code_*` dashboards read from. The tunnel
 (`otel-collector.catalystcloud.dev` → `:4319`) is the **M3 container** route. Contract, verified:
 
-- `POST /v1/logs` and `/v1/traces` → **200**, OTLP/JSON and protobuf both accepted.
+- `POST /v1/logs` and `/v1/traces` → **200**. Verified for BOTH `Content-Type: application/json`
+  and `application/x-protobuf` (Claude Code sends protobuf, so container runners will too).
 - `POST /v1/metrics` → **404** (no OTLP metrics pipeline on that receiver; `metrics/cloudflare` is
   fed by the spanmetrics connector). Container runners need that pipeline added before their
   cost/token metrics can land.
