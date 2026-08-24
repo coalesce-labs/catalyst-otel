@@ -1819,6 +1819,143 @@
         "mode": "markdown",
         "content": "Sessions can't tell DONE from FAILED on their own -- the panels above\ncount RUNS (throughput), not completions. The coordinator verifies every\nrelay report already, so it's the right place to emit a terminal outcome\nevent once per verified report.\n\n**Proposed contract** (OTLP log, same transport as\n`scripts/ai-subscription-limit-scraper.sh` -- `http://100.65.193.30:4318/v1/logs`):\n\n- `event_name`: `relay.phase.completed` (matches this repo's existing\n  `phase.*`/`catalyst.*` event-naming convention)\n- attributes (all snake_case log-record attributes, matching every other\n  event in this schema):\n  - `linear_key` -- the ticket (e.g. `CTC-970`)\n  - `phase` -- `research`/`plan`/`implement`/`validate`/`pr`/...\n  - `provider` -- `anthropic`/`openai`\n  - `model`\n  - `account` -- the fleet rotation slot (`acct6`) or Codex account id\n  - `outcome` -- `done` | `failed` | `blocked`\n  - `duration_s`\n  - `project` -- **not** `repo`: this repo's existing convention (every\n    `OTEL_RESOURCE_ATTRIBUTES` emitter, `use_otel_context`, the dispatcher)\n    already calls this dimension `project`; introducing `repo` as a second\n    spelling of the same thing would fragment queries across two label\n    names for no reason. Use `project` to match everything else.\n\n**New signal_to_metrics rule** (collector-config.yaml, once the emitter\nexists): `ai_phase_completion_total`, a `count`-connector occurrence\ncounter keyed on `event_name==\"relay.phase.completed\"`, attributes\n`phase`, `provider`, `model`, `outcome`, `account` -- LOW-CARD ONLY,\ndeliberately NOT `linear_key`/`project` (matches this repo's existing\ncardinality rule for connector-derived metrics: ticket-level breakdowns\nstay on Loki, aggregate counters stay low-card on Prometheus). Once live,\nadd `ai:phase_completions:sum` to recording-rules.yml the same way as\n`ai:tool_calls:sum`, and a \"$ per COMPLETED phase\" panel here dividing\nthe phase-$ panels above by `ai:phase_completions:sum{outcome=\"done\"}`.\n\n**Worked emit example** (once the endpoint/format is confirmed against a\nreal collector run, same shape as `ai.subscription_limit.sampled` in\n`scripts/ai-subscription-limit-scraper.sh`):\n\n```json\nPOST http://100.65.193.30:4318/v1/logs\n{\n  \"resourceLogs\": [{\n    \"resource\": {\"attributes\": [\n      {\"key\": \"service.name\", \"value\": {\"stringValue\": \"catalyst-coordinator\"}}\n    ]},\n    \"scopeLogs\": [{\n      \"scope\": {\"name\": \"relay_phase_completion\"},\n      \"logRecords\": [{\n        \"timeUnixNano\": \"<epoch ns>\",\n        \"severityNumber\": 9, \"severityText\": \"INFO\",\n        \"body\": {\"stringValue\": \"relay.phase.completed\"},\n        \"attributes\": [\n          {\"key\": \"event_name\", \"value\": {\"stringValue\": \"relay.phase.completed\"}},\n          {\"key\": \"linear_key\", \"value\": {\"stringValue\": \"CTC-970\"}},\n          {\"key\": \"phase\", \"value\": {\"stringValue\": \"implement\"}},\n          {\"key\": \"provider\", \"value\": {\"stringValue\": \"anthropic\"}},\n          {\"key\": \"model\", \"value\": {\"stringValue\": \"claude-sonnet-5\"}},\n          {\"key\": \"account\", \"value\": {\"stringValue\": \"acct6\"}},\n          {\"key\": \"outcome\", \"value\": {\"stringValue\": \"done\"}},\n          {\"key\": \"duration_s\", \"value\": {\"doubleValue\": 842.0}},\n          {\"key\": \"project\", \"value\": {\"stringValue\": \"catalyst-cloud\"}}\n        ]\n      }]\n    }]\n  }]\n}\n```\n\nOnce you (the coordinator) wire this in, ping back and I'll add the\nrecording rule + the \"$ per COMPLETED phase\" panel."
       }
+    },
+    {
+      "id": 800,
+      "type": "row",
+      "title": "\"$ per COMPLETED Phase\" (completions, not runs)",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 125
+      },
+      "panels": []
+    },
+    {
+      "id": 80,
+      "type": "barchart",
+      "title": "Claude: $ per COMPLETED Phase (reported)",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 126
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sort_desc(sum by (phase) (max_over_time(ai:cost_usd:sum{provider=\"anthropic\",phase!=\"\"}[$__range])) / on (phase) sum by (phase) (max_over_time(ai:phase_completions:sum{provider=\"anthropic\",outcome=\"done\"}[$__range])))",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "{{phase}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "mappings": [],
+          "decimals": 2
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "legend": {
+          "showLegend": false
+        }
+      },
+      "description": "REPORTED $ divided by completions with outcome=done (excludes failed/blocked/re-dispatched runs, unlike the Phase Runs row above). NOT YET LIVE as of 2026-08-24 -- ai_phase_completion_total is a brand-new collector count-connector metric (see collector-config.yaml), needs docker compose restart otel-collector + restart otel-prometheus before this query returns data. The underlying event IS live (verified: CTC-977/research/openai/done landed in Loki as relay.phase.completed 2026-08-24) -- only the Prometheus conversion is pending deployment."
+    },
+    {
+      "id": 81,
+      "type": "stat",
+      "title": "Codex: Completions, by outcome (numerator input)",
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 12,
+        "y": 126
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum by (outcome) (max_over_time(ai:phase_completions:sum{provider=\"openai\"}[$__range]))",
+          "legendFormat": "Codex: Completions, by outcome (numerator input)",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#B877D9",
+                "value": null
+              }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background_solid",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "textMode": "value_and_name",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false,
+          "fields": ""
+        }
+      },
+      "description": "Completions by outcome, all phases. NOT YET LIVE as of 2026-08-24 -- ai_phase_completion_total is a brand-new collector count-connector metric (see collector-config.yaml), needs docker compose restart otel-collector + restart otel-prometheus before this query returns data. The underlying event IS live (verified: CTC-977/research/openai/done landed in Loki as relay.phase.completed 2026-08-24) -- only the Prometheus conversion is pending deployment."
+    },
+    {
+      "id": 82,
+      "type": "text",
+      "title": "Codex: how to combine (same pattern as Subscription Efficiency)",
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 18,
+        "y": 126
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "**Codex $ per COMPLETED phase** = (Codex Spend by Phase, calculated -- see the Claude Spend by Dimension row's Loki-sourced Codex equivalent, or the Estimated Cost row on codex-usage.json) / (ai:phase_completions:sum{provider=\"openai\",outcome=\"done\"}).\n\nNot built as a single panel on purpose: same reasoning as the Subscription Efficiency row's Codex side -- the numerator lives in Loki (Codex's calculated $ has no Prometheus series) and the denominator is now Prometheus (this new completions counter), and combining them needs a Grafana table transform (join-by-field + binary-operation calculated field) that can't be visually verified in this API-only environment. Once someone can confirm it renders, replace this text panel with the real combined one -- the Tokens by Provider panel (id 32) already proves per-target Mixed-datasource works here, just not yet a cross-datasource **calculation**."
+      }
     }
   ]
 }
