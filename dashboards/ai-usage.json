@@ -174,7 +174,7 @@
     {
       "id": 100,
       "type": "row",
-      "title": "AI Usage — Overview (real $ + estimated $, kept separate)",
+      "title": "AI Usage — Overview (reported vs calculated spend, kept separate)",
       "collapsed": false,
       "gridPos": {
         "h": 1,
@@ -187,7 +187,7 @@
     {
       "id": 1,
       "type": "stat",
-      "title": "Claude Spend (real $)",
+      "title": "Claude Spend (reported)",
       "gridPos": {
         "h": 6,
         "w": 6,
@@ -239,12 +239,12 @@
           "fields": ""
         }
       },
-      "description": "REAL dollars -- native claude_code_cost_usage_USD_total via the ai:cost_usd:sum recording rule."
+      "description": "REPORTED by Claude Code -- computed at Anthropic's published API list price (verified 2026-08-24 by cross-checking a real session's token counts against the published rates, within ~6%; see the ai:cost_usd:sum recording rule for the worked example). This is a subscription account (acct1..6 rotation), which has no per-token bill -- \"reported\" is a common list-price yardstick, not a charge."
     },
     {
       "id": 2,
       "type": "stat",
-      "title": "Codex Spend (ESTIMATED, list price)",
+      "title": "Codex Spend (calculated)",
       "gridPos": {
         "h": 6,
         "w": 6,
@@ -296,12 +296,12 @@
           "fields": ""
         }
       },
-      "description": "ESTIMATED @ OpenAI's published API list price. Codex runs on a ChatGPT Plan Pro SUBSCRIPTION -- verified no real cost/credit telemetry exists anywhere (see provisioning/prometheus/codex-price-table.md). NOT a real charge -- do not sum with the Claude panel."
+      "description": "CALCULATED by us at OpenAI's published API list price (see provisioning/prometheus/codex-price-table.md, fetched 2026-08-24, never invented). Codex runs on a ChatGPT Plan Pro SUBSCRIPTION -- verified no real cost/credit telemetry exists anywhere (rollout JSONL rate_limits.credits, the OTLP feed, or the OpenAI platform Costs API, unreachable here -- no API key configured). Like the Claude \"reported\" number, this is a common list-price yardstick for relative usage, not a real charge -- NOT summed with the Claude panel."
     },
     {
       "id": 3,
       "type": "stat",
-      "title": "Claude Tokens (real)",
+      "title": "Claude Tokens",
       "gridPos": {
         "h": 6,
         "w": 6,
@@ -357,7 +357,7 @@
     {
       "id": 4,
       "type": "stat",
-      "title": "Codex Tokens (headless relay, Loki)",
+      "title": "Codex Tokens",
       "gridPos": {
         "h": 6,
         "w": 6,
@@ -409,12 +409,12 @@
           "fields": ""
         }
       },
-      "description": "input+output tokens from codex.sse_event unwrap -- codex_exec emits no native Prometheus token-usage metric (see dashboards/codex-usage.json)."
+      "description": "input+output tokens from codex.sse_event unwrap (Loki) -- codex_exec emits no native Prometheus token-usage metric (see dashboards/codex-usage.json)."
     },
     {
       "id": 200,
       "type": "row",
-      "title": "Spend Trend — real vs estimated, plotted separately",
+      "title": "Spend Trend — reported vs calculated, plotted separately",
       "collapsed": false,
       "gridPos": {
         "h": 1,
@@ -496,12 +496,12 @@
           "sort": "desc"
         }
       },
-      "description": "REAL Claude spend only, from the native cost counter. Codex has no comparable real-$ series -- see the estimated panel alongside."
+      "description": "REPORTED Claude spend only, from the native cost counter. Codex has no comparable reported-$ series -- see the calculated panel alongside."
     },
     {
       "id": 11,
       "type": "timeseries",
-      "title": "Estimated Spend Trend — Codex (list price)",
+      "title": "Codex Spend Trend (calculated)",
       "gridPos": {
         "h": 8,
         "w": 12,
@@ -516,7 +516,7 @@
       "targets": [
         {
           "expr": "(sum(sum_over_time({service_name=\"codex_exec\"} | event_name=\"codex.sse_event\" | model=\"gpt-5.6-sol\" | unwrap input_token_count [$__interval])) - sum(sum_over_time({service_name=\"codex_exec\"} | event_name=\"codex.sse_event\" | model=\"gpt-5.6-sol\" | unwrap cached_token_count [$__interval]))) * 0.000004 + sum(sum_over_time({service_name=\"codex_exec\"} | event_name=\"codex.sse_event\" | model=\"gpt-5.6-sol\" | unwrap cached_token_count [$__interval])) * 0.0000004 + sum(sum_over_time({service_name=\"codex_exec\"} | event_name=\"codex.sse_event\" | model=\"gpt-5.6-sol\" | unwrap output_token_count [$__interval])) * 0.00002",
-          "legendFormat": "Codex (ESTIMATED $)",
+          "legendFormat": "Codex (calculated $)",
           "refId": "A"
         }
       ],
@@ -570,12 +570,12 @@
           "sort": "desc"
         }
       },
-      "description": "ESTIMATED @ API list price -- kept in its own panel, never combined with the real Claude spend panel, so the two can never be silently summed into one misleading number."
+      "description": "CALCULATED @ API list price -- kept in its own panel, never combined with the reported Claude spend panel, so the two can never be silently summed into one misleading number."
     },
     {
       "id": 300,
       "type": "row",
-      "title": "Claude Spend by Dimension (real $)",
+      "title": "Claude Spend by Dimension (reported)",
       "collapsed": false,
       "gridPos": {
         "h": 1,
@@ -845,7 +845,7 @@
     {
       "id": 25,
       "type": "barchart",
-      "title": "Estimated Spend by Ticket (Codex, list price)",
+      "title": "Codex Spend by Ticket (calculated)",
       "gridPos": {
         "h": 8,
         "w": 8,
@@ -892,12 +892,12 @@
           "showLegend": false
         }
       },
-      "description": "ESTIMATED @ list price -- same source/formula as dashboards/codex-usage.json's Estimated Cost row."
+      "description": "CALCULATED @ list price -- same source/formula as dashboards/codex-usage.json's Cost row."
     },
     {
       "id": 400,
       "type": "row",
-      "title": "Cross-Provider (real counts -- tool calls, tokens)",
+      "title": "Cross-Provider (tool calls, tokens -- both real counts, no $ involved)",
       "collapsed": false,
       "gridPos": {
         "h": 1,
@@ -1043,20 +1043,37 @@
         "y": 42
       },
       "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
+        "type": "datasource",
+        "uid": "-- Mixed --"
       },
       "interval": "$bucket",
       "targets": [
         {
           "expr": "sum by (provider) (max_over_time(ai:tokens:sum{provider=\"anthropic\"}[$__interval]))",
-          "legendFormat": "anthropic (real, ticket-level)",
-          "refId": "A"
+          "legendFormat": "anthropic (reported, ticket-level)",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
         },
         {
           "expr": "sum by (provider) (max_over_time(ai:tokens:sum{provider=\"openai\"}[$__interval]))",
-          "legendFormat": "openai (Desktop-only, NO ticket dims -- see codex-usage dashboard for headless)",
-          "refId": "B"
+          "legendFormat": "openai — desktop app (native metric, no ticket dims)",
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "expr": "sum(sum_over_time({service_name=\"codex_exec\"} | event_name=\"codex.sse_event\" | unwrap input_token_count [$__interval])) + sum(sum_over_time({service_name=\"codex_exec\"} | event_name=\"codex.sse_event\" | unwrap output_token_count [$__interval]))",
+          "legendFormat": "openai — relay (headless, Loki)",
+          "refId": "C",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          }
         }
       ],
       "fieldConfig": {
@@ -1109,7 +1126,7 @@
           "sort": "desc"
         }
       },
-      "description": "Asymmetric on purpose: the anthropic leg of ai:tokens:sum carries full ticket/project dims (native claude_code_* metrics); the openai leg is Codex_Desktop/app-server ONLY (codex_exec emits no token-usage Prometheus metric at all -- see dashboards/codex-usage.json 'Relay Attribution' row for headless-by-ticket tokens, sourced from Loki instead)."
+      "description": "Now includes headless relay tokens (Loki-derived, codex.sse_event unwrap of input_token_count+output_token_count -- same unit as the two Prometheus legs, raw token counts, so all three are comparable on one axis) alongside the two native Prometheus legs. The anthropic leg carries full ticket/project dims (native claude_code_* metrics); the openai-desktop leg is Codex_Desktop/app-server only (codex_exec emits no native token-usage Prometheus metric at all -- see dashboards/codex-usage.json 'Relay Attribution' row for the same headless-by-ticket data broken out by ticket)."
     },
     {
       "id": 500,
@@ -1164,13 +1181,13 @@
       },
       "options": {
         "mode": "markdown",
-        "content": "### Read this before trusting these numbers\n\n**Directional, not billing truth.** Both providers are flat-rate subscriptions\n($200/mo-class) -- there is no per-token bill to reconcile against. This row\nanswers \"how many retail-priced dollars of work does each subscription\nwindow deliver\" as a **relative efficiency signal**, not a real cost.\n\n- **Numerator** (retail-$): `claude_code_cost_usage_USD_total` is Claude\n  Code's own list-price approximation -- verified 2026-08-24 by cross-checking\n  a real session's token counts against Anthropic's published API pricing\n  (computed $216.12 vs Claude Code's reported $229.56, within ~6%, consistent\n  with the SAME pricing basis -- see recording-rules.yml for the worked\n  example). Codex's numerator is the Task A ESTIMATED-cost series (same\n  list-price logic, Loki-only -- see the two panels below).\n- **Denominator** (limit consumed): neither provider exports this as OTLP.\n  `ai_subscription_limit_used_percent` is a NEW gauge fed by\n  `scripts/ai-subscription-limit-scraper.sh` (proven live end-to-end\n  2026-08-24) -- not yet reflected in Prometheus until the collector config\n  is deployed (restart required).\n- **Limit-charging weights are opaque.** A model that looks \"cheap per\n  limit-%\" here might be internally weighted differently against the actual\n  subscription quota than its published token price implies -- Anthropic/\n  OpenAI do not publish that mapping.\n- **Reset-boundary handling**: the ratio uses a rolling `[5h]`/`[7d]` lookback,\n  not a window strictly aligned to `resets_at`. Right after a reset,\n  `used_percent` drops to ~0 while the rolling $ window still includes\n  pre-reset spend -- the ratio will read artificially high in that gap.\n  Cross-check `resets_at` (carried on every subscription-limit sample) before\n  trusting a ratio near a reset boundary.\n\n- **Claude has NO historical subscription-limit data, anywhere, ever.** The\n  5h/7d `used_percent` this dashboard reads (`catalyst-stack claude-account\n  status` / `claude-accounts-usage.mjs --json`) is a LIVE snapshot of\n  CURRENT usage from Anthropic's OAuth usage endpoint -- it has no history\n  API and this fleet has never logged past readings anywhere. The\n  Subscription Efficiency panels above only have Claude data from whenever\n  `scripts/ai-subscription-limit-scraper.sh`'s cron started sampling it\n  (2026-08-24) forward. If you're looking for what Claude's limit usage\n  looked like last week, it does not exist -- don't go hunting for it.\n- **Codex DOES have bounded history** (`scripts/codex-limit-history-replay.sh`,\n  one-shot, already run 2026-08-24): its rollout JSONLs carry a\n  `rate_limits` snapshot on every turn, going back to 2025-09-16 on this\n  laptop -- but Loki's out-of-order ingestion window caps what's actually\n  queryable at ~7 days back from whenever the replay runs (168h, Loki's\n  default `reject_old_samples_max_age`, measured empirically -- not\n  overridable after the fact). The 2026-08-24 replay landed 60 of 82\n  candidate samples spanning 2026-08-19 through 2026-08-24 (some data loss\n  from Loki's per-stream ingestion ordering, not from the 168h cutoff\n  itself -- see the script's comments).\n"
+        "content": "### Read this before trusting these numbers\n\n**Directional, not billing truth.** Neither number is a real marginal dollar -- both are list-price valuations of usage that differ only in who computed them (Claude Code reports its own; we calculate Codex's from tokens). They exist as a common yardstick for the efficiency quotient below, not as bills. Both providers are flat-rate subscriptions\n($200/mo-class) -- there is no per-token bill to reconcile against. This row\nanswers \"how many retail-priced dollars of work does each subscription\nwindow deliver\" as a **relative efficiency signal**, not a real cost.\n\n- **Numerator** (retail-$): `claude_code_cost_usage_USD_total` is Claude\n  Code's own list-price approximation -- verified 2026-08-24 by cross-checking\n  a real session's token counts against Anthropic's published API pricing\n  (computed $216.12 vs Claude Code's reported $229.56, within ~6%, consistent\n  with the SAME pricing basis -- see recording-rules.yml for the worked\n  example). Codex's numerator is the Task A ESTIMATED-cost series (same\n  list-price logic, Loki-only -- see the two panels below).\n- **Denominator** (limit consumed): neither provider exports this as OTLP.\n  `ai_subscription_limit_used_percent` is a NEW gauge fed by\n  `scripts/ai-subscription-limit-scraper.sh` (proven live end-to-end\n  2026-08-24) -- not yet reflected in Prometheus until the collector config\n  is deployed (restart required).\n- **Limit-charging weights are opaque.** A model that looks \"cheap per\n  limit-%\" here might be internally weighted differently against the actual\n  subscription quota than its published token price implies -- Anthropic/\n  OpenAI do not publish that mapping.\n- **Reset-boundary handling**: the ratio uses a rolling `[5h]`/`[7d]` lookback,\n  not a window strictly aligned to `resets_at`. Right after a reset,\n  `used_percent` drops to ~0 while the rolling $ window still includes\n  pre-reset spend -- the ratio will read artificially high in that gap.\n  Cross-check `resets_at` (carried on every subscription-limit sample) before\n  trusting a ratio near a reset boundary.\n\n- **Claude has NO historical subscription-limit data, anywhere, ever.** The\n  5h/7d `used_percent` this dashboard reads (`catalyst-stack claude-account\n  status` / `claude-accounts-usage.mjs --json`) is a LIVE snapshot of\n  CURRENT usage from Anthropic's OAuth usage endpoint -- it has no history\n  API and this fleet has never logged past readings anywhere. The\n  Subscription Efficiency panels above only have Claude data from whenever\n  `scripts/ai-subscription-limit-scraper.sh`'s cron started sampling it\n  (2026-08-24) forward. If you're looking for what Claude's limit usage\n  looked like last week, it does not exist -- don't go hunting for it.\n- **Codex DOES have bounded history** (`scripts/codex-limit-history-replay.sh`,\n  one-shot, already run 2026-08-24): its rollout JSONLs carry a\n  `rate_limits` snapshot on every turn, going back to 2025-09-16 on this\n  laptop -- but Loki's out-of-order ingestion window caps what's actually\n  queryable at ~7 days back from whenever the replay runs (168h, Loki's\n  default `reject_old_samples_max_age`, measured empirically -- not\n  overridable after the fact). The 2026-08-24 replay landed 60 of 82\n  candidate samples spanning 2026-08-19 through 2026-08-24 (some data loss\n  from Loki's per-stream ingestion ordering, not from the 168h cutoff\n  itself -- see the script's comments).\n"
       }
     },
     {
       "id": 61,
       "type": "barchart",
-      "title": "Claude: Retail-$ per Full 5h Window (by account)",
+      "title": "Claude: Retail-$ per Full 5h Window (reported, by account)",
       "gridPos": {
         "h": 8,
         "w": 8,
@@ -1222,7 +1239,7 @@
     {
       "id": 62,
       "type": "barchart",
-      "title": "Claude: Retail-$ per Full 7d Window (by account)",
+      "title": "Claude: Retail-$ per Full 7d Window (reported, by account)",
       "gridPos": {
         "h": 8,
         "w": 8,
@@ -1274,7 +1291,7 @@
     {
       "id": 63,
       "type": "barchart",
-      "title": "Claude: Retail-$ per Limit-% by Model (5h) — which models burn limit fastest per $",
+      "title": "Claude: Retail-$ per Limit-% by Model (reported, 5h) — which models burn limit fastest per $",
       "gridPos": {
         "h": 8,
         "w": 8,
@@ -1326,7 +1343,7 @@
     {
       "id": 64,
       "type": "stat",
-      "title": "Codex: Estimated Spend, trailing 7d (numerator)",
+      "title": "Codex: Spend (calculated), trailing 7d (numerator)",
       "gridPos": {
         "h": 6,
         "w": 6,
@@ -1449,7 +1466,358 @@
       },
       "options": {
         "mode": "markdown",
-        "content": "**Codex retail-$ per full 7d window** = (Estimated Spend panel value) / (Used-Percent panel value / 100).\n\nExample from the 2026-08-24 verification run: $68.70 estimated spend at 27.0% of the 7-day window used -> **~$254.40 per full window** at the observed rate.\n\nNot computed as a single Grafana panel on purpose: the numerator lives in Loki (Codex headless has no native Prometheus token-usage metric, see dashboards/codex-usage.json) and the denominator lives in Prometheus (the new subscription-limit gauge) -- combining a Loki series and a Prometheus series in one panel needs a Grafana Mixed-datasource transform that could not be visually verified in this environment (API-only access, no rendered browser). Two clearly-labeled panels side by side is honest and correct; a true combined panel is a good follow-up once someone can verify it renders."
+        "content": "**Codex retail-$ per full 7d window (calculated)** = (Spend/calculated panel value) / (Used-Percent panel value / 100).\n\nExample from the 2026-08-24 verification run: $68.70 calculated spend at 27.0% of the 7-day window used -> **~$254.40 per full window** at the observed rate.\n\nNot computed as a single Grafana panel on purpose: the numerator lives in Loki (Codex headless has no native Prometheus token-usage metric, see dashboards/codex-usage.json) and the denominator lives in Prometheus (the new subscription-limit gauge) -- combining a Loki series and a Prometheus series in one panel needs a Grafana Mixed-datasource transform that could not be visually verified in this environment (API-only access, no rendered browser). Two clearly-labeled panels side by side is honest and correct; a true combined panel is a good follow-up once someone can verify it renders."
+      }
+    },
+    {
+      "id": 700,
+      "type": "row",
+      "title": "Phase Throughput & Unit Economics",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 87
+      },
+      "panels": []
+    },
+    {
+      "id": 70,
+      "type": "text",
+      "title": "Coverage caveat",
+      "gridPos": {
+        "h": 5,
+        "w": 24,
+        "x": 0,
+        "y": 88
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "`phase` is a resource attribute the relay dispatcher only started stamping on\nsessions dispatched after ~13:00 today (2026-08-24) -- unlabeled sessions are\nexcluded from every panel below, not blended into an \"unknown\" bucket (same\nrule as the account/phase panels above). Today's data will only show whatever\nphases have actually run since then (e.g. implement/validate/plan/research) --\nthat's real sparse coverage building up over time, not a bug. \"Phase RUNS\"\ncounts every distinct session/conversation that started in that phase,\n**including failed or re-dispatched ones** -- this is throughput, not\ncompletions. A real \"$ per COMPLETED phase\" metric needs a completion-event\ncontract (see the design note panel below) that doesn't exist yet."
+      }
+    },
+    {
+      "id": 71,
+      "type": "barchart",
+      "title": "Claude Phase Runs (session count, not completions)",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 93
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sort_desc(count by (phase) (count by (phase, session_id) (max_over_time(claude_code_token_usage_tokens_total{phase!=\"\"}[$__range]))))",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "{{phase}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "legend": {
+          "showLegend": false
+        }
+      },
+      "description": "Distinct session_id per phase. A run that failed or was re-dispatched still counts -- this is throughput, not completions."
+    },
+    {
+      "id": 72,
+      "type": "barchart",
+      "title": "Codex Phase Runs (conversation count, not completions)",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 93
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "targets": [
+        {
+          "expr": "sort_desc(count by (phase) (count by (phase, conversation_id) (count_over_time({service_name=\"codex_exec\"} | event_name=\"codex.conversation_starts\" | phase!=\"\" [$__range]))))",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "{{phase}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "legend": {
+          "showLegend": false
+        }
+      },
+      "description": "Distinct conversation_id per phase, counted via codex.conversation_starts (sparse, low-cardinality event -- avoids Loki's 500-series query cap that a raw stream count hits)."
+    },
+    {
+      "id": 73,
+      "type": "barchart",
+      "title": "Claude: $ per Phase-Run (reported)",
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 0,
+        "y": 101
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sort_desc(sum by (phase) (max_over_time(claude_code_cost_usage_USD_total{phase!=\"\"}[$__range])) / on (phase) count by (phase) (count by (phase, session_id) (max_over_time(claude_code_token_usage_tokens_total{phase!=\"\"}[$__range]))))",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "{{phase}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "mappings": [],
+          "decimals": 2
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "legend": {
+          "showLegend": false
+        }
+      },
+      "description": "REPORTED $ (Claude Code's own API-list-price computation) divided by phase-run count. What a research/plan/implement/validate run costs on Claude, per unit of work."
+    },
+    {
+      "id": 74,
+      "type": "barchart",
+      "title": "Codex: $ per Phase-Run (calculated)",
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 6,
+        "y": 101
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "targets": [
+        {
+          "expr": "((sum by (phase) (sum_over_time({service_name=\"codex_exec\"} | event_name=\"codex.sse_event\" | model=\"gpt-5.6-sol\" | phase!=\"\" | unwrap input_token_count [$__range])) - sum by (phase) (sum_over_time({service_name=\"codex_exec\"} | event_name=\"codex.sse_event\" | model=\"gpt-5.6-sol\" | phase!=\"\" | unwrap cached_token_count [$__range]))) * 0.000004 + sum by (phase) (sum_over_time({service_name=\"codex_exec\"} | event_name=\"codex.sse_event\" | model=\"gpt-5.6-sol\" | phase!=\"\" | unwrap cached_token_count [$__range])) * 0.0000004 + sum by (phase) (sum_over_time({service_name=\"codex_exec\"} | event_name=\"codex.sse_event\" | model=\"gpt-5.6-sol\" | phase!=\"\" | unwrap output_token_count [$__range])) * 0.00002) / on (phase) count by (phase) (count by (phase, conversation_id) (count_over_time({service_name=\"codex_exec\"} | event_name=\"codex.conversation_starts\" | phase!=\"\" [$__range])))",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "{{phase}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "mappings": [],
+          "decimals": 2
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "legend": {
+          "showLegend": false
+        }
+      },
+      "description": "CALCULATED $ (API list price) divided by phase-run count. Same list-price-per-unit-of-work idea as the Claude panel, computed the other way (Loki-native since Codex's numerator has no Prometheus series)."
+    },
+    {
+      "id": 75,
+      "type": "barchart",
+      "title": "Claude: Tokens per Phase-Run",
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 12,
+        "y": 101
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sort_desc(sum by (phase) (max_over_time(claude_code_token_usage_tokens_total{phase!=\"\"}[$__range])) / on (phase) count by (phase) (count by (phase, session_id) (max_over_time(claude_code_token_usage_tokens_total{phase!=\"\"}[$__range]))))",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "{{phase}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "legend": {
+          "showLegend": false
+        }
+      },
+      "description": "Provider-neutral throughput variant of the $-per-phase-run panel."
+    },
+    {
+      "id": 76,
+      "type": "barchart",
+      "title": "Codex: Tokens per Phase-Run",
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 18,
+        "y": 101
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "targets": [
+        {
+          "expr": "(sum by (phase) (sum_over_time({service_name=\"codex_exec\"} | event_name=\"codex.sse_event\" | phase!=\"\" | unwrap input_token_count [$__range])) + sum by (phase) (sum_over_time({service_name=\"codex_exec\"} | event_name=\"codex.sse_event\" | phase!=\"\" | unwrap output_token_count [$__range]))) / on (phase) count by (phase) (count by (phase, conversation_id) (count_over_time({service_name=\"codex_exec\"} | event_name=\"codex.conversation_starts\" | phase!=\"\" [$__range])))",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "{{phase}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "legend": {
+          "showLegend": false
+        }
+      },
+      "description": "Provider-neutral throughput variant of the $-per-phase-run panel."
+    },
+    {
+      "id": 77,
+      "type": "text",
+      "title": "Design note: completion-event contract (for the coordinator to implement)",
+      "gridPos": {
+        "h": 16,
+        "w": 24,
+        "x": 0,
+        "y": 109
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "Sessions can't tell DONE from FAILED on their own -- the panels above\ncount RUNS (throughput), not completions. The coordinator verifies every\nrelay report already, so it's the right place to emit a terminal outcome\nevent once per verified report.\n\n**Proposed contract** (OTLP log, same transport as\n`scripts/ai-subscription-limit-scraper.sh` -- `http://100.65.193.30:4318/v1/logs`):\n\n- `event_name`: `relay.phase.completed` (matches this repo's existing\n  `phase.*`/`catalyst.*` event-naming convention)\n- attributes (all snake_case log-record attributes, matching every other\n  event in this schema):\n  - `linear_key` -- the ticket (e.g. `CTC-970`)\n  - `phase` -- `research`/`plan`/`implement`/`validate`/`pr`/...\n  - `provider` -- `anthropic`/`openai`\n  - `model`\n  - `account` -- the fleet rotation slot (`acct6`) or Codex account id\n  - `outcome` -- `done` | `failed` | `blocked`\n  - `duration_s`\n  - `project` -- **not** `repo`: this repo's existing convention (every\n    `OTEL_RESOURCE_ATTRIBUTES` emitter, `use_otel_context`, the dispatcher)\n    already calls this dimension `project`; introducing `repo` as a second\n    spelling of the same thing would fragment queries across two label\n    names for no reason. Use `project` to match everything else.\n\n**New signal_to_metrics rule** (collector-config.yaml, once the emitter\nexists): `ai_phase_completion_total`, a `count`-connector occurrence\ncounter keyed on `event_name==\"relay.phase.completed\"`, attributes\n`phase`, `provider`, `model`, `outcome`, `account` -- LOW-CARD ONLY,\ndeliberately NOT `linear_key`/`project` (matches this repo's existing\ncardinality rule for connector-derived metrics: ticket-level breakdowns\nstay on Loki, aggregate counters stay low-card on Prometheus). Once live,\nadd `ai:phase_completions:sum` to recording-rules.yml the same way as\n`ai:tool_calls:sum`, and a \"$ per COMPLETED phase\" panel here dividing\nthe phase-$ panels above by `ai:phase_completions:sum{outcome=\"done\"}`.\n\n**Worked emit example** (once the endpoint/format is confirmed against a\nreal collector run, same shape as `ai.subscription_limit.sampled` in\n`scripts/ai-subscription-limit-scraper.sh`):\n\n```json\nPOST http://100.65.193.30:4318/v1/logs\n{\n  \"resourceLogs\": [{\n    \"resource\": {\"attributes\": [\n      {\"key\": \"service.name\", \"value\": {\"stringValue\": \"catalyst-coordinator\"}}\n    ]},\n    \"scopeLogs\": [{\n      \"scope\": {\"name\": \"relay_phase_completion\"},\n      \"logRecords\": [{\n        \"timeUnixNano\": \"<epoch ns>\",\n        \"severityNumber\": 9, \"severityText\": \"INFO\",\n        \"body\": {\"stringValue\": \"relay.phase.completed\"},\n        \"attributes\": [\n          {\"key\": \"event_name\", \"value\": {\"stringValue\": \"relay.phase.completed\"}},\n          {\"key\": \"linear_key\", \"value\": {\"stringValue\": \"CTC-970\"}},\n          {\"key\": \"phase\", \"value\": {\"stringValue\": \"implement\"}},\n          {\"key\": \"provider\", \"value\": {\"stringValue\": \"anthropic\"}},\n          {\"key\": \"model\", \"value\": {\"stringValue\": \"claude-sonnet-5\"}},\n          {\"key\": \"account\", \"value\": {\"stringValue\": \"acct6\"}},\n          {\"key\": \"outcome\", \"value\": {\"stringValue\": \"done\"}},\n          {\"key\": \"duration_s\", \"value\": {\"doubleValue\": 842.0}},\n          {\"key\": \"project\", \"value\": {\"stringValue\": \"catalyst-cloud\"}}\n        ]\n      }]\n    }]\n  }]\n}\n```\n\nOnce you (the coordinator) wire this in, ping back and I'll add the\nrecording rule + the \"$ per COMPLETED phase\" panel."
       }
     }
   ]
