@@ -30,6 +30,84 @@ Loki events (body `|= "codex.tool_result"` under `{service_name=~"codex.*"}`; at
 - **Sparse-event KPIs** (Turns, Tool Calls, Threads, event logs) use Loki `count_over_time`, **not** Prometheus `increase()` — native `codex_*` counters expire at `metric_expiration:15m`, so a short/idle session keeps only its first sample and `increase()` reads zero. Turns = `codex.turn_ttft`; Tool Calls = `codex.tool_result`; Threads = `codex.conversation_starts`.
 - The **Tokens** KPI has no per-event Loki source, so it uses the Prometheus `codex_turn_token_usage_sum` histogram, filtered by `model` only (it carries `token_type`+`model`, never `originator`/`host_name`).
 
+## Relay workers and container runners — attribution schema
+
+The mini execution-core daemons are **retired**. Work runs as **laptop relay workers**
+(`relay-dispatch.sh`, one `claude -p` per ticket) and, next, as **Cloudflare container runners**.
+Both are ordinary Claude Code sessions emitting the same `claude_code_*` metrics and
+`claude_code.*` events, so everything depends on what the launcher stamps on the OTel resource.
+
+**Use the fleet's existing keys — do NOT invent new ones.** The daemon's per-worker composition
+(CTL-492/495) is what the dashboards are already built on, and the collector already promotes it:
+
+| resource attribute | label | notes |
+| -- | -- | -- |
+| `linear.key` | `linear_key` | **the ticket.** `unified-dashboard.json` keys *Token Burn / Cost / Tokens by Ticket* and *Unique Tickets* on it. A new `catalyst.ticket` would be a second, unused spelling — don't. |
+| `task.type` | `task_type` | the phase. Drives *Cost by Phase* / *Tokens by Phase*. |
+| `project` / `branch` | `project` / `branch` | repo + branch; these are unified's template vars. |
+| `catalyst.orchestration` | `catalyst_orchestration` | who dispatched. Relay sets `relay`, which is the **relay-vs-interactive discriminator** (interactive sets nothing). |
+
+For the container era, prefer **real semconv fields** over customs — all four verified end-to-end
+through the CF tunnel into both Loki and Prometheus:
+
+| `service.instance.id` | `service_instance_id` | which instance produced the record |
+| `cloud.provider` / `cloud.platform` / `cloud.region` | `cloud_*` | absent on laptops, so `cloud_platform` cleanly separates runtimes |
+| `container.id` | `container_id` | the container instance |
+| `session.id` | `session_id` | already set by Claude Code itself |
+
+### Loki promotes resource attributes automatically — the allowlist is NOT for that
+
+⚠️ The comment above `transform/logs` says resource attributes "are not automatically promoted by
+Loki's default config". **That is wrong as an argument for the allowlist.** Measured 2026-08-24: an
+OTLP post carrying `catalyst.ticket`, `catalyst.phase`, `cloud.provider/platform/region`,
+`container.id`, `service.instance.id` and `session.id` went through `logs/cloudflare` — whose only
+processor is `resource/catalyst_cloud` — and **every one** arrived in Loki as structured metadata,
+dot-to-underscore sanitized. Independently: `session_id`, `terminal_type`, `app_version` and
+`organization_id` appear on `claude-code` streams and are in **no** allowlist entry.
+
+So do not add a `transform/logs` copy just to make an attribute queryable in Loki — it already is.
+The allowlist's real job is to create **log-record** attributes, which is what the logs-to-metrics
+**connectors** group by (a connector cannot read a resource attribute). Add an entry only when a
+connector needs that key as a grouping dimension. Prometheus needs nothing either way: the
+`prometheus` exporter's `resource_to_telemetry_conversion` promotes any resource attribute to a label.
+
+### ⚠️ The launcher trap that cost this signal entirely
+
+`~/.claude/settings.json` has an `env` block, and it applies to **every** Claude Code session on the
+box — **including one launched as `env OTEL_...=... claude -p`. The settings value wins.** Measured
+2026-08-24: the relay dispatcher set `service.name`, `catalyst.ticket`, `host.name` and an endpoint
+override; relay session `e68e2e6f` (CTC-178, 15:48:37Z–15:59:47Z) delivered **420 log records** in
+which all four resolved to the *settings* values — `service_name="claude-code"`, `host_name="laptop"`,
+no ticket, and no `service_namespace` (proving it went to the local collector, not the configured
+tunnel). The data was never lost; it was **anonymous**, which reads exactly like "never sent".
+
+The lever that outranks user settings is **`claude --settings <file>`** (documented order: managed >
+command line > project-local > project > user). The file **replaces** the user value wholesale, so it
+must restate every key you want — including the `host.name` pin.
+
+The same replacement is why laptop sessions carry no `project`/`branch`/`linear_key` by default:
+the user block's `OTEL_RESOURCE_ATTRIBUTES=host.name=laptop` overwrites direnv `use_otel_context`'s
+richer set. Note `host_name` and `hostname` are **two different labels from two different sources**
+(the settings pin vs direnv's `hostname -s`); nothing currently emits `hostname`, so a dashboard
+filtering `hostname=~"$hostname"` will have an empty variable.
+
+### The CF tunnel is the CONTAINER route, not the laptop route
+
+Laptop sessions export **grpc direct to the internal collector's `otlp` receiver** and must stay
+there — that is where the `claude_code_*` dashboards read from. The tunnel
+(`otel-collector.catalystcloud.dev` → `:4319`) is the **M3 container** route. Contract, verified:
+
+- `POST /v1/logs` and `/v1/traces` → **200**. Verified for BOTH `Content-Type: application/json`
+  and `application/x-protobuf` (Claude Code sends protobuf, so container runners will too).
+- `POST /v1/metrics` → **404** (no OTLP metrics pipeline on that receiver; `metrics/cloudflare` is
+  fed by the spanmetrics connector). Container runners need that pipeline added before their
+  cost/token metrics can land.
+- Required headers: `CF-Access-Client-Id` + `CF-Access-Client-Secret` (the ingest pair). Without
+  them the edge returns **403** — always run that no-auth control, because a 403 proves Access
+  works and the fault is elsewhere.
+- Everything through this receiver gets `service.namespace=catalyst-cloud`, so its presence on a
+  record is a reliable "came via the tunnel" marker.
+
 ## Loki: structured metadata, NOT stream labels — critical gotcha
 
 Only `service_name`, `service_namespace`, `__stream_shard__` are Loki **stream labels**. Every other OTel attribute — `event_name`, `event_action`, `event_entity`, `tool_name`, `success`, `status_code`, `model`, `host_name`, `scheduler_*`, … — is **structured metadata**, not a stream label. `event_name` is the short form (`tool_result`); the body carries the full `claude_code.tool_result`.
