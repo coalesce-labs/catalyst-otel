@@ -15,7 +15,7 @@
       }
     ]
   },
-  "description": "Unified Claude Code observability — cost, tokens, tools, repos, tickets, and Catalyst orchestration",
+  "description": "Unified Claude Code observability \u2014 cost, tokens, tools, repos, tickets, and Catalyst orchestration",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
@@ -25,7 +25,7 @@
   "panels": [
     {
       "type": "row",
-      "title": "① Spend & Tokens",
+      "title": "\u2460 Spend & Tokens",
       "collapsed": false,
       "gridPos": {
         "h": 1,
@@ -52,7 +52,7 @@
       },
       "targets": [
         {
-          "expr": "sum(increase(claude_code_cost_usage_USD_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range]))",
+          "expr": "sum(max_over_time(claude_code_cost_usage_USD_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range]))",
           "legendFormat": "Cost",
           "refId": "A"
         }
@@ -98,7 +98,8 @@
           "values": false,
           "fields": ""
         }
-      }
+      },
+      "description": "Aggregated with max_over_time, not increase: these counters are cumulative PER SESSION (every series carries session_id) and expire 15m after their last sample, so increase() would treat a short session's first sample as its baseline and undercount. See OTL-75."
     },
     {
       "id": 2,
@@ -116,7 +117,7 @@
       },
       "targets": [
         {
-          "expr": "sum(increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range]))",
+          "expr": "sum(max_over_time(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range]))",
           "legendFormat": "Tokens",
           "refId": "A"
         }
@@ -154,7 +155,8 @@
           "values": false,
           "fields": ""
         }
-      }
+      },
+      "description": "Aggregated with max_over_time, not increase: these counters are cumulative PER SESSION (every series carries session_id) and expire 15m after their last sample, so increase() would treat a short session's first sample as its baseline and undercount. See OTL-75."
     },
     {
       "id": 3,
@@ -228,7 +230,7 @@
       },
       "targets": [
         {
-          "expr": "sum(increase(claude_code_lines_of_code_count_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range]))",
+          "expr": "sum(max_over_time(claude_code_lines_of_code_count_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range]))",
           "legendFormat": "Lines",
           "refId": "A"
         }
@@ -266,12 +268,13 @@
           "values": false,
           "fields": ""
         }
-      }
+      },
+      "description": "Aggregated with max_over_time, not increase: these counters are cumulative PER SESSION (every series carries session_id) and expire 15m after their last sample, so increase() would treat a short session's first sample as its baseline and undercount. See OTL-75."
     },
     {
       "id": 6,
       "title": "Tool Calls",
-      "description": "Fleet-wide total tool executions (claude_code_tool_result_total, OTL-21 connector). This connector metric carries only low-card resource labels (no project / branch / hostname / linear_key), so it does NOT narrow with the $project / $branch / $hostname filters — it is a fleet aggregate by design. Use the by-project / by-ticket tool panels (Loki) to slice.",
+      "description": "Fleet-wide total tool executions (claude_code_tool_result_total, OTL-21 connector). This connector metric carries only low-card resource labels (no project / branch / hostname / linear_key), so it does NOT narrow with the $project / $branch / $hostname filters \u2014 it is a fleet aggregate by design. Use the by-project / by-ticket tool panels (Loki) to slice.",
       "type": "stat",
       "gridPos": {
         "h": 4,
@@ -335,7 +338,7 @@
     },
     {
       "id": 76,
-      "title": "Spend by Host",
+      "title": "Cumulative Spend by Host",
       "type": "timeseries",
       "gridPos": {
         "h": 7,
@@ -349,7 +352,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (display) (label_replace(label_replace(sum by (host_name, hostname) (increase(claude_code_cost_usage_USD_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"}[$__interval])), \"display\", \"$1\", \"hostname\", \"(.+)\"), \"display\", \"$1\", \"host_name\", \"(.+)\"))",
+          "expr": "sum by (display) (label_replace(label_replace(sum by (host_name, hostname) (max_over_time(claude_code_cost_usage_USD_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"}[$__interval])), \"display\", \"$1\", \"hostname\", \"(.+)\"), \"display\", \"$1\", \"host_name\", \"(.+)\"))",
           "legendFormat": "{{display}}",
           "refId": "A",
           "interval": "$bucket"
@@ -407,11 +410,11 @@
           "sort": "desc"
         }
       },
-      "description": "$ spent per time bucket, grouped by canonical host_name (falls back to the machine's hostname when host_name is not set). Shows which hosts are actively spending. Note: only hosts with the OTel context configured emit the canonical host_name (e.g. laptop); others appear under their FQDN."
+      "description": "$ spent per time bucket, grouped by canonical host_name (falls back to the machine's hostname when host_name is not set). Shows which hosts are actively spending. Note: only hosts with the OTel context configured emit the canonical host_name (e.g. laptop); others appear under their FQDN. Aggregated with max_over_time, not increase: these counters are cumulative PER SESSION (every series carries session_id) and expire 15m after their last sample, so increase() would treat a short session's first sample as its baseline and undercount. See OTL-75."
     },
     {
       "id": 77,
-      "title": "Tokens by Host",
+      "title": "Cumulative Tokens by Host",
       "type": "timeseries",
       "gridPos": {
         "h": 7,
@@ -425,7 +428,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (display) (label_replace(label_replace(sum by (host_name, hostname) (increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"}[$__interval])), \"display\", \"$1\", \"hostname\", \"(.+)\"), \"display\", \"$1\", \"host_name\", \"(.+)\"))",
+          "expr": "sum by (display) (label_replace(label_replace(sum by (host_name, hostname) (max_over_time(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"}[$__interval])), \"display\", \"$1\", \"hostname\", \"(.+)\"), \"display\", \"$1\", \"host_name\", \"(.+)\"))",
           "legendFormat": "{{display}}",
           "refId": "A",
           "interval": "$bucket"
@@ -483,11 +486,11 @@
           "sort": "desc"
         }
       },
-      "description": "Tokens consumed per time bucket, grouped by canonical host_name (falls back to hostname when host_name is not set). A liveliness view of per-host activity."
+      "description": "Tokens consumed per time bucket, grouped by canonical host_name (falls back to hostname when host_name is not set). A liveliness view of per-host activity. Aggregated with max_over_time, not increase: these counters are cumulative PER SESSION (every series carries session_id) and expire 15m after their last sample, so increase() would treat a short session's first sample as its baseline and undercount. See OTL-75."
     },
     {
       "id": 7,
-      "title": "Spend by Model",
+      "title": "Cumulative Spend by Model",
       "type": "timeseries",
       "gridPos": {
         "h": 7,
@@ -501,7 +504,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (model_family) (label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(sum by (model) (increase(claude_code_cost_usage_USD_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__interval])), \"model_family\", \"$1\", \"model\", \"(.+)\"), \"model_family\", \"$1 $2.$3\", \"model\", \"claude-([a-z]+)-([0-9]+)-([0-9]+).*\"), \"model_family\", \"$1 $2\", \"model\", \"claude-([a-z]+)-([0-9]+)(\\\\[[^]]*\\\\])?$\"), \"model_family\", \"Opus $1\", \"model_family\", \"opus (.*)\"), \"model_family\", \"Haiku $1\", \"model_family\", \"haiku (.*)\"), \"model_family\", \"Sonnet $1\", \"model_family\", \"sonnet (.*)\"), \"model_family\", \"Fable $1\", \"model_family\", \"fable (.*)\"))",
+          "expr": "sum by (model_family) (label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(sum by (model) (max_over_time(claude_code_cost_usage_USD_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__interval])), \"model_family\", \"$1\", \"model\", \"(.+)\"), \"model_family\", \"$1 $2.$3\", \"model\", \"claude-([a-z]+)-([0-9]+)-([0-9]+).*\"), \"model_family\", \"$1 $2\", \"model\", \"claude-([a-z]+)-([0-9]+)(\\\\[[^]]*\\\\])?$\"), \"model_family\", \"Opus $1\", \"model_family\", \"opus (.*)\"), \"model_family\", \"Haiku $1\", \"model_family\", \"haiku (.*)\"), \"model_family\", \"Sonnet $1\", \"model_family\", \"sonnet (.*)\"), \"model_family\", \"Fable $1\", \"model_family\", \"fable (.*)\"))",
           "legendFormat": "{{model_family}}",
           "refId": "A",
           "interval": "$bucket"
@@ -605,11 +608,11 @@
           "sort": "desc"
         }
       },
-      "description": "$ spent per time bucket (width = Grafana $__interval, typically 15s-15m depending on zoom). Each point = actual cost attributed to that bucket."
+      "description": "$ spent per time bucket (width = Grafana $__interval, typically 15s-15m depending on zoom). Each point = actual cost attributed to that bucket. Aggregated with max_over_time, not increase: these counters are cumulative PER SESSION (every series carries session_id) and expire 15m after their last sample, so increase() would treat a short session's first sample as its baseline and undercount. See OTL-75."
     },
     {
       "id": 8,
-      "title": "Tokens by Type",
+      "title": "Cumulative Tokens by Type",
       "type": "timeseries",
       "gridPos": {
         "h": 7,
@@ -623,7 +626,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (type) (increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__interval]))",
+          "expr": "sum by (type) (max_over_time(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__interval]))",
           "legendFormat": "{{type}}",
           "refId": "A",
           "interval": "$bucket"
@@ -742,11 +745,11 @@
           "sort": "desc"
         }
       },
-      "description": "Tokens consumed per time bucket (width = Grafana $__interval). Each point = actual tokens attributed to that bucket."
+      "description": "Tokens consumed per time bucket (width = Grafana $__interval). Each point = actual tokens attributed to that bucket. Aggregated with max_over_time, not increase: these counters are cumulative PER SESSION (every series carries session_id) and expire 15m after their last sample, so increase() would treat a short session's first sample as its baseline and undercount. See OTL-75."
     },
     {
       "type": "row",
-      "title": "↳ Cumulative (running totals)",
+      "title": "\u21b3 Cumulative (running totals)",
       "collapsed": true,
       "gridPos": {
         "h": 1,
@@ -772,7 +775,7 @@
           },
           "targets": [
             {
-              "expr": "sum(increase(claude_code_cost_usage_USD_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__interval]))",
+              "expr": "sum(max_over_time(claude_code_cost_usage_USD_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__interval]))",
               "legendFormat": "Cost",
               "refId": "A",
               "interval": "1m"
@@ -841,7 +844,8 @@
                 "replaceFields": true
               }
             }
-          ]
+          ],
+          "description": "Aggregated with max_over_time, not increase: these counters are cumulative PER SESSION (every series carries session_id) and expire 15m after their last sample, so increase() would treat a short session's first sample as its baseline and undercount. See OTL-75."
         },
         {
           "id": 31,
@@ -859,7 +863,7 @@
           },
           "targets": [
             {
-              "expr": "sum by (type) (increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__interval]))",
+              "expr": "sum by (type) (max_over_time(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__interval]))",
               "legendFormat": "{{type}}",
               "refId": "A",
               "interval": "1m"
@@ -1029,13 +1033,14 @@
                 }
               }
             }
-          ]
+          ],
+          "description": "Aggregated with max_over_time, not increase: these counters are cumulative PER SESSION (every series carries session_id) and expire 15m after their last sample, so increase() would treat a short session's first sample as its baseline and undercount. See OTL-75."
         }
       ]
     },
     {
       "type": "row",
-      "title": "② Attribution",
+      "title": "\u2461 Attribution",
       "collapsed": true,
       "gridPos": {
         "h": 1,
@@ -1061,7 +1066,7 @@
           },
           "targets": [
             {
-              "expr": "sum by (model_family) (label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(sum by (model) (increase(claude_code_cost_usage_USD_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range])), \"model_family\", \"$1\", \"model\", \"(.+)\"), \"model_family\", \"$1 $2.$3\", \"model\", \"claude-([a-z]+)-([0-9]+)-([0-9]+).*\"), \"model_family\", \"$1 $2\", \"model\", \"claude-([a-z]+)-([0-9]+)(\\\\[[^]]*\\\\])?$\"), \"model_family\", \"Opus $1\", \"model_family\", \"opus (.*)\"), \"model_family\", \"Haiku $1\", \"model_family\", \"haiku (.*)\"), \"model_family\", \"Sonnet $1\", \"model_family\", \"sonnet (.*)\"), \"model_family\", \"Fable $1\", \"model_family\", \"fable (.*)\"))",
+              "expr": "sum by (model_family) (label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(sum by (model) (max_over_time(claude_code_cost_usage_USD_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range])), \"model_family\", \"$1\", \"model\", \"(.+)\"), \"model_family\", \"$1 $2.$3\", \"model\", \"claude-([a-z]+)-([0-9]+)-([0-9]+).*\"), \"model_family\", \"$1 $2\", \"model\", \"claude-([a-z]+)-([0-9]+)(\\\\[[^]]*\\\\])?$\"), \"model_family\", \"Opus $1\", \"model_family\", \"opus (.*)\"), \"model_family\", \"Haiku $1\", \"model_family\", \"haiku (.*)\"), \"model_family\", \"Sonnet $1\", \"model_family\", \"sonnet (.*)\"), \"model_family\", \"Fable $1\", \"model_family\", \"fable (.*)\"))",
               "legendFormat": "{{model_family}}",
               "refId": "A"
             }
@@ -1143,7 +1148,8 @@
               "values": false,
               "fields": ""
             }
-          }
+          },
+          "description": "Aggregated with max_over_time, not increase: these counters are cumulative PER SESSION (every series carries session_id) and expire 15m after their last sample, so increase() would treat a short session's first sample as its baseline and undercount. See OTL-75."
         },
         {
           "id": 13,
@@ -1161,7 +1167,7 @@
           },
           "targets": [
             {
-              "expr": "sum by (model_family) (label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(sum by (model) (increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range])), \"model_family\", \"$1\", \"model\", \"(.+)\"), \"model_family\", \"$1 $2.$3\", \"model\", \"claude-([a-z]+)-([0-9]+)-([0-9]+).*\"), \"model_family\", \"$1 $2\", \"model\", \"claude-([a-z]+)-([0-9]+)(\\\\[[^]]*\\\\])?$\"), \"model_family\", \"Opus $1\", \"model_family\", \"opus (.*)\"), \"model_family\", \"Haiku $1\", \"model_family\", \"haiku (.*)\"), \"model_family\", \"Sonnet $1\", \"model_family\", \"sonnet (.*)\"), \"model_family\", \"Fable $1\", \"model_family\", \"fable (.*)\"))",
+              "expr": "sum by (model_family) (label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(sum by (model) (max_over_time(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range])), \"model_family\", \"$1\", \"model\", \"(.+)\"), \"model_family\", \"$1 $2.$3\", \"model\", \"claude-([a-z]+)-([0-9]+)-([0-9]+).*\"), \"model_family\", \"$1 $2\", \"model\", \"claude-([a-z]+)-([0-9]+)(\\\\[[^]]*\\\\])?$\"), \"model_family\", \"Opus $1\", \"model_family\", \"opus (.*)\"), \"model_family\", \"Haiku $1\", \"model_family\", \"haiku (.*)\"), \"model_family\", \"Sonnet $1\", \"model_family\", \"sonnet (.*)\"), \"model_family\", \"Fable $1\", \"model_family\", \"fable (.*)\"))",
               "legendFormat": "{{model_family}}",
               "refId": "A"
             }
@@ -1243,7 +1249,8 @@
               "values": false,
               "fields": ""
             }
-          }
+          },
+          "description": "Aggregated with max_over_time, not increase: these counters are cumulative PER SESSION (every series carries session_id) and expire 15m after their last sample, so increase() would treat a short session's first sample as its baseline and undercount. See OTL-75."
         },
         {
           "id": 14,
@@ -1261,7 +1268,7 @@
           },
           "targets": [
             {
-              "expr": "sum by (type) (increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range]))",
+              "expr": "sum by (type) (max_over_time(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range]))",
               "legendFormat": "{{type}}",
               "refId": "A"
             }
@@ -1359,13 +1366,14 @@
               "values": false,
               "fields": ""
             }
-          }
+          },
+          "description": "Aggregated with max_over_time, not increase: these counters are cumulative PER SESSION (every series carries session_id) and expire 15m after their last sample, so increase() would treat a short session's first sample as its baseline and undercount. See OTL-75."
         },
         {
           "id": 15,
           "title": "Cache Savings ($)",
           "type": "stat",
-          "description": "Estimated $ saved by cache hits (if cache reads were charged as input)",
+          "description": "Estimated $ saved by cache hits (if cache reads were charged as input) Aggregated with max_over_time, not increase: these counters are cumulative PER SESSION (every series carries session_id) and expire 15m after their last sample, so increase() would treat a short session's first sample as its baseline and undercount. See OTL-75.",
           "gridPos": {
             "h": 7,
             "w": 6,
@@ -1378,7 +1386,7 @@
           },
           "targets": [
             {
-              "expr": "sum(increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",type=\"cacheRead\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range])) * 0.000003",
+              "expr": "sum(max_over_time(claude_code_token_usage_tokens_total{job=\"otel-collector\",type=\"cacheRead\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range])) * 0.000003",
               "legendFormat": "Savings",
               "refId": "A"
             }
@@ -1420,7 +1428,7 @@
         },
         {
           "id": 36,
-          "title": "Token Burn by Ticket (Top 10)",
+          "title": "Cumulative Token Burn by Ticket (Top 10)",
           "type": "timeseries",
           "gridPos": {
             "h": 7,
@@ -1434,7 +1442,7 @@
           },
           "targets": [
             {
-              "expr": "topk(10, sum by (linear_key) (increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",linear_key!=\"\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__interval])))",
+              "expr": "topk(10, sum by (linear_key) (max_over_time(claude_code_token_usage_tokens_total{job=\"otel-collector\",linear_key!=\"\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__interval])))",
               "legendFormat": "{{linear_key}}",
               "refId": "A",
               "interval": "$bucket"
@@ -1553,11 +1561,11 @@
               "sort": "desc"
             }
           },
-          "description": "Top 10 Linear tickets by token burn per time bucket (width = Grafana $__rate_interval). Excludes sessions with no linear_key attached."
+          "description": "Top 10 Linear tickets by token burn per time bucket (width = Grafana $__rate_interval). Excludes sessions with no linear_key attached. Aggregated with max_over_time, not increase: these counters are cumulative PER SESSION (every series carries session_id) and expire 15m after their last sample, so increase() would treat a short session's first sample as its baseline and undercount. See OTL-75."
         },
         {
           "id": 37,
-          "title": "Token Burn by Repo (Top 10)",
+          "title": "Cumulative Token Burn by Repo (Top 10)",
           "type": "timeseries",
           "gridPos": {
             "h": 7,
@@ -1571,7 +1579,7 @@
           },
           "targets": [
             {
-              "expr": "topk(10, sum by (project) (increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",project!=\"\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__interval])))",
+              "expr": "topk(10, sum by (project) (max_over_time(claude_code_token_usage_tokens_total{job=\"otel-collector\",project!=\"\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__interval])))",
               "legendFormat": "{{project}}",
               "refId": "A",
               "interval": "$bucket"
@@ -1690,7 +1698,7 @@
               "sort": "desc"
             }
           },
-          "description": "Top 10 repos by token burn per time bucket (width = Grafana $__rate_interval). Excludes sessions with no repo attached."
+          "description": "Top 10 repos by token burn per time bucket (width = Grafana $__rate_interval). Excludes sessions with no repo attached. Aggregated with max_over_time, not increase: these counters are cumulative PER SESSION (every series carries session_id) and expire 15m after their last sample, so increase() would treat a short session's first sample as its baseline and undercount. See OTL-75."
         },
         {
           "id": 18,
@@ -1708,7 +1716,7 @@
           },
           "targets": [
             {
-              "expr": "sort_desc(topk(10, sum by (linear_key) (increase(claude_code_cost_usage_USD_total{job=\"otel-collector\",linear_key=~\".+\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range]))))",
+              "expr": "sort_desc(topk(10, sum by (linear_key) (max_over_time(claude_code_cost_usage_USD_total{job=\"otel-collector\",linear_key=~\".+\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range]))))",
               "legendFormat": "{{linear_key}}",
               "instant": true,
               "format": "table",
@@ -1755,7 +1763,8 @@
             "tooltip": {
               "mode": "single"
             }
-          }
+          },
+          "description": "Aggregated with max_over_time, not increase: these counters are cumulative PER SESSION (every series carries session_id) and expire 15m after their last sample, so increase() would treat a short session's first sample as its baseline and undercount. See OTL-75."
         },
         {
           "id": 19,
@@ -1773,7 +1782,7 @@
           },
           "targets": [
             {
-              "expr": "sort_desc(topk(10, sum by (linear_key) (increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",linear_key=~\".+\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range]))))",
+              "expr": "sort_desc(topk(10, sum by (linear_key) (max_over_time(claude_code_token_usage_tokens_total{job=\"otel-collector\",linear_key=~\".+\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range]))))",
               "legendFormat": "{{linear_key}}",
               "instant": true,
               "format": "table",
@@ -1820,7 +1829,8 @@
             "tooltip": {
               "mode": "single"
             }
-          }
+          },
+          "description": "Aggregated with max_over_time, not increase: these counters are cumulative PER SESSION (every series carries session_id) and expire 15m after their last sample, so increase() would treat a short session's first sample as its baseline and undercount. See OTL-75."
         },
         {
           "id": 20,
@@ -1890,7 +1900,7 @@
         {
           "id": 34,
           "title": "Unique Tickets",
-          "description": "Total distinct linear_key values in the selected time range. Bars above show top 10.",
+          "description": "Total distinct linear_key values in the selected time range. Bars above show top 10. Aggregated with max_over_time, not increase: these counters are cumulative PER SESSION (every series carries session_id) and expire 15m after their last sample, so increase() would treat a short session's first sample as its baseline and undercount. See OTL-75.",
           "type": "stat",
           "gridPos": {
             "h": 8,
@@ -1904,7 +1914,7 @@
           },
           "targets": [
             {
-              "expr": "count(count by (linear_key) (sum by (linear_key) (increase(claude_code_cost_usage_USD_total{job=\"otel-collector\",linear_key=~\".+\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range])) > 0))",
+              "expr": "count(count by (linear_key) (sum by (linear_key) (max_over_time(claude_code_cost_usage_USD_total{job=\"otel-collector\",linear_key=~\".+\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range])) > 0))",
               "instant": true,
               "refId": "A",
               "legendFormat": "__auto"
@@ -1963,7 +1973,7 @@
           },
           "targets": [
             {
-              "expr": "sort_desc(topk(10, sum by (project) (increase(claude_code_cost_usage_USD_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range]))))",
+              "expr": "sort_desc(topk(10, sum by (project) (max_over_time(claude_code_cost_usage_USD_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range]))))",
               "legendFormat": "{{project}}",
               "instant": true,
               "format": "table",
@@ -2010,7 +2020,8 @@
             "tooltip": {
               "mode": "single"
             }
-          }
+          },
+          "description": "Aggregated with max_over_time, not increase: these counters are cumulative PER SESSION (every series carries session_id) and expire 15m after their last sample, so increase() would treat a short session's first sample as its baseline and undercount. See OTL-75."
         },
         {
           "id": 22,
@@ -2028,7 +2039,7 @@
           },
           "targets": [
             {
-              "expr": "sort_desc(topk(10, sum by (project) (increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range]))))",
+              "expr": "sort_desc(topk(10, sum by (project) (max_over_time(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range]))))",
               "legendFormat": "{{project}}",
               "instant": true,
               "format": "table",
@@ -2075,7 +2086,8 @@
             "tooltip": {
               "mode": "single"
             }
-          }
+          },
+          "description": "Aggregated with max_over_time, not increase: these counters are cumulative PER SESSION (every series carries session_id) and expire 15m after their last sample, so increase() would treat a short session's first sample as its baseline and undercount. See OTL-75."
         },
         {
           "id": 23,
@@ -2145,7 +2157,7 @@
         {
           "id": 35,
           "title": "Unique Repos",
-          "description": "Total distinct repo values in the selected time range. Bars above show top 10.",
+          "description": "Total distinct repo values in the selected time range. Bars above show top 10. Aggregated with max_over_time, not increase: these counters are cumulative PER SESSION (every series carries session_id) and expire 15m after their last sample, so increase() would treat a short session's first sample as its baseline and undercount. See OTL-75.",
           "type": "stat",
           "gridPos": {
             "h": 8,
@@ -2159,7 +2171,7 @@
           },
           "targets": [
             {
-              "expr": "count(count by (project) (sum by (project) (increase(claude_code_cost_usage_USD_total{job=\"otel-collector\",project=~\".+\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range])) > 0))",
+              "expr": "count(count by (project) (sum by (project) (max_over_time(claude_code_cost_usage_USD_total{job=\"otel-collector\",project=~\".+\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range])) > 0))",
               "instant": true,
               "refId": "A",
               "legendFormat": "__auto"
@@ -2293,7 +2305,7 @@
           },
           "targets": [
             {
-              "expr": "topk(10, sum by (session_id, project, branch, linear_key) (increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range])))",
+              "expr": "topk(10, sum by (session_id, project, branch, linear_key) (max_over_time(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range])))",
               "legendFormat": "{{session_id}}",
               "instant": true,
               "refId": "A",
@@ -2340,7 +2352,8 @@
                 }
               }
             }
-          ]
+          ],
+          "description": "Aggregated with max_over_time, not increase: these counters are cumulative PER SESSION (every series carries session_id) and expire 15m after their last sample, so increase() would treat a short session's first sample as its baseline and undercount. See OTL-75."
         },
         {
           "id": 28,
@@ -2358,7 +2371,7 @@
           },
           "targets": [
             {
-              "expr": "sum by (catalyst_role) (increase(claude_code_cost_usage_USD_total{job=\"otel-collector\",catalyst_role=~\".+\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range]))",
+              "expr": "sum by (catalyst_role) (max_over_time(claude_code_cost_usage_USD_total{job=\"otel-collector\",catalyst_role=~\".+\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range]))",
               "legendFormat": "{{catalyst_role}}",
               "instant": true,
               "format": "table",
@@ -2405,7 +2418,8 @@
             "tooltip": {
               "mode": "single"
             }
-          }
+          },
+          "description": "Aggregated with max_over_time, not increase: these counters are cumulative PER SESSION (every series carries session_id) and expire 15m after their last sample, so increase() would treat a short session's first sample as its baseline and undercount. See OTL-75."
         },
         {
           "id": 38,
@@ -2423,7 +2437,7 @@
           },
           "targets": [
             {
-              "expr": "sort_desc(sum by (task_type) (increase(claude_code_cost_usage_USD_total{job=\"otel-collector\",task_type=~\".+\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range])))",
+              "expr": "sort_desc(sum by (task_type) (max_over_time(claude_code_cost_usage_USD_total{job=\"otel-collector\",task_type=~\".+\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range])))",
               "legendFormat": "{{task_type}}",
               "instant": true,
               "format": "table",
@@ -2470,7 +2484,8 @@
             "tooltip": {
               "mode": "single"
             }
-          }
+          },
+          "description": "Aggregated with max_over_time, not increase: these counters are cumulative PER SESSION (every series carries session_id) and expire 15m after their last sample, so increase() would treat a short session's first sample as its baseline and undercount. See OTL-75."
         },
         {
           "id": 39,
@@ -2488,7 +2503,7 @@
           },
           "targets": [
             {
-              "expr": "sort_desc(sum by (task_type) (increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",task_type=~\".+\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range])))",
+              "expr": "sort_desc(sum by (task_type) (max_over_time(claude_code_token_usage_tokens_total{job=\"otel-collector\",task_type=~\".+\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range])))",
               "legendFormat": "{{task_type}}",
               "instant": true,
               "format": "table",
@@ -2535,7 +2550,8 @@
             "tooltip": {
               "mode": "single"
             }
-          }
+          },
+          "description": "Aggregated with max_over_time, not increase: these counters are cumulative PER SESSION (every series carries session_id) and expire 15m after their last sample, so increase() would treat a short session's first sample as its baseline and undercount. See OTL-75."
         },
         {
           "id": 43,
@@ -2553,7 +2569,7 @@
           },
           "targets": [
             {
-              "expr": "sort_desc(sum by (catalyst_dispatch_mode) (increase(claude_code_cost_usage_USD_total{job=\"otel-collector\",catalyst_dispatch_mode=~\".+\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range])))",
+              "expr": "sort_desc(sum by (catalyst_dispatch_mode) (max_over_time(claude_code_cost_usage_USD_total{job=\"otel-collector\",catalyst_dispatch_mode=~\".+\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range])))",
               "legendFormat": "{{catalyst_dispatch_mode}}",
               "instant": true,
               "format": "table",
@@ -2600,7 +2616,8 @@
             "tooltip": {
               "mode": "single"
             }
-          }
+          },
+          "description": "Aggregated with max_over_time, not increase: these counters are cumulative PER SESSION (every series carries session_id) and expire 15m after their last sample, so increase() would treat a short session's first sample as its baseline and undercount. See OTL-75."
         },
         {
           "id": 208,
@@ -2672,7 +2689,7 @@
     },
     {
       "type": "row",
-      "title": "③ Observability",
+      "title": "\u2462 Observability",
       "collapsed": true,
       "gridPos": {
         "h": 1,
@@ -3305,7 +3322,7 @@
     },
     {
       "type": "row",
-      "title": "④ Code & Velocity",
+      "title": "\u2463 Code & Velocity",
       "collapsed": true,
       "gridPos": {
         "h": 1,
@@ -3430,7 +3447,7 @@
         },
         {
           "id": 90,
-          "title": "Pull Requests",
+          "title": "Cumulative Pull Requests",
           "type": "timeseries",
           "gridPos": {
             "h": 7,
@@ -3444,7 +3461,7 @@
           },
           "targets": [
             {
-              "expr": "sum(increase(claude_code_pull_request_count_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__interval]))",
+              "expr": "sum(max_over_time(claude_code_pull_request_count_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__interval]))",
               "legendFormat": "PRs created",
               "refId": "A",
               "interval": "$bucket"
@@ -3503,11 +3520,12 @@
               "mode": "single",
               "sort": "none"
             }
-          }
+          },
+          "description": "Aggregated with max_over_time, not increase: these counters are cumulative PER SESSION (every series carries session_id) and expire 15m after their last sample, so increase() would treat a short session's first sample as its baseline and undercount. See OTL-75."
         },
         {
           "id": 91,
-          "title": "Commits",
+          "title": "Cumulative Commits",
           "type": "timeseries",
           "gridPos": {
             "h": 7,
@@ -3521,7 +3539,7 @@
           },
           "targets": [
             {
-              "expr": "sum(increase(claude_code_commit_count_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__interval]))",
+              "expr": "sum(max_over_time(claude_code_commit_count_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__interval]))",
               "legendFormat": "Commits created",
               "refId": "A",
               "interval": "$bucket"
@@ -3580,13 +3598,14 @@
               "mode": "single",
               "sort": "none"
             }
-          }
+          },
+          "description": "Aggregated with max_over_time, not increase: these counters are cumulative PER SESSION (every series carries session_id) and expire 15m after their last sample, so increase() would treat a short session's first sample as its baseline and undercount. See OTL-75."
         }
       ]
     },
     {
       "type": "row",
-      "title": "⑥ Limits & Quotas",
+      "title": "\u2465 Limits & Quotas",
       "collapsed": true,
       "gridPos": {
         "h": 1,
@@ -3924,7 +3943,7 @@
         },
         {
           "id": 52,
-          "title": "Account Rate Limits — $account",
+          "title": "Account Rate Limits \u2014 $account",
           "type": "timeseries",
           "gridPos": {
             "h": 8,
@@ -4297,7 +4316,7 @@
     },
     {
       "type": "row",
-      "title": "⑦ Logs & Debug",
+      "title": "\u2466 Logs & Debug",
       "collapsed": true,
       "gridPos": {
         "h": 1,
@@ -4460,7 +4479,7 @@
           },
           "targets": [
             {
-              "expr": "sum by (catalyst_exec_context) (increase(claude_code_session_count_total{job=\"otel-collector\",catalyst_exec_context=~\".+\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range]))",
+              "expr": "sum by (catalyst_exec_context) (max_over_time(claude_code_session_count_total{job=\"otel-collector\",catalyst_exec_context=~\".+\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range]))",
               "legendFormat": "{{catalyst_exec_context}}",
               "instant": true,
               "refId": "A"
@@ -4497,7 +4516,8 @@
               "values": false,
               "fields": ""
             }
-          }
+          },
+          "description": "Aggregated with max_over_time, not increase: these counters are cumulative PER SESSION (every series carries session_id) and expire 15m after their last sample, so increase() would treat a short session's first sample as its baseline and undercount. See OTL-75."
         },
         {
           "id": 41,
@@ -4576,7 +4596,7 @@
           },
           "options": {
             "mode": "markdown",
-            "content": "### Hierarchical Execution (Coming Soon)\n\nExecution-graph, Gantt, and treemap views are **blocked** pending CTL emission of:\n`subagent_id`, `workflow_stage`, `parentSpanId`, `query_source`\n(none currently emitted — see [research 2026-06-04-OTL-3](thoughts/shared/research/2026-06-04-OTL-3-catalyst-execution-telemetry-dashboard.md)).\n\n**Intended queries once attributes are emitted:**\n\n```promql\n# Treemap cost by (linear_key → task_type → subagent_id)\nsum by (linear_key, task_type, subagent_id) (increase(claude_code_cost_usage_USD_total{subagent_id=~\".+\"}[$__range]))\n```\n\n```logql\n# Subagent-vs-main split via query_source\nsum by (query_source) (count_over_time({service_name=~\"claude-code.*\"} | query_source=~\".+\" [$__range]))\n\n# Gantt approximation by workflow_stage (min/max timestamps per stage)\ncount_over_time({service_name=~\"claude-code.*\"} | workflow_stage=~\".+\" [$__range])\n```\n\n_Blocked attributes not emitted: `subagent_id`, `workflow_stage`, `parentSpanId`, `query_source` — open a CTL emission ticket to unblock._"
+            "content": "### Hierarchical Execution (Coming Soon)\n\nExecution-graph, Gantt, and treemap views are **blocked** pending CTL emission of:\n`subagent_id`, `workflow_stage`, `parentSpanId`, `query_source`\n(none currently emitted \u2014 see [research 2026-06-04-OTL-3](thoughts/shared/research/2026-06-04-OTL-3-catalyst-execution-telemetry-dashboard.md)).\n\n**Intended queries once attributes are emitted:**\n\n```promql\n# Treemap cost by (linear_key \u2192 task_type \u2192 subagent_id)\nsum by (linear_key, task_type, subagent_id) (max_over_time(claude_code_cost_usage_USD_total{subagent_id=~\".+\"}[$__range]))\n```\n\n```logql\n# Subagent-vs-main split via query_source\nsum by (query_source) (count_over_time({service_name=~\"claude-code.*\"} | query_source=~\".+\" [$__range]))\n\n# Gantt approximation by workflow_stage (min/max timestamps per stage)\ncount_over_time({service_name=~\"claude-code.*\"} | workflow_stage=~\".+\" [$__range])\n```\n\n_`max_over_time`, not `increase`: `claude_code_*` counters are cumulative per session and expire 15m after their last sample \u2014 `increase()` undercounts short sessions (OTL-75). Keep this when building the panel._\n\n_Blocked attributes not emitted: `subagent_id`, `workflow_stage`, `parentSpanId`, `query_source` \u2014 open a CTL emission ticket to unblock._"
           }
         },
         {
@@ -4591,7 +4611,7 @@
           },
           "options": {
             "mode": "markdown",
-            "content": "### Process by Role (CTL-1228, Forthcoming)\n\n**Reserved for execution-core/monitor/broker/agent/claude/trunk CPU+mem + catalyst-vs-host proportion**\n\nPlanned visualization components:\n- Per-process CPU and memory usage (execution-core, monitor, broker, agent, claude, trunk)\n- Resource allocation breakdown by role\n- Catalyst vs. host machine resource split\n- Time series trends for capacity planning\n\n_Status: Not yet implemented — awaiting instrumentation of process-level metrics via OTel resource.process.* and custom catalyst.process_role attributes._"
+            "content": "### Process by Role (CTL-1228, Forthcoming)\n\n**Reserved for execution-core/monitor/broker/agent/claude/trunk CPU+mem + catalyst-vs-host proportion**\n\nPlanned visualization components:\n- Per-process CPU and memory usage (execution-core, monitor, broker, agent, claude, trunk)\n- Resource allocation breakdown by role\n- Catalyst vs. host machine resource split\n- Time series trends for capacity planning\n\n_Status: Not yet implemented \u2014 awaiting instrumentation of process-level metrics via OTel resource.process.* and custom catalyst.process_role attributes._"
           },
           "fieldConfig": {
             "defaults": {}
@@ -4633,7 +4653,7 @@
         "name": "bucket",
         "label": "Bucket",
         "type": "interval",
-        "description": "Bucket width for the rate/volume timeseries (floor 1m ≈ 4× the 15s scrape; default 5m).",
+        "description": "Bucket width for the rate/volume timeseries (floor 1m \u2248 4\u00d7 the 15s scrape; default 5m).",
         "datasource": null,
         "query": "1m,5m,15m,30m,1h,6h,1d",
         "auto": true,
@@ -4794,7 +4814,7 @@
         "name": "account",
         "type": "custom",
         "label": "Account",
-        "description": "Accounts to render rate-limit small-multiples for. account_email is Loki structured metadata, so it can't be auto-discovered — add new accounts here.",
+        "description": "Accounts to render rate-limit small-multiples for. account_email is Loki structured metadata, so it can't be auto-discovered \u2014 add new accounts here.",
         "query": "ryan@getadva.ai",
         "includeAll": true,
         "allValue": ".*",

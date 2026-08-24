@@ -1,0 +1,876 @@
+{
+  "uid": "catalyst-relay-runtime",
+  "title": "Catalyst \u00b7 Relay & Container Runtime",
+  "description": "Which runtime Catalyst work executes on (laptop relay vs Cloudflare container) and whether relay attribution is landing. Per-ticket economics live on the Unified dashboard \u2014 deliberately not duplicated here. Counters aggregated with max_over_time (per-session, 15m expiry), never increase().",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "graphTooltip": 1,
+  "style": "dark",
+  "timezone": "browser",
+  "refresh": "30s",
+  "liveNow": false,
+  "fiscalYearStartMonth": 0,
+  "tags": [
+    "catalyst",
+    "relay",
+    "container",
+    "observability",
+    "cost"
+  ],
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "annotations": {
+    "list": []
+  },
+  "links": [
+    {
+      "title": "Claude Code \u2014 Unified (per-ticket economics)",
+      "type": "link",
+      "url": "/d/claude-code-unified",
+      "targetBlank": false
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "ticket",
+        "type": "query",
+        "label": "Ticket",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "query": {
+          "qryType": 1,
+          "query": "label_values(claude_code_token_usage_tokens_total, linear_key)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "includeAll": true,
+        "allValue": ".+",
+        "multi": true,
+        "refresh": 2,
+        "sort": 1,
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "options": [],
+        "hide": 0
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "text",
+      "title": "",
+      "gridPos": {
+        "h": 5,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "datasource": {
+        "type": "datasource",
+        "uid": "-- Grafana --"
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "## Catalyst \u00b7 Relay & Container Runtime \u2014 WHERE work runs, and is it attributed?\nThe mini execution-core daemons are **retired**. Work runs as **laptop relay workers** (`relay-dispatch.sh`, one `claude -p` per ticket) and, next, as **Cloudflare container runners**.\n\n**Per-ticket economics already exist \u2014 use [Claude Code \u2014 Unified](/d/claude-code-unified) for those.** Its *Token Burn by Ticket*, *Cost by Ticket* and *Cost by Phase* panels are keyed on `linear_key` / `task_type`, which relay workers stamp, so they light up with no change. This dashboard covers only what those do **not**: which runtime the work ran on, and whether relay attribution is landing.\n\n**Discriminators** (verified live): relay workers set `catalyst_orchestration=\"relay\"`; container runners additionally set semconv `cloud_platform` / `container_id` / `service_instance_id` (verified end-to-end through the CF tunnel). Relay workers keep `service_name=\"claude-code\"` \u2014 fleet parity, deliberately not overridden.\n\n\u26a0\ufe0f Relay attribution reaches Claude Code only via `claude --settings <file>`; a plain `env VAR=\u2026 claude` is overridden by `~/.claude/settings.json`'s own `env` block. If *Relay attribution* below reads 0%, check that first.\n\n**Totals use `max_over_time`, not `increase`** \u2014 see any panel description for why."
+      }
+    },
+    {
+      "id": 100,
+      "type": "row",
+      "title": "Is relay attribution landing?",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 5
+      },
+      "panels": []
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Relay attribution",
+      "description": "Share of live relay series carrying a linear_key. Should be 1. Zero means --settings is not reaching the worker. Counts SERIES, so no counter-aggregation concern; denominator clamped against divide-by-zero.",
+      "gridPos": {
+        "h": 4,
+        "w": 5,
+        "x": 0,
+        "y": 6
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "count(claude_code_token_usage_tokens_total{catalyst_orchestration=\"relay\",linear_key!=\"\"}) / clamp_min(count(claude_code_token_usage_tokens_total{catalyst_orchestration=\"relay\"}), 1)",
+          "legendFormat": "Relay attribution",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#73BF69",
+                "value": null
+              }
+            ]
+          },
+          "mappings": [],
+          "noValue": "no data",
+          "decimals": 2
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background_solid",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "textMode": "value_and_name",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false,
+          "fields": ""
+        }
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Relay tickets live",
+      "description": "Distinct linear_key on relay series. Prometheus expires a series 15m after its last sample, so this is 'active recently', not 'open tickets'.",
+      "gridPos": {
+        "h": 4,
+        "w": 5,
+        "x": 5,
+        "y": 6
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "count(count by (linear_key) (claude_code_token_usage_tokens_total{catalyst_orchestration=\"relay\",linear_key!=\"\"}))",
+          "legendFormat": "Relay tickets live",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#5794F2",
+                "value": null
+              }
+            ]
+          },
+          "mappings": [],
+          "noValue": "no data",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background_solid",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "textMode": "value_and_name",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false,
+          "fields": ""
+        }
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Relay spend",
+      "description": "USD attributed to relay workers over the range. \u26a0\ufe0f Aggregated with `max_over_time`, NOT `increase`. These are per-session cumulative counters that expire 15m after their last sample, so a short relay phase can expose only its first nonzero sample and `increase()` would treat that as the baseline and report ~0. `max_over_time` takes each session series' final value; summing across sessions gives the true total. Same pattern as operator-usage.json.",
+      "gridPos": {
+        "h": 4,
+        "w": 5,
+        "x": 10,
+        "y": 6
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum(max_over_time(claude_code_cost_usage_USD_total{catalyst_orchestration=\"relay\"}[$__range])) or vector(0)",
+          "legendFormat": "Relay spend",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#FF9830",
+                "value": null
+              }
+            ]
+          },
+          "mappings": [],
+          "noValue": "no data",
+          "decimals": 2
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background_solid",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "textMode": "value_and_name",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false,
+          "fields": ""
+        }
+      }
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Runtimes seen",
+      "description": "Distinct execution runtimes: each cloud_platform (containers) plus each bare host (laptop).",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 15,
+        "y": 6
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "count(count by (cloud_platform) (claude_code_token_usage_tokens_total{cloud_platform!=\"\"})) + count(count by (host_name) (claude_code_token_usage_tokens_total{cloud_platform=\"\"}))",
+          "legendFormat": "Runtimes seen",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#B877D9",
+                "value": null
+              }
+            ]
+          },
+          "mappings": [],
+          "noValue": "no data",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background_solid",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "textMode": "value_and_name",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false,
+          "fields": ""
+        }
+      }
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "Relay API errors",
+      "description": "Non-zero is the first thing to check when a phase stalls. \u26a0\ufe0f Aggregated with `max_over_time`, NOT `increase`. These are per-session cumulative counters that expire 15m after their last sample, so a short relay phase can expose only its first nonzero sample and `increase()` would treat that as the baseline and report ~0. `max_over_time` takes each session series' final value; summing across sessions gives the true total. Same pattern as operator-usage.json.",
+      "gridPos": {
+        "h": 4,
+        "w": 5,
+        "x": 19,
+        "y": 6
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum(max_over_time(claude_code_api_error_total{catalyst_orchestration=\"relay\"}[$__range])) or vector(0)",
+          "legendFormat": "Relay API errors",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#F2495C",
+                "value": null
+              }
+            ]
+          },
+          "mappings": [],
+          "noValue": "no data",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background_solid",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "textMode": "value_and_name",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false,
+          "fields": ""
+        }
+      }
+    },
+    {
+      "id": 101,
+      "type": "row",
+      "title": "Relay vs interactive vs container",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 10
+      },
+      "panels": []
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Cumulative spend by dispatch origin",
+      "description": "The relay-vs-interactive split. Relay workers carry catalyst_orchestration=\"relay\"; an interactive session sets nothing, so unattributed burn shows in the second series. Lines are CUMULATIVE per bucket (see below), not a rate. \u26a0\ufe0f Aggregated with `max_over_time`, NOT `increase`. These are per-session cumulative counters that expire 15m after their last sample, so a short relay phase can expose only its first nonzero sample and `increase()` would treat that as the baseline and report ~0. `max_over_time` takes each session series' final value; summing across sessions gives the true total. Same pattern as operator-usage.json.",
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 11
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum(max_over_time(claude_code_cost_usage_USD_total{catalyst_orchestration=\"relay\"}[$__interval]))",
+          "legendFormat": "relay worker",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "expr": "sum(max_over_time(claude_code_cost_usage_USD_total{catalyst_orchestration=\"\"}[$__interval]))",
+          "legendFormat": "interactive / unattributed",
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "noValue": "no data",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 18,
+            "showPoints": "auto",
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "calcs": [
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Cumulative spend by runtime",
+      "description": "cloud_platform is stamped only by Cloudflare container runners (verified through the tunnel); laptop relay workers have no cloud.* attributes and appear in the host_name series. \u26a0\ufe0f Aggregated with `max_over_time`, NOT `increase`. These are per-session cumulative counters that expire 15m after their last sample, so a short relay phase can expose only its first nonzero sample and `increase()` would treat that as the baseline and report ~0. `max_over_time` takes each session series' final value; summing across sessions gives the true total. Same pattern as operator-usage.json.",
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 11
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum by (cloud_platform) (max_over_time(claude_code_cost_usage_USD_total{cloud_platform!=\"\"}[$__interval]))",
+          "legendFormat": "{{cloud_platform}}",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "expr": "sum by (host_name) (max_over_time(claude_code_cost_usage_USD_total{cloud_platform=\"\"}[$__interval]))",
+          "legendFormat": "host {{host_name}}",
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "noValue": "no data",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 18,
+            "showPoints": "auto",
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "calcs": [
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 102,
+      "type": "row",
+      "title": "Relay detail",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 18
+      },
+      "panels": []
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Cumulative relay spend by phase",
+      "description": "task_type is the relay ladder step. Unified's 'Cost by Phase' shows the same cut across ALL sources; this is relay-only. \u26a0\ufe0f Aggregated with `max_over_time`, NOT `increase`. These are per-session cumulative counters that expire 15m after their last sample, so a short relay phase can expose only its first nonzero sample and `increase()` would treat that as the baseline and report ~0. `max_over_time` takes each session series' final value; summing across sessions gives the true total. Same pattern as operator-usage.json.",
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 0,
+        "y": 19
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum by (task_type) (max_over_time(claude_code_cost_usage_USD_total{catalyst_orchestration=\"relay\",task_type!=\"\"}[$__interval]))",
+          "legendFormat": "{{task_type}}",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "noValue": "no data",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 18,
+            "showPoints": "auto",
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "calcs": [
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Relay sessions",
+      "description": "One relay worker = one session; the counter is 1 per session series, so max_over_time then sum counts sessions. \u26a0\ufe0f Aggregated with `max_over_time`, NOT `increase`. These are per-session cumulative counters that expire 15m after their last sample, so a short relay phase can expose only its first nonzero sample and `increase()` would treat that as the baseline and report ~0. `max_over_time` takes each session series' final value; summing across sessions gives the true total. Same pattern as operator-usage.json.",
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 8,
+        "y": 19
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum by (linear_key) (max_over_time(claude_code_session_count_total{catalyst_orchestration=\"relay\"}[$__interval]))",
+          "legendFormat": "{{linear_key}}",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "no data",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 18,
+            "showPoints": "auto",
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "calcs": [
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 11,
+      "type": "logs",
+      "title": "Relay worker log tail",
+      "description": "Relay records only. Selector is service_name=~\"claude-code.*\" (the repo's house pattern) rather than an exact match, so the panel survives any future service-name change; catalyst_orchestration is the real discriminator. Loki promotes every resource attribute to structured metadata automatically, so linear_key filters with no collector allowlist entry.",
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 16,
+        "y": 19
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "targets": [
+        {
+          "expr": "{service_name=~\"claude-code.*\"} | catalyst_orchestration=`relay` | linear_key=~\"$ticket\"",
+          "refId": "A",
+          "queryType": "range",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          }
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": true,
+        "sortOrder": "Descending",
+        "enableLogDetails": true,
+        "dedupStrategy": "none",
+        "prettifyLogMessage": false
+      }
+    },
+    {
+      "id": 103,
+      "type": "row",
+      "title": "Container runtime (M3)",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 26
+      },
+      "panels": []
+    },
+    {
+      "id": 12,
+      "type": "table",
+      "title": "Container runners seen",
+      "description": "One row per container instance. cloud_* / container_id / service_instance_id are OTel semconv fields, verified to survive the CF tunnel into both Loki and Prometheus. Empty until container runners ship. \u26a0\ufe0f Aggregated with `max_over_time`, NOT `increase`. These are per-session cumulative counters that expire 15m after their last sample, so a short relay phase can expose only its first nonzero sample and `increase()` would treat that as the baseline and report ~0. `max_over_time` takes each session series' final value; summing across sessions gives the true total. Same pattern as operator-usage.json.",
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 27
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum by (container_id, service_instance_id, cloud_platform, cloud_region, linear_key) (max_over_time(claude_code_cost_usage_USD_total{cloud_platform!=\"\"}[$__range]))",
+          "refId": "A",
+          "instant": true,
+          "format": "table",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "renameByName": {
+              "container_id": "Container",
+              "service_instance_id": "Instance",
+              "cloud_platform": "Platform",
+              "cloud_region": "Region",
+              "linear_key": "Ticket",
+              "Value": "Spend (USD)"
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "no container runners yet",
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Spend (USD)"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyUSD"
+              },
+              {
+                "id": "decimals",
+                "value": 3
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "sortBy": [
+          {
+            "displayName": "Spend (USD)",
+            "desc": true
+          }
+        ]
+      }
+    },
+    {
+      "id": 13,
+      "type": "timeseries",
+      "title": "Cumulative container spend by ticket",
+      "description": "Per-ticket burn for container-run work only. Empty until container runners ship. \u26a0\ufe0f Aggregated with `max_over_time`, NOT `increase`. These are per-session cumulative counters that expire 15m after their last sample, so a short relay phase can expose only its first nonzero sample and `increase()` would treat that as the baseline and report ~0. `max_over_time` takes each session series' final value; summing across sessions gives the true total. Same pattern as operator-usage.json.",
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 27
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum by (linear_key) (max_over_time(claude_code_cost_usage_USD_total{cloud_platform!=\"\",linear_key!=\"\"}[$__interval]))",
+          "legendFormat": "{{linear_key}}",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "noValue": "no data",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 18,
+            "showPoints": "auto",
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "calcs": [
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    }
+  ]
+}
