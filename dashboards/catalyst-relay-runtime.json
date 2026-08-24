@@ -1,7 +1,7 @@
 {
   "uid": "catalyst-relay-runtime",
   "title": "Catalyst \u00b7 Relay & Container Runtime",
-  "description": "Which runtime Catalyst work executes on (laptop relay vs Cloudflare container) and whether relay attribution is landing. Per-ticket economics live on the Unified dashboard \u2014 this one deliberately does not duplicate them.",
+  "description": "Which runtime Catalyst work executes on (laptop relay vs Cloudflare container) and whether relay attribution is landing. Per-ticket economics live on the Unified dashboard \u2014 deliberately not duplicated here. Counters aggregated with max_over_time (per-session, 15m expiry), never increase().",
   "schemaVersion": 39,
   "version": 1,
   "editable": true,
@@ -36,22 +36,6 @@
   ],
   "templating": {
     "list": [
-      {
-        "name": "bucket",
-        "type": "interval",
-        "label": "Interval",
-        "query": "1m,5m,15m,30m,1h,6h,1d",
-        "current": {
-          "text": "15m",
-          "value": "15m"
-        },
-        "auto": false,
-        "auto_count": 30,
-        "auto_min": "10s",
-        "options": [],
-        "refresh": 2,
-        "hide": 0
-      },
       {
         "name": "ticket",
         "type": "query",
@@ -96,7 +80,7 @@
       },
       "options": {
         "mode": "markdown",
-        "content": "## Catalyst \u00b7 Relay & Container Runtime \u2014 WHERE work runs, and is it attributed?\nThe mini execution-core daemons are **retired**. Work runs as **laptop relay workers** (`relay-dispatch.sh`, one `claude -p` per ticket) and, next, as **Cloudflare container runners**.\n\n**Per-ticket economics already exist \u2014 use [Claude Code \u2014 Unified](/d/claude-code-unified) for those.** Its *Token Burn by Ticket*, *Cost by Ticket*, *Cost by Phase* and *Attribution Health* panels are keyed on `linear_key` / `task_type`, which relay workers now stamp, so they light up with no change. This dashboard covers only what those panels do **not**: which runtime the work ran on, and whether relay attribution is landing.\n\n**Discriminators** (all verified live): relay workers set `catalyst_orchestration=\"relay\"`; container runners additionally set the semconv `cloud_platform` / `container_id` / `service_instance_id` (verified end-to-end through the CF tunnel \u2014 an OTLP post carrying them arrived in Loki with every attribute promoted).\n\n\u26a0\ufe0f Relay attribution reaches Claude Code only via `claude --settings <file>` \u2014 a plain `env VAR=\u2026 claude` is overridden by `~/.claude/settings.json`'s own `env` block. If *Relay attribution health* below reads 0%, that is the first thing to check."
+        "content": "## Catalyst \u00b7 Relay & Container Runtime \u2014 WHERE work runs, and is it attributed?\nThe mini execution-core daemons are **retired**. Work runs as **laptop relay workers** (`relay-dispatch.sh`, one `claude -p` per ticket) and, next, as **Cloudflare container runners**.\n\n**Per-ticket economics already exist \u2014 use [Claude Code \u2014 Unified](/d/claude-code-unified) for those.** Its *Token Burn by Ticket*, *Cost by Ticket* and *Cost by Phase* panels are keyed on `linear_key` / `task_type`, which relay workers stamp, so they light up with no change. This dashboard covers only what those do **not**: which runtime the work ran on, and whether relay attribution is landing.\n\n**Discriminators** (verified live): relay workers set `catalyst_orchestration=\"relay\"`; container runners additionally set semconv `cloud_platform` / `container_id` / `service_instance_id` (verified end-to-end through the CF tunnel). Relay workers keep `service_name=\"claude-code\"` \u2014 fleet parity, deliberately not overridden.\n\n\u26a0\ufe0f Relay attribution reaches Claude Code only via `claude --settings <file>`; a plain `env VAR=\u2026 claude` is overridden by `~/.claude/settings.json`'s own `env` block. If *Relay attribution* below reads 0%, check that first.\n\n**Totals use `max_over_time`, not `increase`** \u2014 see any panel description for why."
       }
     },
     {
@@ -116,7 +100,7 @@
       "id": 2,
       "type": "stat",
       "title": "Relay attribution",
-      "description": "Share of live relay series that carry a linear_key. Should be 1. Zero means --settings is not reaching the worker (see the note above); the denominator is clamped so an idle relay reads 'no data', not a divide-by-zero.",
+      "description": "Share of live relay series carrying a linear_key. Should be 1. Zero means --settings is not reaching the worker. Counts SERIES, so no counter-aggregation concern; denominator clamped against divide-by-zero.",
       "gridPos": {
         "h": 4,
         "w": 5,
@@ -240,7 +224,7 @@
       "id": 4,
       "type": "stat",
       "title": "Relay spend",
-      "description": "USD attributed to relay workers over the range.",
+      "description": "USD attributed to relay workers over the range. \u26a0\ufe0f Aggregated with `max_over_time`, NOT `increase`. These are per-session cumulative counters that expire 15m after their last sample, so a short relay phase can expose only its first nonzero sample and `increase()` would treat that as the baseline and report ~0. `max_over_time` takes each session series' final value; summing across sessions gives the true total. Same pattern as operator-usage.json.",
       "gridPos": {
         "h": 4,
         "w": 5,
@@ -253,7 +237,7 @@
       },
       "targets": [
         {
-          "expr": "sum(increase(claude_code_cost_usage_USD_total{catalyst_orchestration=\"relay\"}[$__range]))",
+          "expr": "sum(max_over_time(claude_code_cost_usage_USD_total{catalyst_orchestration=\"relay\"}[$__range])) or vector(0)",
           "legendFormat": "Relay spend",
           "refId": "A",
           "datasource": {
@@ -364,7 +348,7 @@
       "id": 6,
       "type": "stat",
       "title": "Relay API errors",
-      "description": "Non-zero is the first thing to check when a phase stalls.",
+      "description": "Non-zero is the first thing to check when a phase stalls. \u26a0\ufe0f Aggregated with `max_over_time`, NOT `increase`. These are per-session cumulative counters that expire 15m after their last sample, so a short relay phase can expose only its first nonzero sample and `increase()` would treat that as the baseline and report ~0. `max_over_time` takes each session series' final value; summing across sessions gives the true total. Same pattern as operator-usage.json.",
       "gridPos": {
         "h": 4,
         "w": 5,
@@ -377,7 +361,7 @@
       },
       "targets": [
         {
-          "expr": "sum(increase(claude_code_api_error_total{catalyst_orchestration=\"relay\"}[$__range]))",
+          "expr": "sum(max_over_time(claude_code_api_error_total{catalyst_orchestration=\"relay\"}[$__range])) or vector(0)",
           "legendFormat": "Relay API errors",
           "refId": "A",
           "datasource": {
@@ -438,8 +422,8 @@
     {
       "id": 7,
       "type": "timeseries",
-      "title": "Spend by dispatch origin",
-      "description": "The relay-vs-interactive split. Relay workers carry catalyst_orchestration=\"relay\"; an interactive session sets nothing. Anything unattributed lands in the second series, so a rising 'interactive' line during a fleet run means attribution is being dropped.",
+      "title": "Cumulative spend by dispatch origin",
+      "description": "The relay-vs-interactive split. Relay workers carry catalyst_orchestration=\"relay\"; an interactive session sets nothing, so unattributed burn shows in the second series. Lines are CUMULATIVE per bucket (see below), not a rate. \u26a0\ufe0f Aggregated with `max_over_time`, NOT `increase`. These are per-session cumulative counters that expire 15m after their last sample, so a short relay phase can expose only its first nonzero sample and `increase()` would treat that as the baseline and report ~0. `max_over_time` takes each session series' final value; summing across sessions gives the true total. Same pattern as operator-usage.json.",
       "gridPos": {
         "h": 7,
         "w": 12,
@@ -452,7 +436,7 @@
       },
       "targets": [
         {
-          "expr": "sum(increase(claude_code_cost_usage_USD_total{catalyst_orchestration=\"relay\"}[$bucket]))",
+          "expr": "sum(max_over_time(claude_code_cost_usage_USD_total{catalyst_orchestration=\"relay\"}[$__interval]))",
           "legendFormat": "relay worker",
           "refId": "A",
           "datasource": {
@@ -461,7 +445,7 @@
           }
         },
         {
-          "expr": "sum(increase(claude_code_cost_usage_USD_total{catalyst_orchestration=\"\"}[$bucket]))",
+          "expr": "sum(max_over_time(claude_code_cost_usage_USD_total{catalyst_orchestration=\"\"}[$__interval]))",
           "legendFormat": "interactive / unattributed",
           "refId": "B",
           "datasource": {
@@ -493,7 +477,6 @@
           "placement": "right",
           "showLegend": true,
           "calcs": [
-            "sum",
             "max"
           ]
         },
@@ -506,8 +489,8 @@
     {
       "id": 8,
       "type": "timeseries",
-      "title": "Spend by runtime",
-      "description": "cloud_platform is stamped only by Cloudflare container runners (cloud.platform=cloudflare_containers, verified through the tunnel). Laptop relay workers have no cloud.* attributes and appear in the host_name series.",
+      "title": "Cumulative spend by runtime",
+      "description": "cloud_platform is stamped only by Cloudflare container runners (verified through the tunnel); laptop relay workers have no cloud.* attributes and appear in the host_name series. \u26a0\ufe0f Aggregated with `max_over_time`, NOT `increase`. These are per-session cumulative counters that expire 15m after their last sample, so a short relay phase can expose only its first nonzero sample and `increase()` would treat that as the baseline and report ~0. `max_over_time` takes each session series' final value; summing across sessions gives the true total. Same pattern as operator-usage.json.",
       "gridPos": {
         "h": 7,
         "w": 12,
@@ -520,7 +503,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (cloud_platform) (increase(claude_code_cost_usage_USD_total{cloud_platform!=\"\"}[$bucket]))",
+          "expr": "sum by (cloud_platform) (max_over_time(claude_code_cost_usage_USD_total{cloud_platform!=\"\"}[$__interval]))",
           "legendFormat": "{{cloud_platform}}",
           "refId": "A",
           "datasource": {
@@ -529,7 +512,7 @@
           }
         },
         {
-          "expr": "sum by (host_name) (increase(claude_code_cost_usage_USD_total{cloud_platform=\"\"}[$bucket]))",
+          "expr": "sum by (host_name) (max_over_time(claude_code_cost_usage_USD_total{cloud_platform=\"\"}[$__interval]))",
           "legendFormat": "host {{host_name}}",
           "refId": "B",
           "datasource": {
@@ -561,7 +544,6 @@
           "placement": "right",
           "showLegend": true,
           "calcs": [
-            "sum",
             "max"
           ]
         },
@@ -587,8 +569,8 @@
     {
       "id": 9,
       "type": "timeseries",
-      "title": "Relay spend by phase",
-      "description": "task_type is the relay ladder step. Unified's 'Cost by Phase' shows the same cut across ALL sources; this one is relay-only.",
+      "title": "Cumulative relay spend by phase",
+      "description": "task_type is the relay ladder step. Unified's 'Cost by Phase' shows the same cut across ALL sources; this is relay-only. \u26a0\ufe0f Aggregated with `max_over_time`, NOT `increase`. These are per-session cumulative counters that expire 15m after their last sample, so a short relay phase can expose only its first nonzero sample and `increase()` would treat that as the baseline and report ~0. `max_over_time` takes each session series' final value; summing across sessions gives the true total. Same pattern as operator-usage.json.",
       "gridPos": {
         "h": 7,
         "w": 8,
@@ -601,7 +583,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (task_type) (increase(claude_code_cost_usage_USD_total{catalyst_orchestration=\"relay\",task_type!=\"\"}[$bucket]))",
+          "expr": "sum by (task_type) (max_over_time(claude_code_cost_usage_USD_total{catalyst_orchestration=\"relay\",task_type!=\"\"}[$__interval]))",
           "legendFormat": "{{task_type}}",
           "refId": "A",
           "datasource": {
@@ -633,7 +615,6 @@
           "placement": "right",
           "showLegend": true,
           "calcs": [
-            "sum",
             "max"
           ]
         },
@@ -646,8 +627,8 @@
     {
       "id": 10,
       "type": "timeseries",
-      "title": "Relay sessions started",
-      "description": "One relay worker = one session. A restarted phase shows as a new session.",
+      "title": "Relay sessions",
+      "description": "One relay worker = one session; the counter is 1 per session series, so max_over_time then sum counts sessions. \u26a0\ufe0f Aggregated with `max_over_time`, NOT `increase`. These are per-session cumulative counters that expire 15m after their last sample, so a short relay phase can expose only its first nonzero sample and `increase()` would treat that as the baseline and report ~0. `max_over_time` takes each session series' final value; summing across sessions gives the true total. Same pattern as operator-usage.json.",
       "gridPos": {
         "h": 7,
         "w": 8,
@@ -660,7 +641,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (linear_key) (increase(claude_code_session_count_total{catalyst_orchestration=\"relay\"}[$bucket]))",
+          "expr": "sum by (linear_key) (max_over_time(claude_code_session_count_total{catalyst_orchestration=\"relay\"}[$__interval]))",
           "legendFormat": "{{linear_key}}",
           "refId": "A",
           "datasource": {
@@ -692,7 +673,6 @@
           "placement": "right",
           "showLegend": true,
           "calcs": [
-            "sum",
             "max"
           ]
         },
@@ -706,7 +686,7 @@
       "id": 11,
       "type": "logs",
       "title": "Relay worker log tail",
-      "description": "Relay records only. Loki promotes every resource attribute to structured metadata automatically, so linear_key filters without any collector allowlist entry.",
+      "description": "Relay records only. Selector is service_name=~\"claude-code.*\" (the repo's house pattern) rather than an exact match, so the panel survives any future service-name change; catalyst_orchestration is the real discriminator. Loki promotes every resource attribute to structured metadata automatically, so linear_key filters with no collector allowlist entry.",
       "gridPos": {
         "h": 7,
         "w": 8,
@@ -719,7 +699,7 @@
       },
       "targets": [
         {
-          "expr": "{service_name=\"claude-code\"} | catalyst_orchestration=`relay` | linear_key=~\"$ticket\"",
+          "expr": "{service_name=~\"claude-code.*\"} | catalyst_orchestration=`relay` | linear_key=~\"$ticket\"",
           "refId": "A",
           "queryType": "range",
           "datasource": {
@@ -754,7 +734,7 @@
       "id": 12,
       "type": "table",
       "title": "Container runners seen",
-      "description": "One row per container instance. cloud_* / container_id / service_instance_id are OTel semconv fields, verified to survive the CF tunnel end-to-end into both Loki and Prometheus. Empty until container runners ship.",
+      "description": "One row per container instance. cloud_* / container_id / service_instance_id are OTel semconv fields, verified to survive the CF tunnel into both Loki and Prometheus. Empty until container runners ship. \u26a0\ufe0f Aggregated with `max_over_time`, NOT `increase`. These are per-session cumulative counters that expire 15m after their last sample, so a short relay phase can expose only its first nonzero sample and `increase()` would treat that as the baseline and report ~0. `max_over_time` takes each session series' final value; summing across sessions gives the true total. Same pattern as operator-usage.json.",
       "gridPos": {
         "h": 7,
         "w": 12,
@@ -767,7 +747,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (container_id, service_instance_id, cloud_platform, cloud_region, linear_key) (increase(claude_code_cost_usage_USD_total{cloud_platform!=\"\"}[$__range]))",
+          "expr": "sum by (container_id, service_instance_id, cloud_platform, cloud_region, linear_key) (max_over_time(claude_code_cost_usage_USD_total{cloud_platform!=\"\"}[$__range]))",
           "refId": "A",
           "instant": true,
           "format": "table",
@@ -837,8 +817,8 @@
     {
       "id": 13,
       "type": "timeseries",
-      "title": "Container spend by ticket",
-      "description": "Per-ticket burn for container-run work only. Empty until container runners ship.",
+      "title": "Cumulative container spend by ticket",
+      "description": "Per-ticket burn for container-run work only. Empty until container runners ship. \u26a0\ufe0f Aggregated with `max_over_time`, NOT `increase`. These are per-session cumulative counters that expire 15m after their last sample, so a short relay phase can expose only its first nonzero sample and `increase()` would treat that as the baseline and report ~0. `max_over_time` takes each session series' final value; summing across sessions gives the true total. Same pattern as operator-usage.json.",
       "gridPos": {
         "h": 7,
         "w": 12,
@@ -851,7 +831,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (linear_key) (increase(claude_code_cost_usage_USD_total{cloud_platform!=\"\",linear_key!=\"\"}[$bucket]))",
+          "expr": "sum by (linear_key) (max_over_time(claude_code_cost_usage_USD_total{cloud_platform!=\"\",linear_key!=\"\"}[$__interval]))",
           "legendFormat": "{{linear_key}}",
           "refId": "A",
           "datasource": {
@@ -883,7 +863,6 @@
           "placement": "right",
           "showLegend": true,
           "calcs": [
-            "sum",
             "max"
           ]
         },
