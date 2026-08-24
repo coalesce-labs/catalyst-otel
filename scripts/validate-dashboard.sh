@@ -59,6 +59,204 @@ else
   fail "unknown datasource UIDs (count: $BAD)"
 fi
 
+# NOTE (OTL-75): the six per-dimension panels carry the "Cumulative " prefix because their
+#     counters are aggregated with max_over_time, not increase — per-session counters that
+#     expire after 15m, so a per-bucket increase() undercounts. These assertions match on
+#     EXACT titles, so a future rename breaks them loudly rather than silently; update the
+#     title lists below together with the dashboard. Layout (y = 5,12,19,26,33,40,47) and the
+#     weighted-allocation query contract are unchanged by that rename.
+# --- OTL-71: spend/token economics panels are paired by dimension, followed by
+#     model x token-type matrices. Exact grid assertions catch order, overlap,
+#     and first-section placement regressions. ---
+ECON_TITLES='["Cumulative Spend by Host","Cumulative Tokens by Host","Cumulative Spend by Model","Cumulative Tokens by Model","Cumulative Spend by Type","Cumulative Tokens by Type","Tokens by Model × Token Type","Spend by Model × Token Type"]'
+ECON_LAYOUT='[
+  {"title":"Cumulative Spend by Host","gridPos":{"h":7,"w":24,"x":0,"y":5}},
+  {"title":"Cumulative Tokens by Host","gridPos":{"h":7,"w":24,"x":0,"y":12}},
+  {"title":"Cumulative Spend by Model","gridPos":{"h":7,"w":24,"x":0,"y":19}},
+  {"title":"Cumulative Tokens by Model","gridPos":{"h":7,"w":24,"x":0,"y":26}},
+  {"title":"Cumulative Spend by Type","gridPos":{"h":7,"w":24,"x":0,"y":33}},
+  {"title":"Cumulative Tokens by Type","gridPos":{"h":7,"w":24,"x":0,"y":40}},
+  {"title":"Tokens by Model × Token Type","gridPos":{"h":8,"w":12,"x":0,"y":47}},
+  {"title":"Spend by Model × Token Type","gridPos":{"h":8,"w":12,"x":12,"y":47}}
+]'
+if jq -e --argjson titles "$ECON_TITLES" '
+  [.panels[] | select(.title as $t | $titles | index($t)) | .title] as $present
+  | ($titles - $present) | length == 0
+' "$DASH" >/dev/null; then
+  pass "OTL-71 spend/token economics panels are present"
+else
+  fail "OTL-71 spend/token economics panel missing"
+fi
+
+if jq -e --argjson layout "$ECON_LAYOUT" '
+  ($layout | map(.title)) as $titles
+  | [.panels[] | select(.title as $t | $titles | index($t)) | {title, gridPos}]
+  | sort_by(.gridPos.y, .gridPos.x) == $layout
+' "$DASH" >/dev/null; then
+  pass "OTL-71 spend/token panels have the paired first-section layout"
+else
+  fail "OTL-71 spend/token panel layout is wrong"
+fi
+
+# Tokens by Model must use the native token counter. Spend by Type must allocate
+# native model spend using model+type token weights (input=1, output=5,
+# cacheRead=.1, cacheCreation=2) rather than introducing a second cost source.
+if jq -e '[.panels[] | select(.title=="Cumulative Tokens by Model") | .targets[].expr
+          | select(test("claude_code_token_usage_tokens_total") and test("model"))]
+         | length > 0' "$DASH" >/dev/null; then
+  pass "OTL-71 Tokens by Model uses native model-attributed tokens"
+else
+  fail "OTL-71 Tokens by Model query is missing native model attribution"
+fi
+
+if jq -e '
+  def complete_allocation($window):
+    contains("claude_code_cost_usage_USD_total")
+    and contains("claude_code_token_usage_tokens_total")
+    and contains("type=\"input\"")
+    and test("type=\\\"output\\\".*\\* 5")
+    and test("type=\\\"cacheRead\\\".*\\* 0\\.1")
+    and test("type=\\\"cacheCreation\\\".*\\* 2")
+    and contains("on (model) group_left")
+    and contains("clamp_min(")
+    and contains(", 1e-12)")
+    and contains($window);
+  ([.panels[] | select(.title=="Cumulative Spend by Type") | .targets[].expr
+    | select(complete_allocation("[$__interval]"))] | length > 0)
+  and
+  ([.panels[] | select(.title=="Spend by Model × Token Type") | .targets[].expr
+    | select(complete_allocation("[$__range]"))] | length > 0)
+' "$DASH" >/dev/null; then
+  pass "OTL-71 spend panels allocate native model spend with complete weighted proportions"
+else
+  fail "OTL-71 spend allocation query is incomplete"
+fi
+
+for matrix_spec in "Tokens by Model × Token Type|tokens|short|0" "Spend by Model × Token Type|spend|currencyUSD|12"; do
+  IFS='|' read -r title value_field unit x <<EOF
+$matrix_spec
+EOF
+  if jq -e --arg title "$title" --arg value_field "$value_field" --arg unit "$unit" --argjson x "$x" '
+    [.panels[] | select(.title==$title
+                         and .type=="table"
+                         and .gridPos=={"h":8,"w":12,"x":$x,"y":47}
+                         and .fieldConfig.defaults.unit==$unit
+                         and (.targets | length)==4
+                         and .targets[0].instant==true
+                         and .targets[0].range==false
+                         and .targets[0].format=="table"
+                         and (.targets[0].expr | contains("claude_code_token_usage_tokens_total"))
+                         and (.targets[0].expr | contains("[$__range]")))
+     | .transformations[]
+     | select(.id=="groupingToMatrix"
+              and .options.rowField=="model_family"
+              and .options.columnField=="type"
+              and .options.valueField==$value_field
+              and .options.emptyValue=="zero")]
+    | length == 1
+  ' "$DASH" >/dev/null; then
+    pass "OTL-71 matrix configured: $title"
+  else
+    fail "OTL-71 model x token-type matrix misconfigured: $title"
+  fi
+done
+
+# Matrix comparisons must remain stable across refreshes. Rows use hidden
+# family/version keys, columns use the desired token lifecycle order, and every
+# nominal cell exposes its share of the complete matrix as a percentage tooltip.
+if jq -e '
+  def matrix_ready($title; $value_field):
+    .panels[]
+    | select(.title==$title)
+    | . as $panel
+    | (.targets | map(.refId)) == ["A", "B", "C", "D"]
+      and (.targets[0].expr | contains("family_rank") and contains("version_major") and contains("version_minor"))
+      and (.targets[1].expr | contains(" * 100") and contains("scalar(clamp_min("))
+      and all(.targets[0:2][];
+              (.expr | contains("max without (type)")) and
+              (["input", "cacheCreation", "cacheRead", "output"]
+               | all(. as $type | any($panel.targets[0:2][]; .expr | contains("\"type\", \"" + $type + "\"")))))
+      and (["input share", "cache write share", "cache hit share", "output share"]
+           | all(. as $type | $panel.targets[1].expr | contains("\"type\", \"" + $type + "\"")))
+      and (.targets[2].expr | startswith("label_replace(min(") and contains("\"config\", \"min\""))
+      and (.targets[3].expr | startswith("label_replace(max(") and contains("\"config\", \"max\""))
+      and all(.targets[2:4][]; (.hide // false) == false)
+      and ([.transformations[]
+            | select(.id=="sortBy" and .filter.id=="byRefId" and .filter.options=="/^(?:A|merge-A(?:-A)*)$/")
+            | .options.sort]
+           == [[{"field":"version_minor","desc":true}],
+               [{"field":"version_major","desc":true}],
+               [{"field":"family_rank","desc":false}]])
+      and any(.transformations[];
+              .id=="convertFieldType" and .filter.id=="byRefId" and .filter.options=="/^(?:A|merge-A(?:-A)*)$/"
+              and .options.conversions==[
+                {"targetField":"family_rank","destinationType":"number"},
+                {"targetField":"version_major","destinationType":"number"},
+                {"targetField":"version_minor","destinationType":"number"}
+              ])
+      and any(.transformations[];
+              .id=="configFromData" and .options.configRefId=="merge-C-D"
+              and .options.applyTo=={"id":"byName","options":"Value"}
+              and .options.mappings==[
+                {"fieldName":"min","handlerKey":"min","reducerId":"min"},
+                {"fieldName":"max","handlerKey":"max","reducerId":"max"}
+              ])
+      and ([.transformations[] | select(.id=="groupingToMatrix" and .filter.options=="/^(?:A|merge-A(?:-A)*)$/")
+            | .options.valueField] | index($value_field) != null)
+      and ([.transformations[] | select(.id=="groupingToMatrix" and .filter.options=="/^(?:B|merge-B(?:-B)*)$/")
+            | .options.valueField] | index("share") != null)
+      and any(.transformations[]; .id=="joinByField" and .options.byField=="model_family\\type" and .options.mode=="outer")
+      and any(.transformations[];
+              .id=="calculateField"
+              and .options.mode=="reduceRow"
+              and .options.alias=="Total"
+              and .options.replaceFields==false
+              and .options.reduce=={"include":["input","cacheCreation","cacheRead","output"],"reducer":"sum"})
+      and (.transformations | map(.id)
+           | index("configFromData") < index("calculateField")
+             and index("joinByField") < index("calculateField")
+             and index("calculateField") < rindex("organize"))
+      and ([.transformations[] | select(.id=="organize" and .options.indexByName["model_family\\type"]==0)
+            | .options.indexByName]
+           | index({"model_family\\type":0,"input":1,"cacheCreation":2,"cacheRead":3,"output":4,"Total":5,
+                    "input share":6,"cache write share":7,"cache hit share":8,"output share":9}) != null)
+      and .fieldConfig.defaults.fieldMinMax==false
+      and (.fieldConfig.defaults | has("min") | not)
+      and .fieldConfig.defaults.color.mode=="continuous-BlYlRd"
+      and .fieldConfig.defaults.custom.cellOptions=={"type":"auto"}
+      and ([.fieldConfig.overrides[]
+            | select(any(.properties[]; .id=="custom.cellOptions"))
+            | .matcher.options] | sort
+           == (["input","cache write","cache hit (read)","output"] | sort))
+      and ([{"value":"input","share":"input share"},
+            {"value":"cache write","share":"cache write share"},
+            {"value":"cache hit (read)","share":"cache hit share"},
+            {"value":"output","share":"output share"}]
+           | all(. as $column
+             | any($panel.fieldConfig.overrides[];
+                   .matcher.options==$column.value and
+                   any(.properties[]; .id=="custom.cellOptions" and .value=={"type":"color-background","mode":"gradient"}) and
+                   any(.properties[]; .id=="custom.tooltip.field" and .value==$column.share) and
+                   any(.properties[]; .id=="custom.tooltip.placement" and .value=="auto"))
+               and any($panel.fieldConfig.overrides[];
+                       .matcher.options==$column.share and
+                       any(.properties[]; .id=="custom.hideFrom.viz" and .value==true) and
+                       any(.properties[]; .id=="unit" and .value=="percent"))))
+      and (["input","cache write","cache hit (read)","output","Total"]
+           | all(. as $field
+             | any($panel.fieldConfig.overrides[];
+                   .matcher.options==$field and
+                   any(.properties[]; .id=="custom.footer.reducers" and .value==["sum"]))))
+      and all($panel.fieldConfig.overrides[] | select(.matcher.options=="Total");
+              all(.properties[]; .id!="custom.cellOptions"));
+  matrix_ready("Tokens by Model × Token Type"; "tokens")
+  and matrix_ready("Spend by Model × Token Type"; "spend")
+' "$DASH" >/dev/null; then
+  pass "OTL-71 matrices have deterministic axes, isolated gradients, share tooltips, and uncolored totals"
+else
+  fail "OTL-71 matrix comparison behavior is incomplete"
+fi
+
 # --- dashboard: required new Prometheus phase panels present ---
 for t in "Cost by Phase" "Tokens by Phase" "Sessions by Exec Context"; do
   COUNT=$(jq --arg t "$t" '[.. | objects | select(.title==$t)] | length' "$DASH")
