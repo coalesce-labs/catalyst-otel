@@ -9,6 +9,11 @@ loaded on demand rather than every session.
 
 ## Claude Code specifics
 
+- **Dashboards referenced by `make dashboard-validate`:** `dashboards/unified-dashboard.json`
+  (Claude Code), `dashboards/codex-usage.json` (Codex CLI/desktop — turns, tokens, latency, tools,
+  events; see `.agents/skills/otel-dashboards/SKILL.md` for the schema), plus
+  `catalyst-fleet-hosts.json`, `catalyst-worker-event-stream.json`, `catalyst-fleet-ops.json`.
+
 - **Worktrees:** do NOT use the built-in `EnterWorktree` tool here — its hardcoded
   default puts worktrees under `.claude/worktrees/` inside this checkout, which we
   never want. Use the Catalyst convention instead — the catalyst-dev

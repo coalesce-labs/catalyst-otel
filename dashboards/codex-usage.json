@@ -1,7 +1,7 @@
 {
   "uid": "codex-usage",
   "title": "Codex Usage",
-  "description": "Codex (OpenAI) CLI/desktop telemetry — turns, tokens, latency, tools, and events. No cost panels (ChatGPT-subscription auth emits no cost telemetry). Sparse-event/occurrence panels use Loki count_over_time, not expired-counter increase().",
+  "description": "Codex (OpenAI) CLI/desktop telemetry — turns, tokens, latency, tools, and events. No cost panels (ChatGPT-subscription auth emits no cost telemetry). Sparse-event/occurrence panels use Loki count_over_time, not expired-counter increase(). OTL fix 2026-08-24: the Turns/Tool Calls/Threads/Codex-Events/Codex-Errors Loki panels were matching the log BODY, which is always empty for structured codex.* events (all data rides as structured metadata) — fixed to metadata pipeline filters (`| event_name=\"...\"`, `| success=\"false\"`). TTFT/Turn-Latency/TTFM panels pointed at metric names that no longer exist (`*_seconds_bucket` was renamed to `*_duration_ms_milliseconds_bucket` upstream) — fixed + unit corrected to ms. IMPORTANT: codex_exec (headless relay workers) emits NO codex_conversation_turn_count_total / codex_turn_token_usage_* / codex_turn_e2e_duration_ms_* — Tokens, Cache Hit Rate, Turn Rate by Model, Tokens by Model, and Turn Latency reflect Codex Desktop/app-server ONLY. Headless relay turns/tokens/tool-calls by ticket live in the Codex — Relay Attribution row below (Loki + the few codex_exec-native Prometheus metrics: codex_tool_call_total, codex_thread_started_total, codex_turn_ttft/ttfm_duration_ms).",
   "schemaVersion": 39,
   "version": 1,
   "editable": true,
@@ -87,6 +87,45 @@
         "current": { "text": "All", "value": "$__all" },
         "options": [],
         "hide": 0
+      },
+      {
+        "name": "linear_key",
+        "type": "query",
+        "label": "Ticket",
+        "description": "CTC-* relay ticket. Sourced from codex_tool_call_total, the one native codex_exec (headless) Prometheus metric confirmed to carry linear_key/project/task_type/branch/host_name (2026-08-24) -- codex_conversation_turn_count_total and codex_turn_token_usage_* carry NO ticket dims for headless (Desktop-only).",
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "query": {
+          "qryType": 1,
+          "query": "label_values(codex_tool_call_total, linear_key)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": true,
+        "refresh": 2,
+        "sort": 1,
+        "current": { "text": "All", "value": "$__all" },
+        "options": [],
+        "hide": 0
+      },
+      {
+        "name": "project",
+        "type": "query",
+        "label": "Project",
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "query": {
+          "qryType": 1,
+          "query": "label_values(codex_tool_call_total, project)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": true,
+        "refresh": 2,
+        "sort": 1,
+        "current": { "text": "All", "value": "$__all" },
+        "options": [],
+        "hide": 0
       }
     ]
   },
@@ -107,7 +146,7 @@
       "datasource": { "type": "loki", "uid": "loki" },
       "targets": [
         {
-          "expr": "sum(count_over_time({service_name=~\"codex.*\"} |= \"codex.turn_ttft\" | originator=~\"$originator\" [$__range]))",
+          "expr": "sum(count_over_time({service_name=~\"codex.*\"} | event_name=\"codex.turn_ttft\" | originator=~\"$originator\" [$__range]))",
           "legendFormat": "Turns",
           "refId": "A"
         }
@@ -171,7 +210,7 @@
       "datasource": { "type": "loki", "uid": "loki" },
       "targets": [
         {
-          "expr": "sum(count_over_time({service_name=~\"codex.*\"} |= \"codex.tool_result\" | originator=~\"$originator\" [$__range]))",
+          "expr": "sum(count_over_time({service_name=~\"codex.*\"} | event_name=\"codex.tool_result\" | originator=~\"$originator\" [$__range]))",
           "legendFormat": "Tool Calls",
           "refId": "A"
         }
@@ -237,7 +276,7 @@
       "datasource": { "type": "loki", "uid": "loki" },
       "targets": [
         {
-          "expr": "sum(count_over_time({service_name=~\"codex.*\"} |= \"codex.conversation_starts\" | originator=~\"$originator\" [$__range]))",
+          "expr": "sum(count_over_time({service_name=~\"codex.*\"} | event_name=\"codex.conversation_starts\" | originator=~\"$originator\" [$__range]))",
           "legendFormat": "Threads",
           "refId": "A"
         }
@@ -269,17 +308,17 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "histogram_quantile(0.5, sum by (le) (rate(codex_turn_ttft_seconds_bucket{model=~\"$model\"}[$__range])))",
+          "expr": "histogram_quantile(0.5, sum by (le) (rate(codex_turn_ttft_duration_ms_milliseconds_bucket{model=~\"$model\"}[$__range])))",
           "legendFormat": "TTFT p50",
           "refId": "A"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "s",
-          "decimals": 2,
+          "unit": "ms",
+          "decimals": 0,
           "color": { "mode": "thresholds" },
-          "thresholds": { "mode": "absolute", "steps": [ { "color": "#73BF69", "value": null }, { "color": "#FADE2A", "value": 2 }, { "color": "#F2495C", "value": 5 } ] },
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "#73BF69", "value": null }, { "color": "#FADE2A", "value": 2000 }, { "color": "#F2495C", "value": 5000 } ] },
           "mappings": []
         },
         "overrides": []
@@ -430,24 +469,25 @@
       "id": 20,
       "type": "timeseries",
       "title": "Turn Latency (p50/p95)",
+      "description": "codex_turn_e2e_duration_ms — Codex_Desktop / codex-app-server ONLY. Verified 2026-08-24: codex_exec (headless relay) never emits this histogram (turn e2e duration is not exported by the headless CLI). See dashboard-level note.",
       "gridPos": { "h": 7, "w": 12, "x": 0, "y": 21 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "interval": "$bucket",
       "targets": [
         {
-          "expr": "histogram_quantile(0.5, sum by (le, model) (rate(codex_turn_e2e_seconds_bucket{model=~\"$model\"}[$__interval])))",
+          "expr": "histogram_quantile(0.5, sum by (le, model) (rate(codex_turn_e2e_duration_ms_milliseconds_bucket{model=~\"$model\"}[$__interval])))",
           "legendFormat": "p50 {{model}}",
           "refId": "A"
         },
         {
-          "expr": "histogram_quantile(0.95, sum by (le, model) (rate(codex_turn_e2e_seconds_bucket{model=~\"$model\"}[$__interval])))",
+          "expr": "histogram_quantile(0.95, sum by (le, model) (rate(codex_turn_e2e_duration_ms_milliseconds_bucket{model=~\"$model\"}[$__interval])))",
           "legendFormat": "p95 {{model}}",
           "refId": "B"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "s",
+          "unit": "ms",
           "custom": {
             "drawStyle": "line",
             "lineWidth": 2,
@@ -474,34 +514,35 @@
       "id": 21,
       "type": "timeseries",
       "title": "TTFT / TTFM Latency (p50/p95)",
+      "description": "codex_turn_ttft_duration_ms / codex_turn_ttfm_duration_ms — verified 2026-08-24 to be emitted by BOTH codex_exec (headless relay) and Codex_Desktop, unlike Turn Latency (e2e) which is Desktop-only.",
       "gridPos": { "h": 7, "w": 12, "x": 12, "y": 21 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "interval": "$bucket",
       "targets": [
         {
-          "expr": "histogram_quantile(0.5, sum by (le) (rate(codex_turn_ttft_seconds_bucket{model=~\"$model\"}[$__interval])))",
+          "expr": "histogram_quantile(0.5, sum by (le) (rate(codex_turn_ttft_duration_ms_milliseconds_bucket{model=~\"$model\"}[$__interval])))",
           "legendFormat": "TTFT p50",
           "refId": "A"
         },
         {
-          "expr": "histogram_quantile(0.95, sum by (le) (rate(codex_turn_ttft_seconds_bucket{model=~\"$model\"}[$__interval])))",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(codex_turn_ttft_duration_ms_milliseconds_bucket{model=~\"$model\"}[$__interval])))",
           "legendFormat": "TTFT p95",
           "refId": "B"
         },
         {
-          "expr": "histogram_quantile(0.5, sum by (le) (rate(codex_turn_ttfm_seconds_bucket{model=~\"$model\"}[$__interval])))",
+          "expr": "histogram_quantile(0.5, sum by (le) (rate(codex_turn_ttfm_duration_ms_milliseconds_bucket{model=~\"$model\"}[$__interval])))",
           "legendFormat": "TTFM p50",
           "refId": "C"
         },
         {
-          "expr": "histogram_quantile(0.95, sum by (le) (rate(codex_turn_ttfm_seconds_bucket{model=~\"$model\"}[$__interval])))",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(codex_turn_ttfm_duration_ms_milliseconds_bucket{model=~\"$model\"}[$__interval])))",
           "legendFormat": "TTFM p95",
           "refId": "D"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "s",
+          "unit": "ms",
           "custom": {
             "drawStyle": "line",
             "lineWidth": 2,
@@ -629,7 +670,7 @@
       },
       "targets": [
         {
-          "expr": "{service_name=~\"codex.*\"} |= \"codex.\" | originator=~\"$originator\" | line_format \"[{{.originator}}] {{.event_name}} {{.tool}}\"",
+          "expr": "{service_name=~\"codex.*\"} | event_name=~\"codex.*\" | originator=~\"$originator\" | line_format \"[{{.originator}}] {{.event_name}} {{.tool}}\"",
           "queryType": "range",
           "refId": "A"
         }
@@ -653,11 +694,227 @@
       },
       "targets": [
         {
-          "expr": "{service_name=~\"codex.*\"} |~ \"error|api_error\" | originator=~\"$originator\"",
+          "expr": "{service_name=~\"codex.*\"} | success=\"false\" | originator=~\"$originator\"",
           "queryType": "range",
           "refId": "A"
         }
       ]
+    },
+    {
+      "id": 600,
+      "type": "row",
+      "title": "Codex — Relay Attribution (headless, by ticket / project / phase)",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 48 },
+      "panels": []
+    },
+    {
+      "id": 50,
+      "type": "barchart",
+      "title": "Tool Calls by Ticket",
+      "description": "codex_tool_call_total{linear_key} -- codex_exec (headless relay) IS a native emitter of this metric with ticket dims (verified 2026-08-24). Desktop sessions never set linear_key so they do not appear here.",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 49 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sort_desc(topk(15, sum by (linear_key) (increase(codex_tool_call_total{linear_key=~\"$linear_key\",linear_key!=\"\"}[$__range]))))",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "{{linear_key}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "palette-classic" },
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null } ] },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "legend": { "showLegend": false }
+      }
+    },
+    {
+      "id": 51,
+      "type": "barchart",
+      "title": "Turns by Ticket",
+      "description": "Loki-derived (codex_exec emits no native turn-count metric with ticket dims -- codex_conversation_turn_count_total is Desktop-only). Counts codex.turn_ttft events by linear_key.",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 49 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "expr": "sort_desc(topk(15, sum by (linear_key) (count_over_time({service_name=\"codex_exec\"} | event_name=\"codex.turn_ttft\" | linear_key!=\"\" | linear_key=~\"$linear_key\" [$__range]))))",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "{{linear_key}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "palette-classic" },
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null } ] },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "legend": { "showLegend": false }
+      }
+    },
+    {
+      "id": 52,
+      "type": "barchart",
+      "title": "Turns by Project",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 49 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "expr": "sort_desc(topk(15, sum by (project) (count_over_time({service_name=\"codex_exec\"} | event_name=\"codex.turn_ttft\" | project!=\"\" | project=~\"$project\" [$__range]))))",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "{{project}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "palette-classic" },
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null } ] },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "legend": { "showLegend": false }
+      }
+    },
+    {
+      "id": 53,
+      "type": "barchart",
+      "title": "Turns: relay-codex vs Desktop (by task_type)",
+      "description": "task_type=relay-codex is the laptop relay dispatcher (see AGENTS.md relay-dispatch.sh); Desktop/other originators never set task_type and group under the empty bucket.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 57 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "expr": "sort_desc(topk(15, sum by (task_type) (count_over_time({service_name=~\"codex.*\"} | event_name=\"codex.turn_ttft\" [$__range]))))",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "{{task_type}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "palette-classic" },
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null } ] },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "legend": { "showLegend": false }
+      }
+    },
+    {
+      "id": 54,
+      "type": "timeseries",
+      "title": "Relay Token Usage by Ticket (headless, input/output)",
+      "description": "codex_exec emits NO codex_turn_token_usage_* metric -- the only token-usage signal for headless relay work is Loki structured metadata on codex.sse_event (input_token_count/output_token_count/cached_token_count/reasoning_token_count/tool_token_count), verified 2026-08-24. unwrap sums those fields per ticket.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 57 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "interval": "$bucket",
+      "targets": [
+        {
+          "expr": "sum by (linear_key) (sum_over_time({service_name=\"codex_exec\"} | event_name=\"codex.sse_event\" | linear_key!=\"\" | linear_key=~\"$linear_key\" | unwrap input_token_count [$__interval]))",
+          "legendFormat": "{{linear_key}} input",
+          "refId": "A"
+        },
+        {
+          "expr": "sum by (linear_key) (sum_over_time({service_name=\"codex_exec\"} | event_name=\"codex.sse_event\" | linear_key!=\"\" | linear_key=~\"$linear_key\" | unwrap output_token_count [$__interval]))",
+          "legendFormat": "{{linear_key}} output",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "bars",
+            "lineWidth": 1,
+            "fillOpacity": 60,
+            "gradientMode": "opacity",
+            "spanNulls": false,
+            "showPoints": "never",
+            "lineInterpolation": "linear",
+            "stacking": { "mode": "normal", "group": "A" },
+            "scaleDistribution": { "type": "linear" },
+            "thresholdsStyle": { "mode": "off" }
+          },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null } ] }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right", "calcs": ["sum", "mean"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "id": 55,
+      "type": "timeseries",
+      "title": "Relay Token Usage by Model (headless, output tokens)",
+      "description": "Same codex.sse_event unwrap source as the by-ticket panel, grouped by model instead -- the headless equivalent of the native 'Tokens by Model' panel above (which is Desktop-only).",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 65 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "interval": "$bucket",
+      "targets": [
+        {
+          "expr": "sum by (model) (sum_over_time({service_name=\"codex_exec\"} | event_name=\"codex.sse_event\" | model=~\"$model\" | unwrap output_token_count [$__interval]))",
+          "legendFormat": "{{model}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "spanNulls": true,
+            "showPoints": "never",
+            "lineInterpolation": "smooth",
+            "stacking": { "mode": "normal", "group": "A" },
+            "scaleDistribution": { "type": "linear" },
+            "thresholdsStyle": { "mode": "off" }
+          },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null } ] }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right", "calcs": ["sum", "mean"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
     }
   ]
 }
