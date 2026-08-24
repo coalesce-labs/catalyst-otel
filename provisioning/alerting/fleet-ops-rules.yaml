@@ -40,9 +40,17 @@ groups:
             catalyst_scheduler_max_parallel_effective == 1 for 10m.
             The fleet is not dispatching available work — autotune may have
             floor-clamped due to load/memory pressure, or the scheduler is
-            wedged. Check the Queue/Capacity panels on the Fleet Ops dashboard.
+            wedged. Check 'Effective vs Target Slots' (panel 2, the floor clamp)
+            and 'Eligible Work Waiting' (panel 5, the queue) on the Fleet Ops
+            dashboard.
             Threshold: floor = 1 (hardcoded; edit rule if fleet min changes).
           __dashboardUid__: catalyst-fleet-ops
+          # Panel 2 = 'Effective vs Target Slots', the timeseries carrying
+          # catalyst_scheduler_max_parallel_effective — the metric whose floor
+          # clamp IS this alert. Deliberately not panel 1: that id is the
+          # queryless 'Queue / Capacity' ROW header, so Grafana's "View panel"
+          # action would open a panel with no data (caught in review on #142).
+          __panelId__: '2'
         data:
           - refId: A
             relativeTimeRange: { from: 600, to: 0 }
@@ -96,6 +104,7 @@ groups:
             dashboard for which reap types are leaking.
             Threshold: >10 (conservative starting point; tune in-file).
           __dashboardUid__: catalyst-fleet-ops
+          __panelId__: '15'
         data:
           - refId: A
             relativeTimeRange: { from: 900, to: 0 }
@@ -167,6 +176,7 @@ groups:
             extended period. Check the Fleet Event Log or the scheduler-health
             dashboard for the ticket(s) involved.
           __dashboardUid__: catalyst-fleet-ops
+          __panelId__: '13'
         data:
           - refId: A
             relativeTimeRange: { from: 1800, to: 0 }
