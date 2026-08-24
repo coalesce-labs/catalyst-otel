@@ -59,17 +59,23 @@ else
   fail "unknown datasource UIDs (count: $BAD)"
 fi
 
+# NOTE (OTL-75): the six per-dimension panels carry the "Cumulative " prefix because their
+#     counters are aggregated with max_over_time, not increase — per-session counters that
+#     expire after 15m, so a per-bucket increase() undercounts. These assertions match on
+#     EXACT titles, so a future rename breaks them loudly rather than silently; update the
+#     title lists below together with the dashboard. Layout (y = 5,12,19,26,33,40,47) and the
+#     weighted-allocation query contract are unchanged by that rename.
 # --- OTL-71: spend/token economics panels are paired by dimension, followed by
 #     model x token-type matrices. Exact grid assertions catch order, overlap,
 #     and first-section placement regressions. ---
-ECON_TITLES='["Spend by Host","Tokens by Host","Spend by Model","Tokens by Model","Spend by Type","Tokens by Type","Tokens by Model × Token Type","Spend by Model × Token Type"]'
+ECON_TITLES='["Cumulative Spend by Host","Cumulative Tokens by Host","Cumulative Spend by Model","Cumulative Tokens by Model","Cumulative Spend by Type","Cumulative Tokens by Type","Tokens by Model × Token Type","Spend by Model × Token Type"]'
 ECON_LAYOUT='[
-  {"title":"Spend by Host","gridPos":{"h":7,"w":24,"x":0,"y":5}},
-  {"title":"Tokens by Host","gridPos":{"h":7,"w":24,"x":0,"y":12}},
-  {"title":"Spend by Model","gridPos":{"h":7,"w":24,"x":0,"y":19}},
-  {"title":"Tokens by Model","gridPos":{"h":7,"w":24,"x":0,"y":26}},
-  {"title":"Spend by Type","gridPos":{"h":7,"w":24,"x":0,"y":33}},
-  {"title":"Tokens by Type","gridPos":{"h":7,"w":24,"x":0,"y":40}},
+  {"title":"Cumulative Spend by Host","gridPos":{"h":7,"w":24,"x":0,"y":5}},
+  {"title":"Cumulative Tokens by Host","gridPos":{"h":7,"w":24,"x":0,"y":12}},
+  {"title":"Cumulative Spend by Model","gridPos":{"h":7,"w":24,"x":0,"y":19}},
+  {"title":"Cumulative Tokens by Model","gridPos":{"h":7,"w":24,"x":0,"y":26}},
+  {"title":"Cumulative Spend by Type","gridPos":{"h":7,"w":24,"x":0,"y":33}},
+  {"title":"Cumulative Tokens by Type","gridPos":{"h":7,"w":24,"x":0,"y":40}},
   {"title":"Tokens by Model × Token Type","gridPos":{"h":8,"w":12,"x":0,"y":47}},
   {"title":"Spend by Model × Token Type","gridPos":{"h":8,"w":12,"x":12,"y":47}}
 ]'
@@ -95,7 +101,7 @@ fi
 # Tokens by Model must use the native token counter. Spend by Type must allocate
 # native model spend using model+type token weights (input=1, output=5,
 # cacheRead=.1, cacheCreation=2) rather than introducing a second cost source.
-if jq -e '[.panels[] | select(.title=="Tokens by Model") | .targets[].expr
+if jq -e '[.panels[] | select(.title=="Cumulative Tokens by Model") | .targets[].expr
           | select(test("claude_code_token_usage_tokens_total") and test("model"))]
          | length > 0' "$DASH" >/dev/null; then
   pass "OTL-71 Tokens by Model uses native model-attributed tokens"
@@ -115,7 +121,7 @@ if jq -e '
     and contains("clamp_min(")
     and contains(", 1e-12)")
     and contains($window);
-  ([.panels[] | select(.title=="Spend by Type") | .targets[].expr
+  ([.panels[] | select(.title=="Cumulative Spend by Type") | .targets[].expr
     | select(complete_allocation("[$__interval]"))] | length > 0)
   and
   ([.panels[] | select(.title=="Spend by Model × Token Type") | .targets[].expr
