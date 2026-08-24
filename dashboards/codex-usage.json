@@ -1,9 +1,9 @@
 {
   "uid": "codex-usage",
   "title": "Codex Usage",
-  "description": "Codex (OpenAI) CLI/desktop telemetry — turns, tokens, latency, tools, and events. No cost panels (ChatGPT-subscription auth emits no cost telemetry). Sparse-event/occurrence panels use Loki count_over_time, not expired-counter increase(). OTL fix 2026-08-24: the Turns/Tool Calls/Threads/Codex-Events/Codex-Errors Loki panels were matching the log BODY, which is always empty for structured codex.* events (all data rides as structured metadata) — fixed to metadata pipeline filters (`| event_name=\"...\"`, `| success=\"false\"`). TTFT/Turn-Latency/TTFM panels pointed at metric names that no longer exist (`*_seconds_bucket` was renamed to `*_duration_ms_milliseconds_bucket` upstream) — fixed + unit corrected to ms. IMPORTANT: codex_exec (headless relay workers) emits NO codex_conversation_turn_count_total / codex_turn_token_usage_* / codex_turn_e2e_duration_ms_* — Tokens, Cache Hit Rate, Turn Rate by Model, Tokens by Model, and Turn Latency reflect Codex Desktop/app-server ONLY. Headless relay turns/tokens/tool-calls by ticket live in the Codex — Relay Attribution row below (Loki + the few codex_exec-native Prometheus metrics: codex_tool_call_total, codex_thread_started_total, codex_turn_ttft/ttfm_duration_ms).",
+  "description": "Codex (OpenAI) CLI/desktop telemetry — turns, tokens, latency, tools, and events. No cost panels (ChatGPT-subscription auth emits no cost telemetry). Sparse-event/occurrence panels use Loki count_over_time, not expired-counter increase(). OTL fix 2026-08-24: the Turns/Tool Calls/Threads/Codex-Events/Codex-Errors Loki panels were matching the log BODY, which is always empty for structured codex.* events (all data rides as structured metadata) — fixed to metadata pipeline filters (`| event_name=\"...\"`, `| success=\"false\"`). TTFT/Turn-Latency/TTFM panels pointed at metric names that no longer exist (`*_seconds_bucket` was renamed to `*_duration_ms_milliseconds_bucket` upstream) — fixed + unit corrected to ms. IMPORTANT: codex_exec (headless relay workers) emits NO codex_conversation_turn_count_total / codex_turn_token_usage_* / codex_turn_e2e_duration_ms_* — Tokens, Cache Hit Rate, Turn Rate by Model, Tokens by Model, and Turn Latency reflect Codex Desktop/app-server ONLY. Headless relay turns/tokens/tool-calls by ticket live in the Codex — Relay Attribution row below (Loki + the few codex_exec-native Prometheus metrics: codex_tool_call_total, codex_thread_started_total, codex_turn_ttft/ttfm_duration_ms). Codex has NO real cost telemetry (verified 2026-08-24 across the rollout JSONLs, the OTLP feed, and the OpenAI platform Costs API -- see provisioning/prometheus/codex-price-table.md); the Codex \u2014 ESTIMATED Cost row prices the same headless-relay tokens at OpenAI\u0027s published API list price and is labeled ESTIMATED throughout -- never treat it as a real bill.",
   "schemaVersion": 39,
-  "version": 1,
+  "version": 2,
   "editable": true,
   "graphTooltip": 1,
   "style": "dark",
@@ -914,6 +914,79 @@
       "options": {
         "legend": { "displayMode": "table", "placement": "right", "calcs": ["sum", "mean"] },
         "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "id": 700,
+      "type": "row",
+      "title": "Codex — ESTIMATED Cost (API list price -- NOT a real charge)",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 73 },
+      "panels": []
+    },
+    {
+      "id": 60,
+      "type": "stat",
+      "title": "Estimated Cost (list price)",
+      "description": "ESTIMATED @ OpenAI's published API list price for gpt-5.6-sol (see provisioning/prometheus/codex-price-table.md, fetched from https://developers.openai.com/api/docs/pricing 2026-08-24). This laptop's Codex runs on a ChatGPT Plan Pro SUBSCRIPTION, not API billing -- verified no cost/credit telemetry exists anywhere (rollout JSONL rate_limits.credits, the OTLP feed, or the OpenAI platform Costs API, which is unreachable here -- no API key configured). Subscription usage has NO true marginal dollar cost. This number is what the same tokens would cost an API-billed caller -- treat as a proxy for RELATIVE usage weight, not an actual bill.",
+      "gridPos": { "h": 8, "w": 6, "x": 0, "y": 74 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "expr": "(sum(sum_over_time({service_name=\"codex_exec\"} | event_name=\"codex.sse_event\" | model=\"gpt-5.6-sol\" | unwrap input_token_count [$__range])) - sum(sum_over_time({service_name=\"codex_exec\"} | event_name=\"codex.sse_event\" | model=\"gpt-5.6-sol\" | unwrap cached_token_count [$__range]))) * 0.000004 + sum(sum_over_time({service_name=\"codex_exec\"} | event_name=\"codex.sse_event\" | model=\"gpt-5.6-sol\" | unwrap cached_token_count [$__range])) * 0.0000004 + sum(sum_over_time({service_name=\"codex_exec\"} | event_name=\"codex.sse_event\" | model=\"gpt-5.6-sol\" | unwrap output_token_count [$__range])) * 0.00002",
+          "legendFormat": "Estimated Cost",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 2,
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "#5794F2", "value": null } ] },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background_solid",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "textMode": "value_and_name",
+        "reduceOptions": { "calcs": ["lastNotNull"], "values": false, "fields": "" }
+      }
+    },
+    {
+      "id": 61,
+      "type": "barchart",
+      "title": "Estimated Cost by Ticket (list price)",
+      "description": "ESTIMATED -- see the 'Estimated Cost (list price)' stat panel's description. gpt-5.6-sol only (the only model this fleet has used to date); see provisioning/prometheus/codex-price-table.md to extend to terra/luna.",
+      "gridPos": { "h": 8, "w": 18, "x": 6, "y": 74 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "expr": "sort_desc(topk(15, (sum by (linear_key) (sum_over_time({service_name=\"codex_exec\"} | event_name=\"codex.sse_event\" | model=\"gpt-5.6-sol\" | linear_key!=\"\" | linear_key=~\"$linear_key\" | unwrap input_token_count [$__range])) - sum by (linear_key) (sum_over_time({service_name=\"codex_exec\"} | event_name=\"codex.sse_event\" | model=\"gpt-5.6-sol\" | linear_key!=\"\" | linear_key=~\"$linear_key\" | unwrap cached_token_count [$__range]))) * 0.000004 + sum by (linear_key) (sum_over_time({service_name=\"codex_exec\"} | event_name=\"codex.sse_event\" | model=\"gpt-5.6-sol\" | linear_key!=\"\" | linear_key=~\"$linear_key\" | unwrap cached_token_count [$__range])) * 0.0000004 + sum by (linear_key) (sum_over_time({service_name=\"codex_exec\"} | event_name=\"codex.sse_event\" | model=\"gpt-5.6-sol\" | linear_key!=\"\" | linear_key=~\"$linear_key\" | unwrap output_token_count [$__range])) * 0.00002))",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "{{linear_key}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 2,
+          "color": { "mode": "palette-classic" },
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null } ] },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "legend": { "showLegend": false }
       }
     }
   ]

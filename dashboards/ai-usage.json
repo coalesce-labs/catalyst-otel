@@ -1,0 +1,1143 @@
+{
+  "uid": "ai-usage",
+  "title": "AI Usage",
+  "description": "Unified cross-provider AI spend/usage dashboard -- Claude Code (real $, native cost telemetry) + Codex (ESTIMATED $ at API list price -- runs on a ChatGPT Plan Pro subscription with no real cost telemetry, see provisioning/prometheus/codex-price-table.md). Real and estimated dollars are NEVER summed into one number anywhere on this dashboard -- always separate panels/series, always labeled. Built on the ai:tokens:sum / ai:tool_calls:sum / ai:cost_usd:sum canonical recording rules (provisioning/prometheus/recording-rules.yml) plus Loki panels for signals that don't exist in Prometheus yet (Codex headless tokens/cost). Designed to take a third provider (e.g. OpenRouter) by adding a recording-rule leg -- see the design note row at the bottom.",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "graphTooltip": 1,
+  "style": "dark",
+  "timezone": "browser",
+  "refresh": "1m",
+  "liveNow": false,
+  "fiscalYearStartMonth": 0,
+  "tags": [
+    "ai-usage",
+    "cost",
+    "observability"
+  ],
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "annotations": {
+    "list": []
+  },
+  "links": [],
+  "templating": {
+    "list": [
+      {
+        "name": "bucket",
+        "type": "interval",
+        "label": "Interval",
+        "query": "5m,15m,30m,1h,6h,1d",
+        "current": {
+          "text": "1h",
+          "value": "1h"
+        },
+        "auto": false,
+        "auto_count": 30,
+        "auto_min": "10s",
+        "options": [],
+        "refresh": 2,
+        "hide": 0
+      },
+      {
+        "name": "provider",
+        "type": "query",
+        "label": "Provider",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "query": {
+          "qryType": 1,
+          "query": "label_values(ai:tool_calls:sum, provider)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": true,
+        "refresh": 2,
+        "sort": 1,
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "options": [],
+        "hide": 0
+      },
+      {
+        "name": "model",
+        "type": "query",
+        "label": "Model",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "query": {
+          "qryType": 1,
+          "query": "label_values(ai:cost_usd:sum, model)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": true,
+        "refresh": 2,
+        "sort": 1,
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "options": [],
+        "hide": 0
+      },
+      {
+        "name": "project",
+        "type": "query",
+        "label": "Project",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "query": {
+          "qryType": 1,
+          "query": "label_values(ai:cost_usd:sum, project)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": true,
+        "refresh": 2,
+        "sort": 1,
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "options": [],
+        "hide": 0
+      },
+      {
+        "name": "linear_key",
+        "type": "query",
+        "label": "Ticket",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "query": {
+          "qryType": 1,
+          "query": "label_values(ai:cost_usd:sum, linear_key)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": true,
+        "refresh": 2,
+        "sort": 1,
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "options": [],
+        "hide": 0
+      },
+      {
+        "name": "account",
+        "type": "query",
+        "label": "Account",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "query": {
+          "qryType": 1,
+          "query": "label_values(ai:cost_usd:sum, account)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": true,
+        "refresh": 2,
+        "sort": 1,
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "options": [],
+        "hide": 0
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 100,
+      "type": "row",
+      "title": "AI Usage — Overview (real $ + estimated $, kept separate)",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "panels": []
+    },
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Claude Spend (real $)",
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 0,
+        "y": 1
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum(max_over_time(ai:cost_usd:sum{provider=\"anthropic\",linear_key=~\"$linear_key\",project=~\"$project\",account=~\"$account\"}[$__range]))",
+          "legendFormat": "Claude Spend (real $)",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 2,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#5794F2",
+                "value": null
+              }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background_solid",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "textMode": "value_and_name",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false,
+          "fields": ""
+        }
+      },
+      "description": "REAL dollars -- native claude_code_cost_usage_USD_total via the ai:cost_usd:sum recording rule."
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Codex Spend (ESTIMATED, list price)",
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 6,
+        "y": 1
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "targets": [
+        {
+          "expr": "(sum(sum_over_time({service_name=\"codex_exec\"} | event_name=\"codex.sse_event\" | model=\"gpt-5.6-sol\" | linear_key=~\"$linear_key\" | unwrap input_token_count [$__range])) - sum(sum_over_time({service_name=\"codex_exec\"} | event_name=\"codex.sse_event\" | model=\"gpt-5.6-sol\" | linear_key=~\"$linear_key\" | unwrap cached_token_count [$__range]))) * 0.000004 + sum(sum_over_time({service_name=\"codex_exec\"} | event_name=\"codex.sse_event\" | model=\"gpt-5.6-sol\" | linear_key=~\"$linear_key\" | unwrap cached_token_count [$__range])) * 0.0000004 + sum(sum_over_time({service_name=\"codex_exec\"} | event_name=\"codex.sse_event\" | model=\"gpt-5.6-sol\" | linear_key=~\"$linear_key\" | unwrap output_token_count [$__range])) * 0.00002",
+          "legendFormat": "Codex Spend (ESTIMATED, list price)",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 2,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#FF9830",
+                "value": null
+              }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background_solid",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "textMode": "value_and_name",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false,
+          "fields": ""
+        }
+      },
+      "description": "ESTIMATED @ OpenAI's published API list price. Codex runs on a ChatGPT Plan Pro SUBSCRIPTION -- verified no real cost/credit telemetry exists anywhere (see provisioning/prometheus/codex-price-table.md). NOT a real charge -- do not sum with the Claude panel."
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Claude Tokens (real)",
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 12,
+        "y": 1
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum(max_over_time(ai:tokens:sum{provider=\"anthropic\",linear_key=~\"$linear_key\",project=~\"$project\",account=~\"$account\"}[$__range]))",
+          "legendFormat": "Claude Tokens (real)",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#73BF69",
+                "value": null
+              }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background_solid",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "textMode": "value_and_name",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false,
+          "fields": ""
+        }
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Codex Tokens (headless relay, Loki)",
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 18,
+        "y": 1
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "targets": [
+        {
+          "expr": "sum(sum_over_time({service_name=\"codex_exec\"} | event_name=\"codex.sse_event\" | linear_key=~\"$linear_key\" | unwrap output_token_count [$__range])) + sum(sum_over_time({service_name=\"codex_exec\"} | event_name=\"codex.sse_event\" | linear_key=~\"$linear_key\" | unwrap input_token_count [$__range]))",
+          "legendFormat": "Codex Tokens (headless relay, Loki)",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#B877D9",
+                "value": null
+              }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background_solid",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "textMode": "value_and_name",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false,
+          "fields": ""
+        }
+      },
+      "description": "input+output tokens from codex.sse_event unwrap -- codex_exec emits no native Prometheus token-usage metric (see dashboards/codex-usage.json)."
+    },
+    {
+      "id": 200,
+      "type": "row",
+      "title": "Spend Trend — real vs estimated, plotted separately",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 7
+      },
+      "panels": []
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Spend Trend by Provider",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "interval": "$bucket",
+      "targets": [
+        {
+          "expr": "sum(max_over_time(ai:cost_usd:sum{provider=\"anthropic\"}[$__interval]))",
+          "legendFormat": "Claude (real $)",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "spanNulls": true,
+            "showPoints": "never",
+            "lineInterpolation": "smooth",
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "sum",
+            "mean",
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "description": "REAL Claude spend only, from the native cost counter. Codex has no comparable real-$ series -- see the estimated panel alongside."
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Estimated Spend Trend — Codex (list price)",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "interval": "$bucket",
+      "targets": [
+        {
+          "expr": "(sum(sum_over_time({service_name=\"codex_exec\"} | event_name=\"codex.sse_event\" | model=\"gpt-5.6-sol\" | unwrap input_token_count [$__interval])) - sum(sum_over_time({service_name=\"codex_exec\"} | event_name=\"codex.sse_event\" | model=\"gpt-5.6-sol\" | unwrap cached_token_count [$__interval]))) * 0.000004 + sum(sum_over_time({service_name=\"codex_exec\"} | event_name=\"codex.sse_event\" | model=\"gpt-5.6-sol\" | unwrap cached_token_count [$__interval])) * 0.0000004 + sum(sum_over_time({service_name=\"codex_exec\"} | event_name=\"codex.sse_event\" | model=\"gpt-5.6-sol\" | unwrap output_token_count [$__interval])) * 0.00002",
+          "legendFormat": "Codex (ESTIMATED $)",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "spanNulls": true,
+            "showPoints": "never",
+            "lineInterpolation": "smooth",
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "sum",
+            "mean",
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "description": "ESTIMATED @ API list price -- kept in its own panel, never combined with the real Claude spend panel, so the two can never be silently summed into one misleading number."
+    },
+    {
+      "id": 300,
+      "type": "row",
+      "title": "Claude Spend by Dimension (real $)",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 16
+      },
+      "panels": []
+    },
+    {
+      "id": 20,
+      "type": "barchart",
+      "title": "Spend by Model",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 17
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sort_desc(topk(10, sum by (model) (max_over_time(ai:cost_usd:sum{provider=\"anthropic\"}[$__range]))))",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "{{model}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 2,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "legend": {
+          "showLegend": false
+        }
+      }
+    },
+    {
+      "id": 21,
+      "type": "barchart",
+      "title": "Spend by Ticket",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 17
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sort_desc(topk(15, sum by (linear_key) (max_over_time(ai:cost_usd:sum{provider=\"anthropic\",linear_key!=\"\"}[$__range]))))",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "{{linear_key}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 2,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "legend": {
+          "showLegend": false
+        }
+      }
+    },
+    {
+      "id": 22,
+      "type": "barchart",
+      "title": "Spend by Project",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 17
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sort_desc(topk(10, sum by (project) (max_over_time(ai:cost_usd:sum{provider=\"anthropic\",project!=\"\"}[$__range]))))",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "{{project}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 2,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "legend": {
+          "showLegend": false
+        }
+      }
+    },
+    {
+      "id": 23,
+      "type": "barchart",
+      "title": "Spend by Phase",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 25
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sort_desc(topk(10, sum by (phase) (max_over_time(ai:cost_usd:sum{provider=\"anthropic\",phase!=\"\"}[$__range]))))",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "{{phase}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 2,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "legend": {
+          "showLegend": false
+        }
+      },
+      "description": "phase (research/plan/implement/validate/...) is a NEW resource attribute the relay dispatcher started stamping recently -- coverage is partial (sessions dispatched before the rollout have no phase label and are excluded here by design, not summed into an unlabeled bucket)."
+    },
+    {
+      "id": 24,
+      "type": "barchart",
+      "title": "Spend by Account (fleet rotation slot)",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 25
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sort_desc(topk(10, sum by (account) (max_over_time(ai:cost_usd:sum{provider=\"anthropic\",account!=\"\"}[$__range]))))",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "{{account}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 2,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "legend": {
+          "showLegend": false
+        }
+      },
+      "description": "account is the fleet's Claude-account rotation slot (e.g. acct6), NOT the WorkOS/Anthropic-Console login email -- also a recent addition, partial coverage."
+    },
+    {
+      "id": 25,
+      "type": "barchart",
+      "title": "Estimated Spend by Ticket (Codex, list price)",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 25
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "targets": [
+        {
+          "expr": "sort_desc(topk(15, (sum by (linear_key) (sum_over_time({service_name=\"codex_exec\"} | event_name=\"codex.sse_event\" | model=\"gpt-5.6-sol\" | linear_key!=\"\" | unwrap input_token_count [$__range])) - sum by (linear_key) (sum_over_time({service_name=\"codex_exec\"} | event_name=\"codex.sse_event\" | model=\"gpt-5.6-sol\" | linear_key!=\"\" | unwrap cached_token_count [$__range]))) * 0.000004 + sum by (linear_key) (sum_over_time({service_name=\"codex_exec\"} | event_name=\"codex.sse_event\" | model=\"gpt-5.6-sol\" | linear_key!=\"\" | unwrap cached_token_count [$__range])) * 0.0000004 + sum by (linear_key) (sum_over_time({service_name=\"codex_exec\"} | event_name=\"codex.sse_event\" | model=\"gpt-5.6-sol\" | linear_key!=\"\" | unwrap output_token_count [$__range])) * 0.00002))",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "{{linear_key}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 2,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "legend": {
+          "showLegend": false
+        }
+      },
+      "description": "ESTIMATED @ list price -- same source/formula as dashboards/codex-usage.json's Estimated Cost row."
+    },
+    {
+      "id": 400,
+      "type": "row",
+      "title": "Cross-Provider (real counts -- tool calls, tokens)",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 33
+      },
+      "panels": []
+    },
+    {
+      "id": 30,
+      "type": "timeseries",
+      "title": "Tool Calls by Provider",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 34
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "interval": "$bucket",
+      "targets": [
+        {
+          "expr": "sum by (provider) (max_over_time(ai:tool_calls:sum[$__interval]))",
+          "legendFormat": "{{provider}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "spanNulls": true,
+            "showPoints": "never",
+            "lineInterpolation": "smooth",
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            },
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "sum",
+            "mean",
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "description": "Real occurrence counts on BOTH sides -- claude_code_tool_result_total (anthropic) and codex_tool_call_total (openai) via ai:tool_calls:sum. Not a dollar figure, safe to compare/stack directly."
+    },
+    {
+      "id": 31,
+      "type": "barchart",
+      "title": "Tool Calls by Ticket (provider-split)",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 34
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sort_desc(topk(20, sum by (provider, linear_key) (max_over_time(ai:tool_calls:sum{linear_key!=\"\"}[$__range]))))",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "{{linear_key}} ({{provider}})",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 2,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "legend": {
+          "showLegend": false
+        }
+      }
+    },
+    {
+      "id": 32,
+      "type": "timeseries",
+      "title": "Tokens by Provider",
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 42
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "interval": "$bucket",
+      "targets": [
+        {
+          "expr": "sum by (provider) (max_over_time(ai:tokens:sum{provider=\"anthropic\"}[$__interval]))",
+          "legendFormat": "anthropic (real, ticket-level)",
+          "refId": "A"
+        },
+        {
+          "expr": "sum by (provider) (max_over_time(ai:tokens:sum{provider=\"openai\"}[$__interval]))",
+          "legendFormat": "openai (Desktop-only, NO ticket dims -- see codex-usage dashboard for headless)",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "spanNulls": true,
+            "showPoints": "never",
+            "lineInterpolation": "smooth",
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "sum",
+            "mean",
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "description": "Asymmetric on purpose: the anthropic leg of ai:tokens:sum carries full ticket/project dims (native claude_code_* metrics); the openai leg is Codex_Desktop/app-server ONLY (codex_exec emits no token-usage Prometheus metric at all -- see dashboards/codex-usage.json 'Relay Attribution' row for headless-by-ticket tokens, sourced from Loki instead)."
+    },
+    {
+      "id": 500,
+      "type": "row",
+      "title": "Extending to a third provider (e.g. OpenRouter)",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 50
+      },
+      "panels": []
+    },
+    {
+      "id": 50,
+      "type": "text",
+      "title": "Design note: adding a provider",
+      "gridPos": {
+        "h": 14,
+        "w": 24,
+        "x": 0,
+        "y": 51
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "### Adding `provider=\"openrouter\"` (or any new provider) to this schema\n\nThe `ai:tokens:sum` / `ai:tool_calls:sum` / `ai:cost_usd:sum` recording rules\n(`provisioning/prometheus/recording-rules.yml`) are additive per provider --\na new provider needs **its own rule block per metric**, following the\nexisting `anthropic`/`openai` pattern:\n\n```yaml\n- record: ai:tokens:sum\n  labels:\n    provider: openrouter\n  expr: |\n    sum by (model, token_type, project, branch, linear_key, task_type, account, phase) (\n      <openrouter's native token-usage metric>\n    )\n```\n\n**For a new provider to show up correctly across this whole dashboard**, its\nOTLP exporter needs to emit, on whichever metric(s) carry token/cost data:\n\n| canonical label | what to stamp | notes |\n|---|---|---|\n| `model` | the model id string | e.g. `glm-4.6`, `kimi-k2` |\n| `token_type` (or a label `label_replace`-able to it) | `input` / `output` / `cached` / ... | match the OpenAI/Anthropic token_type vocabulary where possible |\n| `project` / `branch` / `linear_key` / `task_type` | same `OTEL_RESOURCE_ATTRIBUTES` the relay dispatcher already sets for Claude/Codex | `~/catalyst/comms/coord/relay-dispatch.sh` is the one place that needs a new `--settings`/env block per provider |\n| `account` / `phase` | same dispatcher-stamped attrs | only useful once the recording rule groups by them (already done here) |\n| a REAL cost metric, if the provider bills per-token (OpenRouter does) | `<provider>_cost_usd_total` or equivalent | if real $ exist, wire a real `ai:cost_usd:sum` leg -- do NOT fall back to an estimated/list-price leg when a real number is available |\n\nOnce the metric exists with those labels, this dashboard's panels need **one\nline each**: add an `{\"expr\": ..., \"legendFormat\": \"openrouter\"}` target\nto the \"by Provider\" panels above (`Tool Calls by Provider`, `Tokens by\nProvider`, `Spend Trend by Provider`) -- the per-dimension panels\n(`Spend by Model`/`by Ticket`/`by Project`/...) don't need changes if they\nalready query the unified `ai:*` recording rule name (the `provider` label\njust gets a new value automatically).\n"
+      }
+    }
+  ]
+}

@@ -8,6 +8,7 @@ HOSTS="dashboards/catalyst-fleet-hosts.json"   # OTL-21: Fleet & Hosts split out
 CODEX="dashboards/codex-usage.json"            # OTL-53: net-new Codex Usage dashboard
 EVENTS="dashboards/catalyst-worker-event-stream.json"  # OTL-63: Loki-only forensic event tail
 FLEETOPS="dashboards/catalyst-fleet-ops.json"          # OTL-5: fleet-ops / aiops dashboard
+AIUSAGE="dashboards/ai-usage.json"                     # OTL: unified cross-provider spend dashboard
 COLLECTOR="collector-config.yaml"
 FAIL=0
 
@@ -452,12 +453,33 @@ for t in "Turns" "Tokens" "Tool Calls" "Cache Hit Rate" "Threads" "TTFT p50" \
   fi
 done
 
-# --- codex dashboard: no cost telemetry (ChatGPT-sub auth emits none) ---
-if jq -e '[.. | objects | select(.expr?) | .expr | select(test("cost"))] | length == 0' \
+# --- codex dashboard: no FAKE cost telemetry -- Codex has no native
+# codex_*cost* Prometheus metric (ChatGPT-sub auth emits none, verified
+# 2026-08-24: no cost/dollar/usd/price/credit field in the rollout JSONLs,
+# the OTLP feed, or the OpenAI platform Costs API, which is unreachable from
+# this box -- no API key configured). A REAL cost row would have to reference
+# a metric name matching this pattern, so guard against that specifically
+# rather than banning "cost" outright -- the dashboard DOES carry a
+# LogQL/unwrap-derived ESTIMATED-at-list-price row (OTL, 2026-08-24; see
+# provisioning/prometheus/codex-price-table.md), which is legitimate as long
+# as it never claims to be a native/real cost metric.
+if jq -e '[.. | objects | select(.expr?) | .expr | select(test("codex.*cost|cost.*codex"; "i"))] | length == 0' \
      "$CODEX" >/dev/null 2>&1; then
-  pass "codex dashboard has no cost queries"
+  pass "codex dashboard has no fake native cost metric"
 else
-  fail "codex dashboard references a cost metric (must be absent)"
+  fail "codex dashboard references a codex_*cost* metric (does not exist -- must be absent)"
+fi
+
+# --- codex dashboard: every panel titled "Cost" is labeled ESTIMATED ---
+# Guards the labeling discipline from acceptance scenario in the OTL PR: a
+# cost panel that doesn't say ESTIMATED (title or description) could be
+# mistaken for a real bill.
+if jq -e '[.. | objects | select(.title? // "" | test("cost"; "i"))
+          | select((.title // "") + " " + (.description // "") | test("estimat"; "i") | not)] | length == 0' \
+     "$CODEX" >/dev/null 2>&1; then
+  pass "codex cost panels are labeled ESTIMATED"
+else
+  fail "codex has a cost-titled panel not labeled ESTIMATED (title or description)"
 fi
 
 # --- codex dashboard: sparse-event occurrence panels use count_over_time, not increase() ---
@@ -689,6 +711,78 @@ jq -e '[.. | objects | select(.targets?) | .targets[]?.expr | select(test("linea
 grep -q 'runbook-otl-67-attribution' docs/data-dictionary.md \
   && pass "data-dictionary links the OTL-67 runbook" \
   || fail "data-dictionary missing OTL-67 runbook link"
+
+# =============================================================================
+# OTL: AI Usage dashboard ($AIUSAGE) — unified cross-provider spend/usage.
+# Mirrors the $CODEX block. Real ($) and estimated ($) must never be
+# summable into one metric name/panel by accident -- the checks below guard
+# that split as a structural invariant, not just a convention.
+# =============================================================================
+
+# --- ai-usage dashboard: file exists + JSON validity ---
+if [ -f "$AIUSAGE" ] && jq empty "$AIUSAGE" 2>/dev/null; then
+  pass "ai-usage dashboard JSON is valid"
+else
+  fail "ai-usage dashboard JSON missing or invalid ($AIUSAGE)"
+fi
+
+# --- ai-usage dashboard: unique panel IDs ---
+DUPA=$(jq '[.. | objects | select(has("id") and has("gridPos")) | .id]
+           | (length) as $n | (unique | length) as $u | $n - $u' "$AIUSAGE" 2>/dev/null || echo 1)
+[ "${DUPA:-1}" -eq 0 ] && pass "ai-usage panel IDs are unique" \
+                       || fail "ai-usage duplicate panel IDs (count: ${DUPA:-?})"
+
+# --- ai-usage dashboard: datasource UIDs resolve to known sources ---
+BADA=$(jq '[.. | objects | select(.datasource?.uid) | .datasource.uid]
+           | map(select(. != "prometheus" and . != "loki" and . != "-- Grafana --"
+                        and (startswith("$") | not))) | length' "$AIUSAGE" 2>/dev/null || echo 1)
+[ "${BADA:-1}" -eq 0 ] && pass "ai-usage datasource UIDs are known" \
+                       || fail "ai-usage unknown datasource UIDs (count: ${BADA:-?})"
+
+# --- ai-usage dashboard: unique uid ---
+UIDA=$(jq -r '.uid // empty' "$AIUSAGE" 2>/dev/null || echo "")
+[ "$UIDA" = "ai-usage" ] && pass "ai-usage uid is ai-usage" \
+                         || fail "ai-usage uid must be 'ai-usage' (got: '${UIDA:-none}')"
+
+# --- ai-usage dashboard: required panels present ---
+for t in "Claude Spend (real \$)" "Codex Spend (ESTIMATED, list price)" \
+         "Spend Trend by Provider" "Estimated Spend Trend — Codex (list price)" \
+         "Tool Calls by Provider" "Tokens by Provider"; do
+  if jq -e --arg t "$t" '[.. | objects | select(.title==$t)] | length > 0' "$AIUSAGE" >/dev/null 2>&1; then
+    pass "ai-usage panel present: $t"
+  else
+    fail "ai-usage panel missing: $t"
+  fi
+done
+
+# --- ai-usage: no panel/query ever sums a real-$ series with an estimated-$
+# series into one target. Heuristic: no single panel may have BOTH a target
+# whose datasource is prometheus AND a target whose datasource is loki when
+# its unit is currencyUSD -- that combination is exactly the "blended $"
+# shape this dashboard must never produce (real and estimated stay in
+# separate panels, each single-datasource).
+MIXED=$(jq '[.panels[] | select(.fieldConfig.defaults.unit? == "currencyUSD")
+            | (.datasource.uid // (.targets[0].datasource.uid // "?")) as $ds0
+            | select([.targets[].datasource.uid // $ds0] | unique | length > 1)] | length' \
+      "$AIUSAGE" 2>/dev/null || echo 1)
+[ "${MIXED:-1}" -eq 0 ] && pass "ai-usage never mixes real+estimated \$ datasources in one panel" \
+                         || fail "ai-usage has a currencyUSD panel mixing prometheus+loki targets (real+estimated blend risk)"
+
+# --- ai-usage: every currencyUSD panel sourced from Loki (i.e. Codex) is
+# labeled ESTIMATED; every one sourced from Prometheus (i.e. the ai:*
+# recording rules, real $) is NOT labeled estimated (catches a stale/wrong
+# label as loudly as a missing one). ---
+BADLABEL=$(jq '[.panels[] | select(.fieldConfig.defaults.unit? == "currencyUSD")
+            | (.datasource.uid // (.targets[0].datasource.uid // "?")) as $ds
+            | (.title // "") as $title
+            | ((.title // "") + " " + (.description // "")) as $text
+            | select(
+                ($ds == "loki" and ($text | test("estimat"; "i") | not))
+                or
+                ($ds == "prometheus" and ($title | test("estimat"; "i")))
+              )] | length' "$AIUSAGE" 2>/dev/null || echo 1)
+[ "${BADLABEL:-1}" -eq 0 ] && pass "ai-usage \$ panels are labeled real vs estimated correctly" \
+                            || fail "ai-usage has a \$ panel with a real/estimated label mismatch"
 
 # --- single pass/fail gate (moved here from mid-script so all checks run) ---
 if [ "$FAIL" -ne 0 ]; then
