@@ -139,3 +139,89 @@ groups:
           sum by (model, project, branch, linear_key, task_type, catalyst_orchestration, account, phase) (
             claude_code_cost_usage_USD_total
           )
+
+  # ---------------------------------------------------------------------
+  # OTL Task C (Ryan-directed, 2026-08-24): subscription efficiency --
+  # "how many retail-priced dollars of work does each subscription window
+  # deliver, and which models burn subscription limit fastest per dollar."
+  #
+  # NUMERATOR: retail-$ equivalent of work performed. Verified 2026-08-24
+  # (cross-checked a real session: claude_code_cost_usage_USD_total for a
+  # claude-sonnet-5 session with 151,040 input / 17,732,657 cacheCreation /
+  # 772,691,591 cacheRead / 1,694,674 output tokens reported $229.56;
+  # tokens x Anthropic's published API list price for claude-sonnet-5
+  # ($2/$2.50(5m-write)/$0.20(cache-read)/$10 per MTok, from
+  # platform.claude.com/docs/en/about-claude/pricing, fetched 2026-08-24)
+  # computes to $216.12 -- within ~6% (the residual is explained by tool-use
+  # system-prompt token overhead, mixed 5m/1h cache-write durations, etc.,
+  # not by a different pricing basis). ai:cost_usd:sum (provider=anthropic)
+  # is therefore the RETAIL-EQUIVALENT of work performed, NOT this laptop's
+  # actual subscription cost -- this account authenticates via a Claude
+  # subscription seat (acct1..6 rotation), which has no per-token bill.
+  # Codex's numerator is the Task A estimated-cost series (same list-price
+  # basis, see provisioning/prometheus/codex-price-table.md) -- Loki-only,
+  # so it is NOT a Prometheus recording rule leg here; see
+  # dashboards/ai-usage.json's Subscription Efficiency row for the Codex
+  # side (computed the same way as the Codex Usage dashboard's cost row).
+  #
+  # DENOMINATOR: subscription-limit-consumed, a gauge that neither provider
+  # exports as OTLP on its own -- ai_subscription_limit_used_percent (see
+  # collector-config.yaml's signal_to_metrics rule of the same name), fed by
+  # scripts/ai-subscription-limit-scraper.sh. Proven live end-to-end
+  # 2026-08-24 (13 real samples, laptop -> collector -> Loki) -- the
+  # Prometheus GAUGE conversion below additionally needs the collector
+  # config deployed (restart), same as every other collector-config.yaml
+  # change in this repo.
+  #
+  # HONESTY (Ryan's explicit requirement -- read before using these panels):
+  #   - This is a DIRECTIONAL ratio, not a bill. Anthropic/OpenAI's internal
+  #     limit-charging weights are opaque (cache discounts, per-model
+  #     multipliers on the LIMIT side are not published the way token PRICES
+  #     are) -- a model that looks "cheap per limit-%" here might be
+  #     internally weighted differently against the actual quota.
+  #   - The `[5h]`/`[7d]` lookback is a ROLLING window, not necessarily
+  #     aligned to the account's actual reset boundary (`resets_at`, present
+  #     on every ai_subscription_limit_used_percent sample as
+  #     `resets_at` -- not joinable into a PromQL rule, since Prometheus
+  #     range durations must be literal; a dashboard viewing a specific
+  #     account should cross-check `resets_at` against "now" and discount
+  #     the ratio near/just-after a reset, when used_percent is low but the
+  #     rolling $ window still includes PRE-reset spend).
+  #   - `retail_usd_per_limit_pct` is dollars per ONE percentage point of the
+  #     window consumed; multiply by 100 for "retail-$ if the window were
+  #     fully consumed at the observed rate" ("retail-$ per full window").
+  # ---------------------------------------------------------------------
+  - name: ai-canonical-efficiency
+    interval: 1m
+    rules:
+      - record: ai:efficiency:retail_usd_per_limit_pct
+        labels:
+          window: 5h
+        expr: |
+          sum by (provider, account) (max_over_time(ai:cost_usd:sum{provider="anthropic"}[5h]))
+          / on (provider, account) group_left
+            ai_subscription_limit_used_percent{provider="anthropic", window="5h"}
+
+      - record: ai:efficiency:retail_usd_per_limit_pct
+        labels:
+          window: 7d
+        expr: |
+          sum by (provider, account) (max_over_time(ai:cost_usd:sum{provider="anthropic"}[7d]))
+          / on (provider, account) group_left
+            ai_subscription_limit_used_percent{provider="anthropic", window="7d"}
+
+      - record: ai:efficiency:retail_usd_per_limit_pct_by_model
+        labels:
+          window: 5h
+        expr: |
+          sum by (provider, account, model) (max_over_time(ai:cost_usd:sum{provider="anthropic"}[5h]))
+          / on (provider, account) group_left
+            ai_subscription_limit_used_percent{provider="anthropic", window="5h"}
+
+      - record: ai:efficiency:retail_usd_per_limit_pct_by_model
+        labels:
+          window: 7d
+        expr: |
+          sum by (provider, account, model) (max_over_time(ai:cost_usd:sum{provider="anthropic"}[7d]))
+          / on (provider, account) group_left
+            ai_subscription_limit_used_percent{provider="anthropic", window="7d"}

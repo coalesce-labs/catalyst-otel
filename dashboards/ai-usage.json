@@ -1138,6 +1138,319 @@
         "mode": "markdown",
         "content": "### Adding `provider=\"openrouter\"` (or any new provider) to this schema\n\nThe `ai:tokens:sum` / `ai:tool_calls:sum` / `ai:cost_usd:sum` recording rules\n(`provisioning/prometheus/recording-rules.yml`) are additive per provider --\na new provider needs **its own rule block per metric**, following the\nexisting `anthropic`/`openai` pattern:\n\n```yaml\n- record: ai:tokens:sum\n  labels:\n    provider: openrouter\n  expr: |\n    sum by (model, token_type, project, branch, linear_key, task_type, account, phase) (\n      <openrouter's native token-usage metric>\n    )\n```\n\n**For a new provider to show up correctly across this whole dashboard**, its\nOTLP exporter needs to emit, on whichever metric(s) carry token/cost data:\n\n| canonical label | what to stamp | notes |\n|---|---|---|\n| `model` | the model id string | e.g. `glm-4.6`, `kimi-k2` |\n| `token_type` (or a label `label_replace`-able to it) | `input` / `output` / `cached` / ... | match the OpenAI/Anthropic token_type vocabulary where possible |\n| `project` / `branch` / `linear_key` / `task_type` | same `OTEL_RESOURCE_ATTRIBUTES` the relay dispatcher already sets for Claude/Codex | `~/catalyst/comms/coord/relay-dispatch.sh` is the one place that needs a new `--settings`/env block per provider |\n| `account` / `phase` | same dispatcher-stamped attrs | only useful once the recording rule groups by them (already done here) |\n| a REAL cost metric, if the provider bills per-token (OpenRouter does) | `<provider>_cost_usd_total` or equivalent | if real $ exist, wire a real `ai:cost_usd:sum` leg -- do NOT fall back to an estimated/list-price leg when a real number is available |\n\nOnce the metric exists with those labels, this dashboard's panels need **one\nline each**: add an `{\"expr\": ..., \"legendFormat\": \"openrouter\"}` target\nto the \"by Provider\" panels above (`Tool Calls by Provider`, `Tokens by\nProvider`, `Spend Trend by Provider`) -- the per-dimension panels\n(`Spend by Model`/`by Ticket`/`by Project`/...) don't need changes if they\nalready query the unified `ai:*` recording rule name (the `provider` label\njust gets a new value automatically).\n"
       }
+    },
+    {
+      "id": 600,
+      "type": "row",
+      "title": "Subscription Efficiency — retail-$ per subscription-window (Ryan's Task C)",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 59
+      },
+      "panels": []
+    },
+    {
+      "id": 60,
+      "type": "text",
+      "title": "Read this first",
+      "gridPos": {
+        "h": 11,
+        "w": 24,
+        "x": 0,
+        "y": 60
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "### Read this before trusting these numbers\n\n**Directional, not billing truth.** Both providers are flat-rate subscriptions\n($200/mo-class) -- there is no per-token bill to reconcile against. This row\nanswers \"how many retail-priced dollars of work does each subscription\nwindow deliver\" as a **relative efficiency signal**, not a real cost.\n\n- **Numerator** (retail-$): `claude_code_cost_usage_USD_total` is Claude\n  Code's own list-price approximation -- verified 2026-08-24 by cross-checking\n  a real session's token counts against Anthropic's published API pricing\n  (computed $216.12 vs Claude Code's reported $229.56, within ~6%, consistent\n  with the SAME pricing basis -- see recording-rules.yml for the worked\n  example). Codex's numerator is the Task A ESTIMATED-cost series (same\n  list-price logic, Loki-only -- see the two panels below).\n- **Denominator** (limit consumed): neither provider exports this as OTLP.\n  `ai_subscription_limit_used_percent` is a NEW gauge fed by\n  `scripts/ai-subscription-limit-scraper.sh` (proven live end-to-end\n  2026-08-24) -- not yet reflected in Prometheus until the collector config\n  is deployed (restart required).\n- **Limit-charging weights are opaque.** A model that looks \"cheap per\n  limit-%\" here might be internally weighted differently against the actual\n  subscription quota than its published token price implies -- Anthropic/\n  OpenAI do not publish that mapping.\n- **Reset-boundary handling**: the ratio uses a rolling `[5h]`/`[7d]` lookback,\n  not a window strictly aligned to `resets_at`. Right after a reset,\n  `used_percent` drops to ~0 while the rolling $ window still includes\n  pre-reset spend -- the ratio will read artificially high in that gap.\n  Cross-check `resets_at` (carried on every subscription-limit sample) before\n  trusting a ratio near a reset boundary.\n"
+      }
+    },
+    {
+      "id": 61,
+      "type": "barchart",
+      "title": "Claude: Retail-$ per Full 5h Window (by account)",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 71
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sort_desc(ai:efficiency:retail_usd_per_limit_pct{window=\"5h\"} * 100)",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "{{account}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 2,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "legend": {
+          "showLegend": false
+        }
+      },
+      "description": "(retail-$ spent in the trailing 5h) / (used_percent of the 5h window) * 100 -- 'if this account fully consumed its 5h window at the observed rate, this is roughly what it would be worth at API list price.' NOT YET LIVE -- needs ai_subscription_limit_used_percent deployed (see collector-config.yaml). Query-equivalent verified 2026-08-24: acct6 spent $23.38 retail in 5h at 62% used -> $37.71/full-window."
+    },
+    {
+      "id": 62,
+      "type": "barchart",
+      "title": "Claude: Retail-$ per Full 7d Window (by account)",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 71
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sort_desc(ai:efficiency:retail_usd_per_limit_pct{window=\"7d\"} * 100)",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "{{account}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 2,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "legend": {
+          "showLegend": false
+        }
+      },
+      "description": "Same formula as the 5h panel, 7-day window. NOT YET LIVE -- needs ai_subscription_limit_used_percent deployed."
+    },
+    {
+      "id": 63,
+      "type": "barchart",
+      "title": "Claude: Retail-$ per Limit-% by Model (5h) — which models burn limit fastest per $",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 71
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sort_desc(ai:efficiency:retail_usd_per_limit_pct_by_model{window=\"5h\"})",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "{{model}} ({{account}})",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 2,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "legend": {
+          "showLegend": false
+        }
+      },
+      "description": "retail-$ per ONE percentage point of the 5h window consumed, broken out by model. A LOW value means that model's retail-priced work consumes subscription limit fast relative to its list price -- i.e. it 'burns limit fastest per dollar of output.' Directional only -- see the caveat panel above. NOT YET LIVE -- needs ai_subscription_limit_used_percent deployed."
+    },
+    {
+      "id": 64,
+      "type": "stat",
+      "title": "Codex: Estimated Spend, trailing 7d (numerator)",
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 0,
+        "y": 79
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "targets": [
+        {
+          "expr": "(sum(sum_over_time({service_name=\"codex_exec\"} | event_name=\"codex.sse_event\" | model=\"gpt-5.6-sol\" | unwrap input_token_count [7d])) - sum(sum_over_time({service_name=\"codex_exec\"} | event_name=\"codex.sse_event\" | model=\"gpt-5.6-sol\" | unwrap cached_token_count [7d]))) * 0.000004 + sum(sum_over_time({service_name=\"codex_exec\"} | event_name=\"codex.sse_event\" | model=\"gpt-5.6-sol\" | unwrap cached_token_count [7d])) * 0.0000004 + sum(sum_over_time({service_name=\"codex_exec\"} | event_name=\"codex.sse_event\" | model=\"gpt-5.6-sol\" | unwrap output_token_count [7d])) * 0.00002",
+          "legendFormat": "Codex: Estimated Spend, trailing 7d (numerator)",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 2,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#FF9830",
+                "value": null
+              }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background_solid",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "textMode": "value_and_name",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false,
+          "fields": ""
+        }
+      },
+      "description": "ESTIMATED @ list price, trailing 7d (matches the Codex account's only active window -- this laptop's Codex has no 5h window, see the Codex account status probe). Divide by the panel to the right (used_percent/100) by hand for the Codex efficiency ratio -- Grafana can't natively divide a Loki series by a Prometheus series in one panel; see the design note."
+    },
+    {
+      "id": 65,
+      "type": "stat",
+      "title": "Codex: Subscription Limit Used, 7d window (denominator)",
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 6,
+        "y": 79
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "ai_subscription_limit_used_percent{provider=\"openai\",window=\"7d\"}",
+          "legendFormat": "Codex: Subscription Limit Used, 7d window (denominator)",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 2,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#B877D9",
+                "value": null
+              }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background_solid",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "textMode": "value_and_name",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false,
+          "fields": ""
+        }
+      },
+      "description": "NOT YET LIVE -- needs ai_subscription_limit_used_percent deployed. Query-equivalent verified 2026-08-24: this laptop's single Codex account read 27.0% used of its 7-day window."
+    },
+    {
+      "id": 66,
+      "type": "text",
+      "title": "Codex efficiency: how to combine the two panels above",
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 12,
+        "y": 79
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "**Codex retail-$ per full 7d window** = (Estimated Spend panel value) / (Used-Percent panel value / 100).\n\nExample from the 2026-08-24 verification run: $68.70 estimated spend at 27.0% of the 7-day window used -> **~$254.40 per full window** at the observed rate.\n\nNot computed as a single Grafana panel on purpose: the numerator lives in Loki (Codex headless has no native Prometheus token-usage metric, see dashboards/codex-usage.json) and the denominator lives in Prometheus (the new subscription-limit gauge) -- combining a Loki series and a Prometheus series in one panel needs a Grafana Mixed-datasource transform that could not be visually verified in this environment (API-only access, no rendered browser). Two clearly-labeled panels side by side is honest and correct; a true combined panel is a good follow-up once someone can verify it renders."
+      }
     }
   ]
 }
