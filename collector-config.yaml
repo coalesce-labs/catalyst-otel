@@ -842,6 +842,37 @@ connectors:
           - key: rate_limit_tier
         gauge:
           value: 'Double(attributes["ratelimit_seven_day_pace"])'
+
+      # --- OTL Task C (Ryan-directed, 2026-08-24): AI subscription-limit
+      # consumed, the "denominator" for retail-$-per-subscription-window
+      # efficiency (see dashboards/ai-usage.json "Subscription Efficiency"
+      # row + provisioning/prometheus/recording-rules.yml's
+      # ai_efficiency_retail_usd_per_limit_pct rules). Emitted by
+      # scripts/ai-subscription-limit-scraper.sh (cron/launchd, laptop-side)
+      # -- NOT the same signal as catalyst_account_ratelimit_*_pct above:
+      # those are wired to an `account.ratelimit.sampled` event that (per the
+      # CTL-787/CTL-812 comments earlier in this file) has never actually
+      # been emitted (0 series live, checked 2026-08-24) and carries
+      # `rate_limit_tier`, not a specific fleet-account identity. This gauge
+      # carries the real per-account label (`account`: Claude's fleet
+      # rotation slot e.g. "acct6", or Codex's ChatGPT account_id e.g.
+      # "codex-641648d1") plus `provider` and `window` ("5h"/"7d"), and IS
+      # live -- proven end-to-end 2026-08-24 (13 real samples, laptop
+      # scraper -> OTLP/HTTP -> this collector -> Loki, verified via the
+      # Grafana datasource proxy) as of this PR's authoring, though the
+      # gauge conversion below only takes effect once this collector config
+      # is deployed (restart required, same as any other collector-config.yaml
+      # change).
+      - name: ai_subscription_limit_used_percent
+        description: "Percent of a provider account's subscription rate-limit window consumed (denominator for retail-$-per-subscription-window efficiency)"
+        conditions: ['attributes["event_name"] == "ai.subscription_limit.sampled"']
+        attributes:
+          - key: provider
+          - key: account
+          - key: window
+        gauge:
+          value: 'Double(attributes["used_percent"])'
+
       # --- recovery fleet-health gauge (recovery.board-scan) ---
       - name: catalyst_recovery_invariants_failed
         description: "Count of failed recovery invariants per board-scan (0..7)"
