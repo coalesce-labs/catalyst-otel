@@ -102,13 +102,22 @@ else
   fail "OTL-71 spend/token panel layout is wrong"
 fi
 
-# Tokens by Model must use the native token counter. Spend by Type must allocate
-# native model spend using model+type token weights (input=1, output=5,
-# cacheRead=.1, cacheCreation=2) rather than introducing a second cost source.
+# Tokens by Model must use model-attributed tokens, native or recording-rule-backed.
+# Spend by Type must allocate native model spend using model+type token weights
+# (input=1, output=5, cacheRead=.1, cacheCreation=2) rather than introducing a
+# second cost source.
+#
+# OTL-82 recording-rules round: this panel's query now reads from the
+# ai:tokens_accum:sum recording rule (provisioning/prometheus/recording-rules.yml,
+# "ai-canonical-running-total" group) instead of the raw claude_code_token_usage_tokens_total
+# counter directly -- the rule itself is fed by that same counter (see the rule's
+# own expr), so "native model-attributed tokens" still holds, just one layer
+# removed. Accept either spelling so this assertion doesn't silently regress to
+# always-pass on an unrelated string, and stays loud if BOTH sources disappear.
 if jq -e '[.panels[] | select(.title=="Tokens per Interval by Model") | .targets[].expr
-          | select(test("claude_code_token_usage_tokens_total") and test("model"))]
+          | select((test("claude_code_token_usage_tokens_total") or test("ai:tokens_accum:sum")) and test("model"))]
          | length > 0' "$DASH" >/dev/null; then
-  pass "OTL-71 Tokens by Model uses native model-attributed tokens"
+  pass "OTL-71 Tokens by Model uses native or recording-rule-backed model-attributed tokens"
 else
   fail "OTL-71 Tokens by Model query is missing native model attribution"
 fi
