@@ -172,16 +172,87 @@ print(json.dumps(out))
 fi
 
 # ---------------------------------------------------------------------------
+# Gather: Qwen Token Plan (Alibaba) -- OTL-80 recipe. No REST route with
+# API-key auth exists (checked live, see OTL-80's research comment) -- the
+# ONLY source is the official `qwencloud` CLI, authenticated via
+# `qwencloud auth login` (account-level keychain, NOT the model API key --
+# zero ToS exposure; Qwen Token Plan is interactive-only, see CTC-1007).
+#
+# GATED, not scheduled: `qwencloud usage summary --format json`'s
+# `token_plan` block returns `subscribed:false` for Individual plans today
+# (2026-08-25, an account-recognition gap on Alibaba's side, support ticket
+# open) -- confirmed live moments before this comment was written. This
+# block is therefore INERT in production (emits nothing, same as every
+# other qwen leg in this repo) until `subscribed` flips true on its own;
+# there is nothing to wire or redeploy when that happens -- this script
+# already runs on a cron/launchd schedule (see the file header), so the
+# very next scheduled run after the flip starts emitting real samples
+# automatically. Do not poll for the flip from inside this script -- it
+# already IS the poll, on its normal cadence.
+#
+# used_percent: prefers the CLI's own `usedPct` field; falls back to
+# computing it from totalCredits/remainingCredits if usedPct is ever
+# absent but the credit counts are present. resetDate: OTL-80's research
+# comment describes a `resetDate` field on the (currently empty)
+# token_plan block once subscribed -- UNVERIFIED, since no subscribed:true
+# response has ever been observed (the fixture behind this code path is
+# the unsubscribed stub: {subscribed:false, planName, totalCredits:0,
+# remainingCredits:0, usedPct:0} -- no resetDate key present to confirm
+# against). A couple of plausible key spellings are tried defensively;
+# missing resets_at degrades gracefully (same "if present" handling as
+# every other provider leg below), it does not break the sample.
+# ---------------------------------------------------------------------------
+qwen_json="[]"
+if command -v qwencloud >/dev/null 2>&1; then
+  qwen_json=$(timeout 30 qwencloud usage summary --format json 2>/dev/null | python3 -c '
+import json, sys
+try:
+    d = json.load(sys.stdin)
+except Exception:
+    print("[]"); raise SystemExit
+out = []
+tp = d.get("token_plan") or {}
+if tp.get("subscribed"):
+    total = tp.get("totalCredits")
+    remaining = tp.get("remainingCredits")
+    used_pct = tp.get("usedPct")
+    if used_pct is None and total:
+        used = (total - remaining) if remaining is not None else None
+        used_pct = (used / total * 100) if used is not None else None
+    if used_pct is not None:
+        resets_at = None
+        reset_raw = tp.get("resetDate") or tp.get("reset_date") or tp.get("nextResetDate")
+        if reset_raw:
+            try:
+                from datetime import datetime
+                resets_at = datetime.fromisoformat(str(reset_raw).replace("Z", "+00:00")).timestamp()
+            except Exception:
+                resets_at = None
+        out.append({
+            "provider": "qwen",
+            "account": "qwen-token-plan",
+            "window": "7d",
+            "used_percent": used_pct,
+            "window_minutes": 10080,
+            "resets_at": resets_at,
+        })
+print(json.dumps(out))
+' 2>/dev/null) || qwen_json="[]"
+  [[ -n "$qwen_json" ]] || qwen_json="[]"
+fi
+
+# ---------------------------------------------------------------------------
 # Build + send the OTLP/HTTP logs payload (one logRecord per provider/
 # account/window sample).
 # ---------------------------------------------------------------------------
-CODEX_JSON="$codex_json" CLAUDE_JSON="$claude_json" GLM_JSON="$glm_json" OTLP_HTTP_ENDPOINT="$OTLP_HTTP_ENDPOINT" SCRAPER_DRY_RUN="$([[ $DRY_RUN -eq 1 ]] && echo 1 || echo 0)" python3 <<PYEOF
+CODEX_JSON="$codex_json" CLAUDE_JSON="$claude_json" GLM_JSON="$glm_json" QWEN_JSON="$qwen_json" OTLP_HTTP_ENDPOINT="$OTLP_HTTP_ENDPOINT" SCRAPER_DRY_RUN="$([[ $DRY_RUN -eq 1 ]] && echo 1 || echo 0)" python3 <<PYEOF
 import json, os, sys, time, subprocess
 
 codex = json.loads(os.environ["CODEX_JSON"])
 claude = json.loads(os.environ["CLAUDE_JSON"])
 glm = json.loads(os.environ.get("GLM_JSON", "[]"))
-samples = codex + claude + glm
+qwen = json.loads(os.environ.get("QWEN_JSON", "[]"))
+samples = codex + claude + glm + qwen
 
 now_ns = int(time.time() * 1e9)
 
