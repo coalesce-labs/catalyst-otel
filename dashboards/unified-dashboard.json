@@ -6810,674 +6810,674 @@
       },
       "description": "Static plan constants (40,000-credit quota, window reset anchor) are documented as config in provisioning/prometheus/recording-rules.yml's ai-qwen-credits-estimate group, not hardcoded only here."
     },
-      {
-        "id": 240,
-        "type": "row",
-        "title": "⑧ Latency (per model)",
-        "collapsed": false,
-        "gridPos": {
-          "h": 1,
-          "w": 24,
-          "x": 0,
-          "y": 139
-        },
-        "panels": [],
-        "description": "OTL-84 (Ryan-directed): replaces the old single 'API Request Duration' panel that overlaid every model's p50/p95 on one axis. One tile per model now (Grafana panel repeat on $model_latency, maxPerRow=3 -- dynamically follows however many models are actually emitting, not a fixed count), each plotting P50/P75/P90/P95/P99 with an Avg-per-percentile legend. Y-axis min/max are a SHARED, STATIC range (not a per-refresh dynamic computation -- Grafana's panel-repeat has no mechanism for tiles to see each other's data and auto-scale to a common range) chosen from live data at build time so relative tile heights are comparable; fast models will look visually compressed against slower ones by design, since the goal is cross-model comparison, not per-model internal precision. Revisit the static ceiling if real-world latencies grow past it (values would clip) or shrink well under it (wasted range)."
+    {
+      "id": 240,
+      "type": "row",
+      "title": "\u2467 Latency (per model)",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 139
       },
-      {
-        "id": 241,
-        "type": "timeseries",
-        "title": "$model_latency",
-        "repeat": "model_latency",
-        "repeatDirection": "h",
-        "maxPerRow": 3,
-        "gridPos": {
-          "h": 8,
-          "w": 8,
-          "x": 0,
-          "y": 140
+      "panels": [],
+      "description": "OTL-84 (Ryan-directed): replaces the old single 'API Request Duration' panel that overlaid every model's p50/p95 on one axis. One tile per model now (Grafana panel repeat on $model_latency, maxPerRow=3 -- dynamically follows however many models are actually emitting, not a fixed count), each plotting P50/P75/P90/P95/P99 with an Avg-per-percentile legend. Y-axis min/max are a SHARED, STATIC range (not a per-refresh dynamic computation -- Grafana's panel-repeat has no mechanism for tiles to see each other's data and auto-scale to a common range) chosen from live data at build time so relative tile heights are comparable; fast models will look visually compressed against slower ones by design, since the goal is cross-model comparison, not per-model internal precision. Revisit the static ceiling if real-world latencies grow past it (values would clip) or shrink well under it (wasted range)."
+    },
+    {
+      "id": 241,
+      "type": "timeseries",
+      "title": "$model_latency",
+      "repeat": "model_latency",
+      "repeatDirection": "h",
+      "maxPerRow": 3,
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 140
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "histogram_quantile(0.5, sum by (le) (rate(claude_code_api_request_duration_seconds_bucket{model=\"$model_latency\"}[$bucket])))",
+          "legendFormat": "P50",
+          "range": true
         },
-        "datasource": {
-          "type": "prometheus",
-          "uid": "prometheus"
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "histogram_quantile(0.75, sum by (le) (rate(claude_code_api_request_duration_seconds_bucket{model=\"$model_latency\"}[$bucket])))",
+          "legendFormat": "P75",
+          "range": true
         },
-        "targets": [
-          {
-            "refId": "A",
-            "datasource": {
-              "type": "prometheus",
-              "uid": "prometheus"
-            },
-            "editorMode": "code",
-            "expr": "histogram_quantile(0.5, sum by (le) (rate(claude_code_api_request_duration_seconds_bucket{model=\"$model_latency\"}[$__interval])))",
-            "legendFormat": "P50",
-            "range": true
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
           },
-          {
-            "refId": "B",
-            "datasource": {
-              "type": "prometheus",
-              "uid": "prometheus"
-            },
-            "editorMode": "code",
-            "expr": "histogram_quantile(0.75, sum by (le) (rate(claude_code_api_request_duration_seconds_bucket{model=\"$model_latency\"}[$__interval])))",
-            "legendFormat": "P75",
-            "range": true
+          "editorMode": "code",
+          "expr": "histogram_quantile(0.9, sum by (le) (rate(claude_code_api_request_duration_seconds_bucket{model=\"$model_latency\"}[$bucket])))",
+          "legendFormat": "P90",
+          "range": true
+        },
+        {
+          "refId": "D",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
           },
-          {
-            "refId": "C",
-            "datasource": {
-              "type": "prometheus",
-              "uid": "prometheus"
-            },
-            "editorMode": "code",
-            "expr": "histogram_quantile(0.9, sum by (le) (rate(claude_code_api_request_duration_seconds_bucket{model=\"$model_latency\"}[$__interval])))",
-            "legendFormat": "P90",
-            "range": true
+          "editorMode": "code",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(claude_code_api_request_duration_seconds_bucket{model=\"$model_latency\"}[$bucket])))",
+          "legendFormat": "P95",
+          "range": true
+        },
+        {
+          "refId": "E",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
           },
-          {
-            "refId": "D",
-            "datasource": {
-              "type": "prometheus",
-              "uid": "prometheus"
+          "editorMode": "code",
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(claude_code_api_request_duration_seconds_bucket{model=\"$model_latency\"}[$bucket])))",
+          "legendFormat": "P99",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "min": 0,
+          "max": 90,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "spanNulls": true,
+            "showPoints": "never",
+            "lineInterpolation": "smooth",
+            "stacking": {
+              "mode": "none",
+              "group": "A"
             },
-            "editorMode": "code",
-            "expr": "histogram_quantile(0.95, sum by (le) (rate(claude_code_api_request_duration_seconds_bucket{model=\"$model_latency\"}[$__interval])))",
-            "legendFormat": "P95",
-            "range": true
-          },
-          {
-            "refId": "E",
-            "datasource": {
-              "type": "prometheus",
-              "uid": "prometheus"
+            "scaleDistribution": {
+              "type": "linear"
             },
-            "editorMode": "code",
-            "expr": "histogram_quantile(0.99, sum by (le) (rate(claude_code_api_request_duration_seconds_bucket{model=\"$model_latency\"}[$__interval])))",
-            "legendFormat": "P99",
-            "range": true
-          }
-        ],
-        "fieldConfig": {
-          "defaults": {
-            "unit": "s",
-            "min": 0,
-            "max": 90,
-            "custom": {
-              "drawStyle": "line",
-              "lineWidth": 2,
-              "fillOpacity": 10,
-              "gradientMode": "opacity",
-              "spanNulls": true,
-              "showPoints": "never",
-              "lineInterpolation": "smooth",
-              "stacking": {
-                "mode": "none",
-                "group": "A"
-              },
-              "scaleDistribution": {
-                "type": "linear"
-              },
-              "thresholdsStyle": {
-                "mode": "off"
-              }
-            },
-            "mappings": [],
-            "color": {
-              "mode": "palette-classic"
-            },
-            "thresholds": {
-              "mode": "absolute",
-              "steps": [
-                {
-                  "color": "green",
-                  "value": null
-                }
-              ]
+            "thresholdsStyle": {
+              "mode": "off"
             }
           },
-          "overrides": [
-            {
-              "matcher": {
-                "id": "byName",
-                "options": "P50"
-              },
-              "properties": [
-                {
-                  "id": "color",
-                  "value": {
-                    "fixedColor": "#73BF69",
-                    "mode": "fixed"
-                  }
-                }
-              ]
-            },
-            {
-              "matcher": {
-                "id": "byName",
-                "options": "P75"
-              },
-              "properties": [
-                {
-                  "id": "color",
-                  "value": {
-                    "fixedColor": "#FADE2A",
-                    "mode": "fixed"
-                  }
-                }
-              ]
-            },
-            {
-              "matcher": {
-                "id": "byName",
-                "options": "P90"
-              },
-              "properties": [
-                {
-                  "id": "color",
-                  "value": {
-                    "fixedColor": "#FF9830",
-                    "mode": "fixed"
-                  }
-                }
-              ]
-            },
-            {
-              "matcher": {
-                "id": "byName",
-                "options": "P95"
-              },
-              "properties": [
-                {
-                  "id": "color",
-                  "value": {
-                    "fixedColor": "#F2495C",
-                    "mode": "fixed"
-                  }
-                }
-              ]
-            },
-            {
-              "matcher": {
-                "id": "byName",
-                "options": "P99"
-              },
-              "properties": [
-                {
-                  "id": "color",
-                  "value": {
-                    "fixedColor": "#B877D9",
-                    "mode": "fixed"
-                  }
-                }
-              ]
-            }
-          ]
-        },
-        "options": {
-          "legend": {
-            "displayMode": "table",
-            "placement": "right",
-            "calcs": [
-              "mean"
-            ],
-            "showLegend": true,
-            "width": 200,
-            "sortBy": "Mean",
-            "sortDesc": true
+          "mappings": [],
+          "color": {
+            "mode": "palette-classic"
           },
-          "tooltip": {
-            "mode": "multi",
-            "sort": "desc"
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
           }
         },
-        "description": "P50/P75/P90/P95/P99 request-duration distribution for this one model, from claude_code_api_request_duration_seconds_bucket (native Claude Code histogram, includes GLM which rides the same exporter -- see OTL-81). Y-axis is a shared static 0-90s range across every tile in this row for cross-model comparison; a model whose latencies are far below 90s will look visually flat here by design."
-      },
-      {
-        "id": 242,
-        "type": "row",
-        "title": "⑨ Throughput (per model)",
-        "collapsed": false,
-        "gridPos": {
-          "h": 1,
-          "w": 24,
-          "x": 0,
-          "y": 148
-        },
-        "panels": [],
-        "description": "OTL-84 (Ryan-directed): meant to mirror the Latency section with per-model tok/s percentile tiles. Not built -- see the panel below for exactly what instrumentation is missing and why a fake/approximate version was not shipped instead."
-      },
-      {
-        "id": 243,
-        "type": "text",
-        "title": "Throughput — no per-request tok/s instrumentation today",
-        "gridPos": {
-          "h": 6,
-          "w": 24,
-          "x": 0,
-          "y": 149
-        },
-        "options": {
-          "mode": "markdown",
-          "content": "### Claude Code emits no metric this section could plot\n\nA tok/s **percentile distribution** per model (mirroring the Latency section above) needs a per-request pairing of *tokens generated* and *time taken*, exposed as a histogram Grafana can run `histogram_quantile()` against. Checked the full live `claude_code_*` metric surface (2026-08-25) -- it does not exist:\n\n- `claude_code_api_request_duration_seconds_bucket` -- a duration histogram, labeled `model`/`le`. No token count attached to any one request.\n- `claude_code_token_usage_tokens_total` -- a counter, labeled `model`/`type` (input/output/cacheRead/cacheCreation). No duration attached, and it is a *cumulative counter*, not a per-request event -- there is no way to recover \"tokens produced in the same request that took N seconds\" from it.\n\nThese two metrics are never joined at the per-request level anywhere in the exported telemetry, so there is no way to derive a real percentile distribution of tokens/second from what's on this stack today -- only a coarse aggregate (`rate(tokens_total) / rate(duration_seconds_sum)` over a window), which is a single blended number, not a P50-P99 distribution, and would misrepresent the ticket's ask if shown here as if it were one.\n\n**What would light this up:** Claude Code's OTel exporter would need to either (a) emit a genuine per-request `tokens_per_second` (or `output_tokens` + `duration`) histogram, or (b) attach an output-token count as an attribute on the same span/event that already carries `api_request_duration`, so the two can be correlated per-request instead of only as independent aggregates. Neither exists in the current Claude Code telemetry surface -- this is an upstream instrumentation gap, not something this dashboard's queries can work around."
-        },
-        "description": "OTL-84 acceptance: 'if no throughput-capable metric exists today, record what instrumentation is missing instead' -- this panel is that record, not a stale placeholder to revisit blindly. Once Claude Code exports a per-request token/duration pairing, replace this panel with a $model_latency-repeated tile row mirroring the Latency section (same repeat/maxPerRow=3 pattern)."
-      },
-      {
-        "id": 260,
-        "type": "row",
-        "title": "↳ Cumulative (optional secondary view, by Host / Model)",
-        "collapsed": true,
-        "gridPos": {
-          "h": 1,
-          "w": 24,
-          "x": 0,
-          "y": 156
-        },
-        "description": "OTL-84 (Ryan-directed): added after Ryan confirmed the per-interval redesign above is correct and these panels were never meant to be cumulative. Collapsed by default -- open this row for the running-total/cumulative reading of spend and tokens by host and by model, reusing OTL-82-r3's proven window-anchored construction (starts at 0, documented semantics, does not match the per-interval panels of the same base title).",
-        "panels": [
+        "overrides": [
           {
-            "id": 261,
-            "title": "Cumulative Spend by Host",
-            "type": "timeseries",
-            "gridPos": {
-              "h": 7,
-              "w": 24,
-              "x": 0,
-              "y": 0
+            "matcher": {
+              "id": "byName",
+              "options": "P50"
             },
-            "datasource": {
-              "type": "prometheus",
-              "uid": "prometheus"
-            },
-            "targets": [
+            "properties": [
               {
-                "expr": "clamp_min((sum by (display) (label_replace(label_replace(sum by (host_name, hostname) (ai:cost_usd_accum:sum{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"}), \"display\", \"$1\", \"hostname\", \"(.+)\"), \"display\", \"$1\", \"host_name\", \"(.+)\"))) - ((sum by (display) (label_replace(label_replace(sum by (host_name, hostname) (ai:cost_usd_accum:sum{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"} @ ${__from:date:seconds}), \"display\", \"$1\", \"hostname\", \"(.+)\"), \"display\", \"$1\", \"host_name\", \"(.+)\"))) or (sum by (display) (label_replace(label_replace(sum by (host_name, hostname) (ai:cost_usd_accum:sum{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"}), \"display\", \"$1\", \"hostname\", \"(.+)\"), \"display\", \"$1\", \"host_name\", \"(.+)\")) * 0)), 0)",
-                "legendFormat": "{{display}}",
-                "refId": "A",
-                "interval": "$bucket"
-              }
-            ],
-            "fieldConfig": {
-              "defaults": {
-                "unit": "currencyUSD",
-                "custom": {
-                  "drawStyle": "line",
-                  "lineWidth": 2,
-                  "fillOpacity": 10,
-                  "gradientMode": "opacity",
-                  "spanNulls": true,
-                  "showPoints": "never",
-                  "lineInterpolation": "smooth",
-                  "stacking": {
-                    "mode": "none",
-                    "group": "A"
-                  },
-                  "scaleDistribution": {
-                    "type": "linear"
-                  },
-                  "thresholdsStyle": {
-                    "mode": "off"
-                  }
-                },
-                "mappings": [],
-                "thresholds": {
-                  "mode": "absolute",
-                  "steps": [
-                    {
-                      "color": "green",
-                      "value": null
-                    }
-                  ]
+                "id": "color",
+                "value": {
+                  "fixedColor": "#73BF69",
+                  "mode": "fixed"
                 }
-              },
-              "overrides": []
-            },
-            "options": {
-              "legend": {
-                "displayMode": "table",
-                "placement": "right",
-                "calcs": [
-                  "lastNotNull",
-                  "max"
-                ],
-                "showLegend": true,
-                "width": 240,
-                "sortBy": "Last *",
-                "sortDesc": true
-              },
-              "tooltip": {
-                "mode": "multi",
-                "sort": "desc"
               }
-            },
-            "description": "$ spent per time bucket, grouped by canonical host_name (falls back to the machine's hostname when host_name is not set). Shows which hosts are actively spending. Note: only hosts with the OTel context configured emit the canonical host_name (e.g. laptop); others appear under their FQDN. Aggregated with max_over_time, not increase: these counters are cumulative PER SESSION (every series carries session_id) and expire 15m after their last sample, so increase() would treat a short session's first sample as its baseline and undercount. See OTL-75. OTL-83 / OTL-82 recording-rules round (Ryan-directed): Ryan independently confirmed these 'by Host'/'by Model' panels were never meant to be cumulative -- the per-interval redesign in the primary section above (same title, no 'Cumulative' prefix) is correct and stays primary. This panel is an OPTIONAL secondary view, collapsed by default, offering the cumulative/running-total reading for whoever wants it. No longer built from a query-time max_over_time($__range) window (OTL-82-r3's shape, which matched the true total exactly at the FINAL point but could still dip mid-chart under session churn -- OTL-83). Now reads directly from the same monotonic, forward-latching recording rule the per-interval panels use (ai:tokens_accum:sum / ai:cost_usd_accum:sum -- see provisioning/prometheus/recording-rules.yml's \"ai-canonical-running-total\" group), anchored to the dashboard's own start via `@ ${__from:date:seconds}` (closes the earlier Codex P1 finding -- no pre-loaded first point). Because the underlying series is monotonic non-decreasing by construction (each 1m tick can only take the max of its prior recorded value and what it just observed), accum(t) - accum(@ start) is GENUINELY unable to decrease as t advances -- not merely measured to dip less often. Do not conflate this number with the per-interval panel of the same base title above -- they answer different questions (growth-since-window-start vs amount-in-this-bucket) and will not match."
+            ]
           },
           {
-            "id": 262,
-            "title": "Cumulative Tokens by Host",
-            "type": "timeseries",
-            "gridPos": {
-              "h": 7,
-              "w": 24,
-              "x": 0,
-              "y": 7
+            "matcher": {
+              "id": "byName",
+              "options": "P75"
             },
-            "datasource": {
-              "type": "prometheus",
-              "uid": "prometheus"
-            },
-            "targets": [
+            "properties": [
               {
-                "expr": "clamp_min((sum by (display) (label_replace(label_replace(sum by (host_name, hostname) (ai:tokens_accum:sum{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"}), \"display\", \"$1\", \"hostname\", \"(.+)\"), \"display\", \"$1\", \"host_name\", \"(.+)\"))) - ((sum by (display) (label_replace(label_replace(sum by (host_name, hostname) (ai:tokens_accum:sum{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"} @ ${__from:date:seconds}), \"display\", \"$1\", \"hostname\", \"(.+)\"), \"display\", \"$1\", \"host_name\", \"(.+)\"))) or (sum by (display) (label_replace(label_replace(sum by (host_name, hostname) (ai:tokens_accum:sum{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"}), \"display\", \"$1\", \"hostname\", \"(.+)\"), \"display\", \"$1\", \"host_name\", \"(.+)\")) * 0)), 0)",
-                "legendFormat": "{{display}}",
-                "refId": "A",
-                "interval": "$bucket"
-              }
-            ],
-            "fieldConfig": {
-              "defaults": {
-                "unit": "short",
-                "custom": {
-                  "drawStyle": "line",
-                  "lineWidth": 2,
-                  "fillOpacity": 10,
-                  "gradientMode": "opacity",
-                  "spanNulls": true,
-                  "showPoints": "never",
-                  "lineInterpolation": "smooth",
-                  "stacking": {
-                    "mode": "none",
-                    "group": "A"
-                  },
-                  "scaleDistribution": {
-                    "type": "linear"
-                  },
-                  "thresholdsStyle": {
-                    "mode": "off"
-                  }
-                },
-                "mappings": [],
-                "thresholds": {
-                  "mode": "absolute",
-                  "steps": [
-                    {
-                      "color": "green",
-                      "value": null
-                    }
-                  ]
+                "id": "color",
+                "value": {
+                  "fixedColor": "#FADE2A",
+                  "mode": "fixed"
                 }
-              },
-              "overrides": []
-            },
-            "options": {
-              "legend": {
-                "displayMode": "table",
-                "placement": "right",
-                "calcs": [
-                  "lastNotNull",
-                  "max"
-                ],
-                "showLegend": true,
-                "width": 240,
-                "sortBy": "Last *",
-                "sortDesc": true
-              },
-              "tooltip": {
-                "mode": "multi",
-                "sort": "desc"
               }
-            },
-            "description": "Tokens consumed per time bucket, grouped by canonical host_name (falls back to hostname when host_name is not set). A liveliness view of per-host activity. Aggregated with max_over_time, not increase: these counters are cumulative PER SESSION (every series carries session_id) and expire 15m after their last sample, so increase() would treat a short session's first sample as its baseline and undercount. See OTL-75. OTL-83 / OTL-82 recording-rules round (Ryan-directed): Ryan independently confirmed these 'by Host'/'by Model' panels were never meant to be cumulative -- the per-interval redesign in the primary section above (same title, no 'Cumulative' prefix) is correct and stays primary. This panel is an OPTIONAL secondary view, collapsed by default, offering the cumulative/running-total reading for whoever wants it. No longer built from a query-time max_over_time($__range) window (OTL-82-r3's shape, which matched the true total exactly at the FINAL point but could still dip mid-chart under session churn -- OTL-83). Now reads directly from the same monotonic, forward-latching recording rule the per-interval panels use (ai:tokens_accum:sum / ai:cost_usd_accum:sum -- see provisioning/prometheus/recording-rules.yml's \"ai-canonical-running-total\" group), anchored to the dashboard's own start via `@ ${__from:date:seconds}` (closes the earlier Codex P1 finding -- no pre-loaded first point). Because the underlying series is monotonic non-decreasing by construction (each 1m tick can only take the max of its prior recorded value and what it just observed), accum(t) - accum(@ start) is GENUINELY unable to decrease as t advances -- not merely measured to dip less often. Do not conflate this number with the per-interval panel of the same base title above -- they answer different questions (growth-since-window-start vs amount-in-this-bucket) and will not match."
+            ]
           },
           {
-            "id": 263,
-            "title": "Cumulative Spend by Model",
-            "type": "timeseries",
-            "gridPos": {
-              "h": 7,
-              "w": 24,
-              "x": 0,
-              "y": 14
+            "matcher": {
+              "id": "byName",
+              "options": "P90"
             },
-            "datasource": {
-              "type": "prometheus",
-              "uid": "prometheus"
-            },
-            "targets": [
+            "properties": [
               {
-                "expr": "clamp_min((sum by (model_family) (label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(sum by (model) (ai:cost_usd_accum:sum{project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}), \"model_family\", \"$1\", \"model\", \"(.+)\"), \"model_family\", \"$1 $2.$3\", \"model\", \"claude-([a-z]+)-([0-9]+)-([0-9]+).*\"), \"model_family\", \"$1 $2\", \"model\", \"claude-([a-z]+)-([0-9]+)(\\\\[[^]]*\\\\])?$\"), \"model_family\", \"Opus $1\", \"model_family\", \"opus (.*)\"), \"model_family\", \"Haiku $1\", \"model_family\", \"haiku (.*)\"), \"model_family\", \"Sonnet $1\", \"model_family\", \"sonnet (.*)\"), \"model_family\", \"Fable $1\", \"model_family\", \"fable (.*)\"))) - ((sum by (model_family) (label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(sum by (model) (ai:cost_usd_accum:sum{project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"} @ ${__from:date:seconds}), \"model_family\", \"$1\", \"model\", \"(.+)\"), \"model_family\", \"$1 $2.$3\", \"model\", \"claude-([a-z]+)-([0-9]+)-([0-9]+).*\"), \"model_family\", \"$1 $2\", \"model\", \"claude-([a-z]+)-([0-9]+)(\\\\[[^]]*\\\\])?$\"), \"model_family\", \"Opus $1\", \"model_family\", \"opus (.*)\"), \"model_family\", \"Haiku $1\", \"model_family\", \"haiku (.*)\"), \"model_family\", \"Sonnet $1\", \"model_family\", \"sonnet (.*)\"), \"model_family\", \"Fable $1\", \"model_family\", \"fable (.*)\"))) or (sum by (model_family) (label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(sum by (model) (ai:cost_usd_accum:sum{project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}), \"model_family\", \"$1\", \"model\", \"(.+)\"), \"model_family\", \"$1 $2.$3\", \"model\", \"claude-([a-z]+)-([0-9]+)-([0-9]+).*\"), \"model_family\", \"$1 $2\", \"model\", \"claude-([a-z]+)-([0-9]+)(\\\\[[^]]*\\\\])?$\"), \"model_family\", \"Opus $1\", \"model_family\", \"opus (.*)\"), \"model_family\", \"Haiku $1\", \"model_family\", \"haiku (.*)\"), \"model_family\", \"Sonnet $1\", \"model_family\", \"sonnet (.*)\"), \"model_family\", \"Fable $1\", \"model_family\", \"fable (.*)\")) * 0)), 0)",
-                "legendFormat": "{{model_family}}",
-                "refId": "A",
-                "interval": "$bucket"
-              }
-            ],
-            "fieldConfig": {
-              "defaults": {
-                "unit": "currencyUSD",
-                "custom": {
-                  "drawStyle": "line",
-                  "lineWidth": 2,
-                  "fillOpacity": 10,
-                  "gradientMode": "opacity",
-                  "spanNulls": true,
-                  "showPoints": "never",
-                  "lineInterpolation": "smooth",
-                  "stacking": {
-                    "mode": "none",
-                    "group": "A"
-                  },
-                  "scaleDistribution": {
-                    "type": "linear"
-                  },
-                  "thresholdsStyle": {
-                    "mode": "off"
-                  }
-                },
-                "mappings": [],
-                "thresholds": {
-                  "mode": "absolute",
-                  "steps": [
-                    {
-                      "color": "green",
-                      "value": null
-                    }
-                  ]
+                "id": "color",
+                "value": {
+                  "fixedColor": "#FF9830",
+                  "mode": "fixed"
                 }
-              },
-              "overrides": [
-                {
-                  "matcher": {
-                    "id": "byRegexp",
-                    "options": "(?i)opus"
-                  },
-                  "properties": [
-                    {
-                      "id": "color",
-                      "value": {
-                        "fixedColor": "#9B59B6",
-                        "mode": "fixed"
-                      }
-                    }
-                  ]
-                },
-                {
-                  "matcher": {
-                    "id": "byRegexp",
-                    "options": "(?i)sonnet"
-                  },
-                  "properties": [
-                    {
-                      "id": "color",
-                      "value": {
-                        "fixedColor": "#E67E22",
-                        "mode": "fixed"
-                      }
-                    }
-                  ]
-                },
-                {
-                  "matcher": {
-                    "id": "byRegexp",
-                    "options": "(?i)haiku"
-                  },
-                  "properties": [
-                    {
-                      "id": "color",
-                      "value": {
-                        "fixedColor": "#3498DB",
-                        "mode": "fixed"
-                      }
-                    }
-                  ]
-                }
-              ]
-            },
-            "options": {
-              "legend": {
-                "displayMode": "table",
-                "placement": "right",
-                "calcs": [
-                  "lastNotNull",
-                  "max"
-                ],
-                "showLegend": true,
-                "width": 240,
-                "sortBy": "Last *",
-                "sortDesc": true
-              },
-              "tooltip": {
-                "mode": "multi",
-                "sort": "desc"
               }
-            },
-            "description": "$ spent per time bucket (width = Grafana $__interval, typically 15s-15m depending on zoom). Each point = actual cost attributed to that bucket. Aggregated with max_over_time, not increase: these counters are cumulative PER SESSION (every series carries session_id) and expire 15m after their last sample, so increase() would treat a short session's first sample as its baseline and undercount. See OTL-75. OTL-83 / OTL-82 recording-rules round (Ryan-directed): Ryan independently confirmed these 'by Host'/'by Model' panels were never meant to be cumulative -- the per-interval redesign in the primary section above (same title, no 'Cumulative' prefix) is correct and stays primary. This panel is an OPTIONAL secondary view, collapsed by default, offering the cumulative/running-total reading for whoever wants it. No longer built from a query-time max_over_time($__range) window (OTL-82-r3's shape, which matched the true total exactly at the FINAL point but could still dip mid-chart under session churn -- OTL-83). Now reads directly from the same monotonic, forward-latching recording rule the per-interval panels use (ai:tokens_accum:sum / ai:cost_usd_accum:sum -- see provisioning/prometheus/recording-rules.yml's \"ai-canonical-running-total\" group), anchored to the dashboard's own start via `@ ${__from:date:seconds}` (closes the earlier Codex P1 finding -- no pre-loaded first point). Because the underlying series is monotonic non-decreasing by construction (each 1m tick can only take the max of its prior recorded value and what it just observed), accum(t) - accum(@ start) is GENUINELY unable to decrease as t advances -- not merely measured to dip less often. Do not conflate this number with the per-interval panel of the same base title above -- they answer different questions (growth-since-window-start vs amount-in-this-bucket) and will not match."
+            ]
           },
           {
-            "id": 264,
-            "title": "Cumulative Tokens by Model",
-            "type": "timeseries",
-            "gridPos": {
-              "h": 7,
-              "w": 24,
-              "x": 0,
-              "y": 21
+            "matcher": {
+              "id": "byName",
+              "options": "P95"
             },
-            "datasource": {
-              "type": "prometheus",
-              "uid": "prometheus"
-            },
-            "targets": [
+            "properties": [
               {
-                "expr": "clamp_min((sum by (model_family) (label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(sum by (model) (ai:tokens_accum:sum{project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}), \"model_family\", \"$1\", \"model\", \"(.+)\"), \"model_family\", \"$1 $2.$3\", \"model\", \"claude-([a-z]+)-([0-9]+)-([0-9]+).*\"), \"model_family\", \"$1 $2\", \"model\", \"claude-([a-z]+)-([0-9]+)(\\\\[[^]]*\\\\])?$\"), \"model_family\", \"Opus $1\", \"model_family\", \"opus (.*)\"), \"model_family\", \"Haiku $1\", \"model_family\", \"haiku (.*)\"), \"model_family\", \"Sonnet $1\", \"model_family\", \"sonnet (.*)\"), \"model_family\", \"Fable $1\", \"model_family\", \"fable (.*)\"))) - ((sum by (model_family) (label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(sum by (model) (ai:tokens_accum:sum{project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"} @ ${__from:date:seconds}), \"model_family\", \"$1\", \"model\", \"(.+)\"), \"model_family\", \"$1 $2.$3\", \"model\", \"claude-([a-z]+)-([0-9]+)-([0-9]+).*\"), \"model_family\", \"$1 $2\", \"model\", \"claude-([a-z]+)-([0-9]+)(\\\\[[^]]*\\\\])?$\"), \"model_family\", \"Opus $1\", \"model_family\", \"opus (.*)\"), \"model_family\", \"Haiku $1\", \"model_family\", \"haiku (.*)\"), \"model_family\", \"Sonnet $1\", \"model_family\", \"sonnet (.*)\"), \"model_family\", \"Fable $1\", \"model_family\", \"fable (.*)\"))) or (sum by (model_family) (label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(sum by (model) (ai:tokens_accum:sum{project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}), \"model_family\", \"$1\", \"model\", \"(.+)\"), \"model_family\", \"$1 $2.$3\", \"model\", \"claude-([a-z]+)-([0-9]+)-([0-9]+).*\"), \"model_family\", \"$1 $2\", \"model\", \"claude-([a-z]+)-([0-9]+)(\\\\[[^]]*\\\\])?$\"), \"model_family\", \"Opus $1\", \"model_family\", \"opus (.*)\"), \"model_family\", \"Haiku $1\", \"model_family\", \"haiku (.*)\"), \"model_family\", \"Sonnet $1\", \"model_family\", \"sonnet (.*)\"), \"model_family\", \"Fable $1\", \"model_family\", \"fable (.*)\")) * 0)), 0)",
-                "legendFormat": "{{model_family}}",
-                "refId": "A",
-                "interval": "$bucket"
-              }
-            ],
-            "fieldConfig": {
-              "defaults": {
-                "unit": "short",
-                "custom": {
-                  "drawStyle": "line",
-                  "lineWidth": 2,
-                  "fillOpacity": 10,
-                  "gradientMode": "opacity",
-                  "spanNulls": true,
-                  "showPoints": "never",
-                  "lineInterpolation": "smooth",
-                  "stacking": {
-                    "mode": "none",
-                    "group": "A"
-                  },
-                  "scaleDistribution": {
-                    "type": "linear"
-                  },
-                  "thresholdsStyle": {
-                    "mode": "off"
-                  }
-                },
-                "mappings": [],
-                "thresholds": {
-                  "mode": "absolute",
-                  "steps": [
-                    {
-                      "color": "green",
-                      "value": null
-                    }
-                  ]
+                "id": "color",
+                "value": {
+                  "fixedColor": "#F2495C",
+                  "mode": "fixed"
                 }
-              },
-              "overrides": [
-                {
-                  "matcher": {
-                    "id": "byRegexp",
-                    "options": "(?i)opus"
-                  },
-                  "properties": [
-                    {
-                      "id": "color",
-                      "value": {
-                        "fixedColor": "#9B59B6",
-                        "mode": "fixed"
-                      }
-                    }
-                  ]
-                },
-                {
-                  "matcher": {
-                    "id": "byRegexp",
-                    "options": "(?i)sonnet"
-                  },
-                  "properties": [
-                    {
-                      "id": "color",
-                      "value": {
-                        "fixedColor": "#E67E22",
-                        "mode": "fixed"
-                      }
-                    }
-                  ]
-                },
-                {
-                  "matcher": {
-                    "id": "byRegexp",
-                    "options": "(?i)haiku"
-                  },
-                  "properties": [
-                    {
-                      "id": "color",
-                      "value": {
-                        "fixedColor": "#3498DB",
-                        "mode": "fixed"
-                      }
-                    }
-                  ]
-                }
-              ]
-            },
-            "options": {
-              "legend": {
-                "displayMode": "table",
-                "placement": "right",
-                "calcs": [
-                  "lastNotNull",
-                  "max"
-                ],
-                "showLegend": true,
-                "width": 240,
-                "sortBy": "Last *",
-                "sortDesc": true
-              },
-              "tooltip": {
-                "mode": "multi",
-                "sort": "desc"
               }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "P99"
             },
-            "description": "Tokens consumed per time bucket, grouped by normalized model family and summed across input, output, cache-read, and cache-creation token classes. Aggregated with max_over_time, not increase: these counters are cumulative PER SESSION (every series carries session_id) and expire 15m after their last sample, so increase() would treat a short session's first sample as its baseline and undercount. See OTL-75. OTL-83 / OTL-82 recording-rules round (Ryan-directed): Ryan independently confirmed these 'by Host'/'by Model' panels were never meant to be cumulative -- the per-interval redesign in the primary section above (same title, no 'Cumulative' prefix) is correct and stays primary. This panel is an OPTIONAL secondary view, collapsed by default, offering the cumulative/running-total reading for whoever wants it. No longer built from a query-time max_over_time($__range) window (OTL-82-r3's shape, which matched the true total exactly at the FINAL point but could still dip mid-chart under session churn -- OTL-83). Now reads directly from the same monotonic, forward-latching recording rule the per-interval panels use (ai:tokens_accum:sum / ai:cost_usd_accum:sum -- see provisioning/prometheus/recording-rules.yml's \"ai-canonical-running-total\" group), anchored to the dashboard's own start via `@ ${__from:date:seconds}` (closes the earlier Codex P1 finding -- no pre-loaded first point). Because the underlying series is monotonic non-decreasing by construction (each 1m tick can only take the max of its prior recorded value and what it just observed), accum(t) - accum(@ start) is GENUINELY unable to decrease as t advances -- not merely measured to dip less often. Do not conflate this number with the per-interval panel of the same base title above -- they answer different questions (growth-since-window-start vs amount-in-this-bucket) and will not match."
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#B877D9",
+                  "mode": "fixed"
+                }
+              }
+            ]
           }
         ]
-      }
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "mean"
+          ],
+          "showLegend": true,
+          "width": 200,
+          "sortBy": "Mean",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "description": "P50/P75/P90/P95/P99 request-duration distribution for this one model, from claude_code_api_request_duration_seconds_bucket (native Claude Code histogram, includes GLM which rides the same exporter -- see OTL-81). Y-axis is a shared static 0-90s range across every tile in this row for cross-model comparison; a model whose latencies are far below 90s will look visually flat here by design. Quantiles are computed over the selected Bucket window (the Bucket dropdown), so wider buckets give smoother, more aggregated curves."
+    },
+    {
+      "id": 242,
+      "type": "row",
+      "title": "\u2468 Throughput (per model)",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 148
+      },
+      "panels": [],
+      "description": "OTL-84 (Ryan-directed): meant to mirror the Latency section with per-model tok/s percentile tiles. Not built -- see the panel below for exactly what instrumentation is missing and why a fake/approximate version was not shipped instead."
+    },
+    {
+      "id": 243,
+      "type": "text",
+      "title": "Throughput \u2014 no per-request tok/s instrumentation today",
+      "gridPos": {
+        "h": 6,
+        "w": 24,
+        "x": 0,
+        "y": 149
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "### Claude Code emits no metric this section could plot\n\nA tok/s **percentile distribution** per model (mirroring the Latency section above) needs a per-request pairing of *tokens generated* and *time taken*, exposed as a histogram Grafana can run `histogram_quantile()` against. Checked the full live `claude_code_*` metric surface (2026-08-25) -- it does not exist:\n\n- `claude_code_api_request_duration_seconds_bucket` -- a duration histogram, labeled `model`/`le`. No token count attached to any one request.\n- `claude_code_token_usage_tokens_total` -- a counter, labeled `model`/`type` (input/output/cacheRead/cacheCreation). No duration attached, and it is a *cumulative counter*, not a per-request event -- there is no way to recover \"tokens produced in the same request that took N seconds\" from it.\n\nThese two metrics are never joined at the per-request level anywhere in the exported telemetry, so there is no way to derive a real percentile distribution of tokens/second from what's on this stack today -- only a coarse aggregate (`rate(tokens_total) / rate(duration_seconds_sum)` over a window), which is a single blended number, not a P50-P99 distribution, and would misrepresent the ticket's ask if shown here as if it were one.\n\n**What would light this up:** Claude Code's OTel exporter would need to either (a) emit a genuine per-request `tokens_per_second` (or `output_tokens` + `duration`) histogram, or (b) attach an output-token count as an attribute on the same span/event that already carries `api_request_duration`, so the two can be correlated per-request instead of only as independent aggregates. Neither exists in the current Claude Code telemetry surface -- this is an upstream instrumentation gap, not something this dashboard's queries can work around."
+      },
+      "description": "OTL-84 acceptance: 'if no throughput-capable metric exists today, record what instrumentation is missing instead' -- this panel is that record, not a stale placeholder to revisit blindly. Once Claude Code exports a per-request token/duration pairing, replace this panel with a $model_latency-repeated tile row mirroring the Latency section (same repeat/maxPerRow=3 pattern)."
+    },
+    {
+      "id": 260,
+      "type": "row",
+      "title": "\u21b3 Cumulative (optional secondary view, by Host / Model)",
+      "collapsed": true,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 156
+      },
+      "description": "OTL-84 (Ryan-directed): added after Ryan confirmed the per-interval redesign above is correct and these panels were never meant to be cumulative. Collapsed by default -- open this row for the running-total/cumulative reading of spend and tokens by host and by model, reusing OTL-82-r3's proven window-anchored construction (starts at 0, documented semantics, does not match the per-interval panels of the same base title).",
+      "panels": [
+        {
+          "id": 261,
+          "title": "Cumulative Spend by Host",
+          "type": "timeseries",
+          "gridPos": {
+            "h": 7,
+            "w": 24,
+            "x": 0,
+            "y": 0
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "expr": "clamp_min((sum by (display) (label_replace(label_replace(sum by (host_name, hostname) (ai:cost_usd_accum:sum{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"}), \"display\", \"$1\", \"hostname\", \"(.+)\"), \"display\", \"$1\", \"host_name\", \"(.+)\"))) - ((sum by (display) (label_replace(label_replace(sum by (host_name, hostname) (ai:cost_usd_accum:sum{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"} @ ${__from:date:seconds}), \"display\", \"$1\", \"hostname\", \"(.+)\"), \"display\", \"$1\", \"host_name\", \"(.+)\"))) or (sum by (display) (label_replace(label_replace(sum by (host_name, hostname) (ai:cost_usd_accum:sum{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"}), \"display\", \"$1\", \"hostname\", \"(.+)\"), \"display\", \"$1\", \"host_name\", \"(.+)\")) * 0)), 0)",
+              "legendFormat": "{{display}}",
+              "refId": "A",
+              "interval": "$bucket"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "currencyUSD",
+              "custom": {
+                "drawStyle": "line",
+                "lineWidth": 2,
+                "fillOpacity": 10,
+                "gradientMode": "opacity",
+                "spanNulls": true,
+                "showPoints": "never",
+                "lineInterpolation": "smooth",
+                "stacking": {
+                  "mode": "none",
+                  "group": "A"
+                },
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "right",
+              "calcs": [
+                "lastNotNull",
+                "max"
+              ],
+              "showLegend": true,
+              "width": 240,
+              "sortBy": "Last *",
+              "sortDesc": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "description": "$ spent per time bucket, grouped by canonical host_name (falls back to the machine's hostname when host_name is not set). Shows which hosts are actively spending. Note: only hosts with the OTel context configured emit the canonical host_name (e.g. laptop); others appear under their FQDN. Aggregated with max_over_time, not increase: these counters are cumulative PER SESSION (every series carries session_id) and expire 15m after their last sample, so increase() would treat a short session's first sample as its baseline and undercount. See OTL-75. OTL-83 / OTL-82 recording-rules round (Ryan-directed): Ryan independently confirmed these 'by Host'/'by Model' panels were never meant to be cumulative -- the per-interval redesign in the primary section above (same title, no 'Cumulative' prefix) is correct and stays primary. This panel is an OPTIONAL secondary view, collapsed by default, offering the cumulative/running-total reading for whoever wants it. No longer built from a query-time max_over_time($__range) window (OTL-82-r3's shape, which matched the true total exactly at the FINAL point but could still dip mid-chart under session churn -- OTL-83). Now reads directly from the same monotonic, forward-latching recording rule the per-interval panels use (ai:tokens_accum:sum / ai:cost_usd_accum:sum -- see provisioning/prometheus/recording-rules.yml's \"ai-canonical-running-total\" group), anchored to the dashboard's own start via `@ ${__from:date:seconds}` (closes the earlier Codex P1 finding -- no pre-loaded first point). Because the underlying series is monotonic non-decreasing by construction (each 1m tick can only take the max of its prior recorded value and what it just observed), accum(t) - accum(@ start) is GENUINELY unable to decrease as t advances -- not merely measured to dip less often. Do not conflate this number with the per-interval panel of the same base title above -- they answer different questions (growth-since-window-start vs amount-in-this-bucket) and will not match."
+        },
+        {
+          "id": 262,
+          "title": "Cumulative Tokens by Host",
+          "type": "timeseries",
+          "gridPos": {
+            "h": 7,
+            "w": 24,
+            "x": 0,
+            "y": 7
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "expr": "clamp_min((sum by (display) (label_replace(label_replace(sum by (host_name, hostname) (ai:tokens_accum:sum{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"}), \"display\", \"$1\", \"hostname\", \"(.+)\"), \"display\", \"$1\", \"host_name\", \"(.+)\"))) - ((sum by (display) (label_replace(label_replace(sum by (host_name, hostname) (ai:tokens_accum:sum{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"} @ ${__from:date:seconds}), \"display\", \"$1\", \"hostname\", \"(.+)\"), \"display\", \"$1\", \"host_name\", \"(.+)\"))) or (sum by (display) (label_replace(label_replace(sum by (host_name, hostname) (ai:tokens_accum:sum{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"}), \"display\", \"$1\", \"hostname\", \"(.+)\"), \"display\", \"$1\", \"host_name\", \"(.+)\")) * 0)), 0)",
+              "legendFormat": "{{display}}",
+              "refId": "A",
+              "interval": "$bucket"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": {
+                "drawStyle": "line",
+                "lineWidth": 2,
+                "fillOpacity": 10,
+                "gradientMode": "opacity",
+                "spanNulls": true,
+                "showPoints": "never",
+                "lineInterpolation": "smooth",
+                "stacking": {
+                  "mode": "none",
+                  "group": "A"
+                },
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "right",
+              "calcs": [
+                "lastNotNull",
+                "max"
+              ],
+              "showLegend": true,
+              "width": 240,
+              "sortBy": "Last *",
+              "sortDesc": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "description": "Tokens consumed per time bucket, grouped by canonical host_name (falls back to hostname when host_name is not set). A liveliness view of per-host activity. Aggregated with max_over_time, not increase: these counters are cumulative PER SESSION (every series carries session_id) and expire 15m after their last sample, so increase() would treat a short session's first sample as its baseline and undercount. See OTL-75. OTL-83 / OTL-82 recording-rules round (Ryan-directed): Ryan independently confirmed these 'by Host'/'by Model' panels were never meant to be cumulative -- the per-interval redesign in the primary section above (same title, no 'Cumulative' prefix) is correct and stays primary. This panel is an OPTIONAL secondary view, collapsed by default, offering the cumulative/running-total reading for whoever wants it. No longer built from a query-time max_over_time($__range) window (OTL-82-r3's shape, which matched the true total exactly at the FINAL point but could still dip mid-chart under session churn -- OTL-83). Now reads directly from the same monotonic, forward-latching recording rule the per-interval panels use (ai:tokens_accum:sum / ai:cost_usd_accum:sum -- see provisioning/prometheus/recording-rules.yml's \"ai-canonical-running-total\" group), anchored to the dashboard's own start via `@ ${__from:date:seconds}` (closes the earlier Codex P1 finding -- no pre-loaded first point). Because the underlying series is monotonic non-decreasing by construction (each 1m tick can only take the max of its prior recorded value and what it just observed), accum(t) - accum(@ start) is GENUINELY unable to decrease as t advances -- not merely measured to dip less often. Do not conflate this number with the per-interval panel of the same base title above -- they answer different questions (growth-since-window-start vs amount-in-this-bucket) and will not match."
+        },
+        {
+          "id": 263,
+          "title": "Cumulative Spend by Model",
+          "type": "timeseries",
+          "gridPos": {
+            "h": 7,
+            "w": 24,
+            "x": 0,
+            "y": 14
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "expr": "clamp_min((sum by (model_family) (label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(sum by (model) (ai:cost_usd_accum:sum{project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}), \"model_family\", \"$1\", \"model\", \"(.+)\"), \"model_family\", \"$1 $2.$3\", \"model\", \"claude-([a-z]+)-([0-9]+)-([0-9]+).*\"), \"model_family\", \"$1 $2\", \"model\", \"claude-([a-z]+)-([0-9]+)(\\\\[[^]]*\\\\])?$\"), \"model_family\", \"Opus $1\", \"model_family\", \"opus (.*)\"), \"model_family\", \"Haiku $1\", \"model_family\", \"haiku (.*)\"), \"model_family\", \"Sonnet $1\", \"model_family\", \"sonnet (.*)\"), \"model_family\", \"Fable $1\", \"model_family\", \"fable (.*)\"))) - ((sum by (model_family) (label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(sum by (model) (ai:cost_usd_accum:sum{project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"} @ ${__from:date:seconds}), \"model_family\", \"$1\", \"model\", \"(.+)\"), \"model_family\", \"$1 $2.$3\", \"model\", \"claude-([a-z]+)-([0-9]+)-([0-9]+).*\"), \"model_family\", \"$1 $2\", \"model\", \"claude-([a-z]+)-([0-9]+)(\\\\[[^]]*\\\\])?$\"), \"model_family\", \"Opus $1\", \"model_family\", \"opus (.*)\"), \"model_family\", \"Haiku $1\", \"model_family\", \"haiku (.*)\"), \"model_family\", \"Sonnet $1\", \"model_family\", \"sonnet (.*)\"), \"model_family\", \"Fable $1\", \"model_family\", \"fable (.*)\"))) or (sum by (model_family) (label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(sum by (model) (ai:cost_usd_accum:sum{project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}), \"model_family\", \"$1\", \"model\", \"(.+)\"), \"model_family\", \"$1 $2.$3\", \"model\", \"claude-([a-z]+)-([0-9]+)-([0-9]+).*\"), \"model_family\", \"$1 $2\", \"model\", \"claude-([a-z]+)-([0-9]+)(\\\\[[^]]*\\\\])?$\"), \"model_family\", \"Opus $1\", \"model_family\", \"opus (.*)\"), \"model_family\", \"Haiku $1\", \"model_family\", \"haiku (.*)\"), \"model_family\", \"Sonnet $1\", \"model_family\", \"sonnet (.*)\"), \"model_family\", \"Fable $1\", \"model_family\", \"fable (.*)\")) * 0)), 0)",
+              "legendFormat": "{{model_family}}",
+              "refId": "A",
+              "interval": "$bucket"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "currencyUSD",
+              "custom": {
+                "drawStyle": "line",
+                "lineWidth": 2,
+                "fillOpacity": 10,
+                "gradientMode": "opacity",
+                "spanNulls": true,
+                "showPoints": "never",
+                "lineInterpolation": "smooth",
+                "stacking": {
+                  "mode": "none",
+                  "group": "A"
+                },
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  }
+                ]
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byRegexp",
+                  "options": "(?i)opus"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "#9B59B6",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byRegexp",
+                  "options": "(?i)sonnet"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "#E67E22",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byRegexp",
+                  "options": "(?i)haiku"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "#3498DB",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "right",
+              "calcs": [
+                "lastNotNull",
+                "max"
+              ],
+              "showLegend": true,
+              "width": 240,
+              "sortBy": "Last *",
+              "sortDesc": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "description": "$ spent per time bucket (width = Grafana $__interval, typically 15s-15m depending on zoom). Each point = actual cost attributed to that bucket. Aggregated with max_over_time, not increase: these counters are cumulative PER SESSION (every series carries session_id) and expire 15m after their last sample, so increase() would treat a short session's first sample as its baseline and undercount. See OTL-75. OTL-83 / OTL-82 recording-rules round (Ryan-directed): Ryan independently confirmed these 'by Host'/'by Model' panels were never meant to be cumulative -- the per-interval redesign in the primary section above (same title, no 'Cumulative' prefix) is correct and stays primary. This panel is an OPTIONAL secondary view, collapsed by default, offering the cumulative/running-total reading for whoever wants it. No longer built from a query-time max_over_time($__range) window (OTL-82-r3's shape, which matched the true total exactly at the FINAL point but could still dip mid-chart under session churn -- OTL-83). Now reads directly from the same monotonic, forward-latching recording rule the per-interval panels use (ai:tokens_accum:sum / ai:cost_usd_accum:sum -- see provisioning/prometheus/recording-rules.yml's \"ai-canonical-running-total\" group), anchored to the dashboard's own start via `@ ${__from:date:seconds}` (closes the earlier Codex P1 finding -- no pre-loaded first point). Because the underlying series is monotonic non-decreasing by construction (each 1m tick can only take the max of its prior recorded value and what it just observed), accum(t) - accum(@ start) is GENUINELY unable to decrease as t advances -- not merely measured to dip less often. Do not conflate this number with the per-interval panel of the same base title above -- they answer different questions (growth-since-window-start vs amount-in-this-bucket) and will not match."
+        },
+        {
+          "id": 264,
+          "title": "Cumulative Tokens by Model",
+          "type": "timeseries",
+          "gridPos": {
+            "h": 7,
+            "w": 24,
+            "x": 0,
+            "y": 21
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "expr": "clamp_min((sum by (model_family) (label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(sum by (model) (ai:tokens_accum:sum{project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}), \"model_family\", \"$1\", \"model\", \"(.+)\"), \"model_family\", \"$1 $2.$3\", \"model\", \"claude-([a-z]+)-([0-9]+)-([0-9]+).*\"), \"model_family\", \"$1 $2\", \"model\", \"claude-([a-z]+)-([0-9]+)(\\\\[[^]]*\\\\])?$\"), \"model_family\", \"Opus $1\", \"model_family\", \"opus (.*)\"), \"model_family\", \"Haiku $1\", \"model_family\", \"haiku (.*)\"), \"model_family\", \"Sonnet $1\", \"model_family\", \"sonnet (.*)\"), \"model_family\", \"Fable $1\", \"model_family\", \"fable (.*)\"))) - ((sum by (model_family) (label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(sum by (model) (ai:tokens_accum:sum{project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"} @ ${__from:date:seconds}), \"model_family\", \"$1\", \"model\", \"(.+)\"), \"model_family\", \"$1 $2.$3\", \"model\", \"claude-([a-z]+)-([0-9]+)-([0-9]+).*\"), \"model_family\", \"$1 $2\", \"model\", \"claude-([a-z]+)-([0-9]+)(\\\\[[^]]*\\\\])?$\"), \"model_family\", \"Opus $1\", \"model_family\", \"opus (.*)\"), \"model_family\", \"Haiku $1\", \"model_family\", \"haiku (.*)\"), \"model_family\", \"Sonnet $1\", \"model_family\", \"sonnet (.*)\"), \"model_family\", \"Fable $1\", \"model_family\", \"fable (.*)\"))) or (sum by (model_family) (label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(sum by (model) (ai:tokens_accum:sum{project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}), \"model_family\", \"$1\", \"model\", \"(.+)\"), \"model_family\", \"$1 $2.$3\", \"model\", \"claude-([a-z]+)-([0-9]+)-([0-9]+).*\"), \"model_family\", \"$1 $2\", \"model\", \"claude-([a-z]+)-([0-9]+)(\\\\[[^]]*\\\\])?$\"), \"model_family\", \"Opus $1\", \"model_family\", \"opus (.*)\"), \"model_family\", \"Haiku $1\", \"model_family\", \"haiku (.*)\"), \"model_family\", \"Sonnet $1\", \"model_family\", \"sonnet (.*)\"), \"model_family\", \"Fable $1\", \"model_family\", \"fable (.*)\")) * 0)), 0)",
+              "legendFormat": "{{model_family}}",
+              "refId": "A",
+              "interval": "$bucket"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": {
+                "drawStyle": "line",
+                "lineWidth": 2,
+                "fillOpacity": 10,
+                "gradientMode": "opacity",
+                "spanNulls": true,
+                "showPoints": "never",
+                "lineInterpolation": "smooth",
+                "stacking": {
+                  "mode": "none",
+                  "group": "A"
+                },
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  }
+                ]
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byRegexp",
+                  "options": "(?i)opus"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "#9B59B6",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byRegexp",
+                  "options": "(?i)sonnet"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "#E67E22",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byRegexp",
+                  "options": "(?i)haiku"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "#3498DB",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "right",
+              "calcs": [
+                "lastNotNull",
+                "max"
+              ],
+              "showLegend": true,
+              "width": 240,
+              "sortBy": "Last *",
+              "sortDesc": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "description": "Tokens consumed per time bucket, grouped by normalized model family and summed across input, output, cache-read, and cache-creation token classes. Aggregated with max_over_time, not increase: these counters are cumulative PER SESSION (every series carries session_id) and expire 15m after their last sample, so increase() would treat a short session's first sample as its baseline and undercount. See OTL-75. OTL-83 / OTL-82 recording-rules round (Ryan-directed): Ryan independently confirmed these 'by Host'/'by Model' panels were never meant to be cumulative -- the per-interval redesign in the primary section above (same title, no 'Cumulative' prefix) is correct and stays primary. This panel is an OPTIONAL secondary view, collapsed by default, offering the cumulative/running-total reading for whoever wants it. No longer built from a query-time max_over_time($__range) window (OTL-82-r3's shape, which matched the true total exactly at the FINAL point but could still dip mid-chart under session churn -- OTL-83). Now reads directly from the same monotonic, forward-latching recording rule the per-interval panels use (ai:tokens_accum:sum / ai:cost_usd_accum:sum -- see provisioning/prometheus/recording-rules.yml's \"ai-canonical-running-total\" group), anchored to the dashboard's own start via `@ ${__from:date:seconds}` (closes the earlier Codex P1 finding -- no pre-loaded first point). Because the underlying series is monotonic non-decreasing by construction (each 1m tick can only take the max of its prior recorded value and what it just observed), accum(t) - accum(@ start) is GENUINELY unable to decrease as t advances -- not merely measured to dip less often. Do not conflate this number with the per-interval panel of the same base title above -- they answer different questions (growth-since-window-start vs amount-in-this-bucket) and will not match."
+        }
+      ]
+    }
   ],
   "refresh": "30s",
   "schemaVersion": 39,
