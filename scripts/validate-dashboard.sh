@@ -812,6 +812,23 @@ BADLABEL=$(jq '[.panels[] | select(.fieldConfig.defaults.unit? == "currencyUSD")
 [ "${BADLABEL:-1}" -eq 0 ] && pass "ai-usage \$ panels are labeled reported vs calculated correctly" \
                             || fail "ai-usage has a \$ panel with a reported/calculated label mismatch"
 
+# --- OTL-86: no panel may filter the raw `hostname` label ---
+# Live claude_code_* series stamp the canonical `host_name`; a raw `hostname`
+# matcher silently returns zero series whenever a specific host is selected.
+# The anchor requires `hostname` immediately after a selector `{`/`,` or a LogQL
+# `|`, so it does not match `host_name`, nor the "hostname" string arguments of
+# the label_replace reconciliation in panels 76/77/261/262.
+for f in dashboards/*.json; do
+  [ -f "$f" ] || continue
+  n=$(jq '[.. | objects | select(.targets?) | .targets[]?.expr
+           | select(test("[{,|] *hostname *!?[=~]"))] | length' "$f")
+  if [ "${n:-0}" -eq 0 ]; then
+    pass "no raw hostname matcher in $(basename "$f")"
+  else
+    fail "$n raw hostname matcher(s) in $f — use host_name (OTL-86)"
+  fi
+done
+
 # --- single pass/fail gate (moved here from mid-script so all checks run) ---
 if [ "$FAIL" -ne 0 ]; then
   echo ""

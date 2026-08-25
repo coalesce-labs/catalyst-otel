@@ -32,8 +32,8 @@ Full reliability matrix:
 |---|---|---|---|
 | `service.name` / `service_name` | metrics, logs, traces | ✅ reliable | THE cross-signal join key. Now live on traces too (`catalyst.execution-core`, CTL-1330). |
 | `service.namespace` / `service_namespace` | metrics, logs, traces | ✅ reliable | Clean `{catalyst, conductor}`; Loki stream label. Now on traces too (CATALYST added it 2026-06-24). |
-| `host_name` | metrics, logs | ⚠️ partial | Clean SHORT in metrics; **split FQDN/short in logs** (see below). Joinable for catalyst.* only. |
-| `hostname` | metrics, logs | ❌ broken | 2nd host dim; chaotic OS aliases (one machine = many names); sole host signal on claude_code metrics. |
+| `host_name` | metrics, logs | ✅ reliable for `claude_code.*`; ⚠️ partial for `catalyst.*` | Canonical short host label. Since the ~2026-06-18 cutover (CTL-1237) it is the **sole** host signal on `claude_code_*` metrics and `claude-code` logs. Still **split FQDN/short in `catalyst.*` logs** (see below); joinable for `catalyst.*` only within the short form. |
+| `hostname` | metrics, logs | ❌ broken | Legacy pre-cutover host dim; chaotic OS aliases (one machine = many names). Present only on `claude_code_*` data older than ~2026-06-18 (before the CTL-1237 rename to `host_name`) — no series written since carries it. |
 | `catalyst_node_name` | logs only | ❌ broken | 3rd host dim; ~86% empty; never a metric label. |
 | `host_id` | metrics only | ⚠️ partial | Cleanest host key *within* metrics (1:1 with host.name) but metrics-only. |
 | `instance` | metrics only | ❌ broken | **NOT a host** — the Prometheus scrape target `otel-collector:8889`. `service.instance.id` is unset everywhere. |
@@ -44,6 +44,8 @@ Full reliability matrix:
 | `session_id` | metrics, logs | ⚠️ partial | Most precise metrics↔logs join but ~23k cardinality — drill-down only, never a label. |
 | `service.version` | metrics | ⚠️ partial | 89 distinct values, per-deploy churn — facet, not a join key. |
 | `catalyst_node_class` | metrics, logs | ⚠️ partial | Fleet role `{developer, worker, monitor}` (CTL-1368; default `worker` when unset). Stamped on every catalyst signal as resource attr `catalyst.node.class` → label `catalyst_node_class` (NOT bare `node_class` — dashboard vars must key the prefixed name). Reusable node-class facet/template var; orthogonal to host identity (`host.name`=which machine, `node.class`=what role). |
+
+**The `host_name`/`hostname` split on `claude_code_*` data has a hard boundary.** Around 2026-06-18 (CTL-1237) the label emitted on `claude_code_*` metrics and `claude-code` logs was renamed from `hostname` to `host_name`; the two vocabularies are disjoint — no series carries both labels, and no canonical `host_name` value (`laptop`, `mini`, `mini-2`, `oliverb-win`) appears among the legacy `hostname` OS aliases (`office-desk`, `RYANS-MAC_MINI-M4`, `Ryans-MacBook-Pro-2`, `Ryans-MBP-2`, `RyansMini250233`). Practically: pre-cutover `claude_code_*` history is reachable only via an unfiltered ("All") host selection, never a specific host; every `claude_code_*` dashboard panel filters `host_name` exclusively (OTL-86).
 
 **Host identity is the biggest gap (verified 2026-06-24).** `host_name` is clean short (`mini`/`mini-2`) in metrics but **split in logs** over 24h:
 
