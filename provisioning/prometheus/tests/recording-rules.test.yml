@@ -1,5 +1,11 @@
 # OTL-87: promtool unit tests for the ai-canonical-running-total group.
-# Run with: promtool test rules provisioning/prometheus/recording-rules.test.yml
+# Run with: promtool test rules provisioning/prometheus/tests/recording-rules.test.yml
+#
+# OTL-89: lives outside provisioning/prometheus/ itself -- prometheus.yml globs
+# that directory for rule_files (/etc/prometheus/rules/*.yml, non-recursive),
+# and this file's promtool test-format keys (rule_files/evaluation_interval/
+# tests) are not valid rulefmt, so a promtool test file sitting in the globbed
+# directory crashloops Prometheus on boot (the #182 incident).
 #
 # IMPORTANT CAVEAT, confirmed empirically while writing this fixture: promtool's
 # unit-test harness cannot chain a TRUE self-referential recording rule --
@@ -42,7 +48,7 @@
 # live-proof the coordinator re-verifies post-deploy (both regimes), same as
 # the ticket's own Gherkin asks for.
 rule_files:
-  - recording-rules.yml
+  - ../recording-rules.yml
 
 evaluation_interval: 1m
 
