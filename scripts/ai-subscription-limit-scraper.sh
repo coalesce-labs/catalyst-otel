@@ -129,15 +129,59 @@ print(json.dumps(out))
 fi
 
 # ---------------------------------------------------------------------------
+# Gather: GLM Coding Plan (z.ai) -- the portal's own quota endpoint (OTL-80).
+# SANCTIONED with the coding-plan key: z.ai's official glm-plan-usage plugin
+# hits this same route. NEVER call the model routes (/api/paas/v4, /api/
+# anthropic) from here -- those are whitelisted-tools-only (ban ladder).
+# Two response generations exist: CREDIT_LIMIT (new, level=pro) and
+# TOKENS_LIMIT (old) rows -- parse both. unit:3,number:5 = 5h; unit:6 = weekly.
+# ---------------------------------------------------------------------------
+glm_json="[]"
+GLM_KEY=$(grep "^export GLM_CODING_PLAN_API_KEY=" "$HOME/.config/direnv/profiles/catalyst-cloud.env" 2>/dev/null | sed -E "s/^export GLM_CODING_PLAN_API_KEY='([^']*)'.*/\1/")
+if [[ -n "$GLM_KEY" ]]; then
+  glm_json=$(curl -s -m 20 -H "Authorization: $GLM_KEY" "https://api.z.ai/api/monitor/usage/quota/limit" | python3 -c '
+import json, sys
+try:
+    d = json.load(sys.stdin)
+except Exception:
+    print("[]"); raise SystemExit
+out = []
+level = ((d.get("data") or {}).get("level")) or "unknown"
+for row in (d.get("data") or {}).get("limits", []):
+    if row.get("type") not in ("CREDIT_LIMIT", "TOKENS_LIMIT"):
+        continue
+    if row.get("unit") == 3 and row.get("number") == 5:
+        window, minutes = "5h", 300
+    elif row.get("unit") == 6:
+        window, minutes = "7d", 10080
+    else:
+        continue
+    if row.get("percentage") is None:
+        continue
+    out.append({
+        "provider": "glm",
+        "account": f"glm-coding-{level}",
+        "window": window,
+        "used_percent": row["percentage"],
+        "window_minutes": minutes,
+        "resets_at": (row.get("nextResetTime") or 0) / 1000 or None,
+    })
+print(json.dumps(out))
+' 2>/dev/null) || glm_json="[]"
+  [[ -n "$glm_json" ]] || glm_json="[]"
+fi
+
+# ---------------------------------------------------------------------------
 # Build + send the OTLP/HTTP logs payload (one logRecord per provider/
 # account/window sample).
 # ---------------------------------------------------------------------------
-CODEX_JSON="$codex_json" CLAUDE_JSON="$claude_json" OTLP_HTTP_ENDPOINT="$OTLP_HTTP_ENDPOINT" SCRAPER_DRY_RUN="$([[ $DRY_RUN -eq 1 ]] && echo 1 || echo 0)" python3 <<PYEOF
+CODEX_JSON="$codex_json" CLAUDE_JSON="$claude_json" GLM_JSON="$glm_json" OTLP_HTTP_ENDPOINT="$OTLP_HTTP_ENDPOINT" SCRAPER_DRY_RUN="$([[ $DRY_RUN -eq 1 ]] && echo 1 || echo 0)" python3 <<PYEOF
 import json, os, sys, time, subprocess
 
 codex = json.loads(os.environ["CODEX_JSON"])
 claude = json.loads(os.environ["CLAUDE_JSON"])
-samples = codex + claude
+glm = json.loads(os.environ.get("GLM_JSON", "[]"))
+samples = codex + claude + glm
 
 now_ns = int(time.time() * 1e9)
 
