@@ -208,7 +208,7 @@ groups:
       #   high-cardinality series (type x model), so one 2-model session cannot
       #   clear the floor on its own. LogQL not needed — native connector counter.
       - uid: claude_code_attribution_missing
-        title: Claude Code telemetry attribution missing (majority of series lack linear_key)
+        title: Claude Code telemetry attribution missing (majority of RELAY-DISPATCHED series lack linear_key)
         condition: C
         for: 15m
         noDataState: OK
@@ -218,17 +218,24 @@ groups:
           signal: claude_code_attribution_missing
           severity: warning
         annotations:
-          summary: '>50% of live claude_code_* series carry no linear_key for 15m — per-ticket attribution lost'
+          summary: '>50% of live RELAY-dispatched claude_code_* series carry no linear_key for 15m — per-ticket attribution lost'
           description: >
             The unattributed fraction of live claude_code_token_usage_tokens_total
-            series is above 50% for 15m (volume floor >=5 distinct session_id).
-            This is the
-            OTL-67 failure mode: SDK-dispatched workers emitting claude_code_*
+            series WITH catalyst_orchestration="relay" is above 50% for 15m
+            (volume floor >=5 distinct session_id). Rescoped 2026-08-24 (OTL-81
+            investigation): interactive/concierge sessions and in-process
+            Agent-tool subagents structurally never carry a single ticket's
+            linear_key (catalyst_orchestration is absent, not "relay" — they are
+            not relay-dispatched and routinely span many tickets), and mixing
+            them into the denominator drove this alert's ratio to 40-60%
+            overnight on 2026-08-24 even though every relay-dispatched series in
+            that window was fully attributed (verified live). This is the OTL-67
+            failure mode: SDK-dispatched (relay) workers emitting claude_code_*
             metrics with only host_name/session_id/type and no linear_key/project/
             branch (settings.json OTEL_RESOURCE_ATTRIBUTES pin winning over the
-            per-job env). Verify the catalyst#3721 fix is deployed on the emitting
-            host; check ~/.claude/settings.json is not re-pinning host.name only.
-            See docs/runbook-otl-67-attribution.md.
+            per-job env). If this fires again, verify the catalyst#3721 fix is
+            still deployed on the emitting host; check ~/.claude/settings.json is
+            not re-pinning host.name only. See docs/runbook-otl-67-attribution.md.
           __dashboardUid__: claude-code-unified
           __panelId__: '208'
         data:
@@ -243,12 +250,12 @@ groups:
               refId: A
               expr: >-
                 (
-                  count(claude_code_token_usage_tokens_total{linear_key=""})
+                  count(claude_code_token_usage_tokens_total{catalyst_orchestration="relay", linear_key=""})
                   /
-                  scalar(count(claude_code_token_usage_tokens_total))
+                  scalar(count(claude_code_token_usage_tokens_total{catalyst_orchestration="relay"}) > 0 or vector(1))
                 )
                 and on()
-                (count(count by (session_id) (claude_code_token_usage_tokens_total)) >= 5)
+                (count(count by (session_id) (claude_code_token_usage_tokens_total{catalyst_orchestration="relay"})) >= 5)
           - refId: B
             relativeTimeRange: { from: 300, to: 0 }
             datasourceUid: __expr__
