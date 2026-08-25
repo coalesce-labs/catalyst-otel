@@ -7037,7 +7037,7 @@
       "options": {
         "legend": {
           "displayMode": "table",
-          "placement": "right",
+          "placement": "bottom",
           "calcs": [
             "mean"
           ],
@@ -7051,7 +7051,7 @@
           "sort": "desc"
         }
       },
-      "description": "P50/P75/P90/P95/P99 request-duration distribution for this one model, from claude_code_api_request_duration_seconds_bucket (native Claude Code histogram, includes GLM which rides the same exporter -- see OTL-81). Y-axis is a shared static 0-90s range across every tile in this row for cross-model comparison; a model whose latencies are far below 90s will look visually flat here by design. Quantiles are computed over the selected Bucket window (the Bucket dropdown), so wider buckets give smoother, more aggregated curves."
+      "description": "P50/P75/P90/P95/P99 request-duration distribution for this one model, from claude_code_api_request_duration_seconds_bucket (native Claude Code histogram, includes GLM which rides the same exporter -- see OTL-81). Y-axis is a shared static 0-90s range across every tile in this row for cross-model comparison; a model whose latencies are far below 90s will look visually flat here by design. Quantiles are computed over the selected Bucket window (the Bucket dropdown), so wider buckets give smoother, more aggregated curves. \u26a0 The 1-minute ceiling is a histogram clamp, not a timeout: Claude Code's duration histogram has finite buckets up to le=60s, so any quantile that falls into the overflow bucket reports exactly 60s. A P99 flatlined at 1 min means \u22651% of requests ran LONGER than 60s by an unknowable amount (measured 2026-08-25: 1.2% of 3h traffic). Bucket boundaries are baked into Claude Code's instrumentation \u2014 not fixable dashboard-side."
     },
     {
       "id": 242,
