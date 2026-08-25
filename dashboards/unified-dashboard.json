@@ -6650,7 +6650,7 @@
     {
       "id": 229,
       "type": "text",
-      "title": "Qwen Lane \u2014 Not Yet Emitting",
+      "title": "Qwen Lane \u2014 Self-Metered Estimate (OTL-80)",
       "gridPos": {
         "h": 4,
         "w": 24,
@@ -6659,9 +6659,156 @@
       },
       "options": {
         "mode": "markdown",
-        "content": "### Qwen (OpenCode) \u2014 no telemetry today\n\nQwen is interactive-only via OpenCode and emits **no telemetry into this stack** as of 2026-08-24 \u2014 zero `qwen_*`/`opencode_*` series in Prometheus, no `service_name=~\"qwen.*|opencode.*\"` streams in Loki (checked live). This is a **structural placeholder**, not a stale panel: `ai:tokens:sum{provider=\"qwen\"}` and `ai:cost_usd:sum` legs exist in `provisioning/prometheus/recording-rules.yml` today (inert \u2014 match zero series until real data lands), and the Tokens/Spend-by-Provider panels above already group by `provider`, so Qwen appears automatically once telemetry starts, no dashboard edit required.\n\n**To light this up:**\n1. Wire `qwencloud auth login` (account-level keychain, not the model key \u2014 zero ToS exposure) and the `qwencloud usage summary --format json` poll into `scripts/ai-subscription-limit-scraper.sh` alongside the existing claude/codex/glm scrapers \u2014 recipe + verified endpoint shape on **OTL-80**.\n2. Confirm what OpenCode's actual OTel exporter emits (metric family name, service.name) \u2014 unverified; update the recording-rule metric names in `recording-rules.yml` from the placeholder once real series are observed.\n\nCredit formula for Qwen is **not published** (dynamic, hidden consumption items per OTL-80 research) \u2014 client-side cost estimation is not viable there the way it is for GLM; the limit-window scrape is the only trustworthy Qwen usage signal available."
+        "content": "### Qwen (OpenCode) \u2014 self-metered ESTIMATE, still no real telemetry\n\nQwen is interactive-only via OpenCode and still emits **no telemetry into this stack** as of 2026-08-25 \u2014 zero `qwen_*`/`opencode_*` series in Prometheus, no `service_name=~\"qwen.*|opencode.*\"` streams in Loki (checked live). Alibaba's own usage API cannot report remaining credits for Individual plans yet (`qwencloud usage summary`'s token_plan block returns `subscribed:false` \u2014 account-recognition gap, support ticket open), so the three panels to the right are a **client-side ESTIMATE** built from our own token counters and Ryan's worked-example credit coefficients (OTL-80, 2026-08-25) \u2014 not a vendor reading. They read zero/no-data today, same as this text panel says, and will start reflecting real numbers automatically the moment Qwen/OpenCode calls start emitting telemetry (`ai:tokens:sum{provider=\"qwen\"}` in `provisioning/prometheus/recording-rules.yml`, still an inert OTL-81 placeholder) \u2014 no dashboard edit required for that part. **Swap the whole block to `qwencloud usage summary`'s token_plan fields the moment Alibaba fixes Individual-plan recognition** \u2014 that is the real source of truth, this is a stopgap."
       },
-      "description": "OTL-81 acceptance: 'the Qwen lane's series appear automatically once Qwen telemetry first arrives' \u2014 satisfied structurally (recording-rule leg + provider-grouped panels), not by fabricating data."
+      "description": "OTL-81 acceptance: 'the Qwen lane's series appear automatically once Qwen telemetry first arrives' \u2014 satisfied structurally (recording-rule leg + provider-grouped panels), not by fabricating data. OTL-80 adds a self-metered ESTIMATE on top of that same inert leg so there is SOMETHING to look at before real telemetry lands \u2014 see the gauge/stat/text panels below for the full honesty notes."
+    },
+    {
+      "id": 231,
+      "type": "gauge",
+      "title": "Qwen Credits \u2014 Estimated % of 7d Quota (SELF-METERED ESTIMATE)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 138
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "ai:qwen_credits_pct_of_quota:sum",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "noValue": "no data (Qwen not emitting yet)",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 70
+              },
+              {
+                "color": "red",
+                "value": 90
+              }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      },
+      "description": "OTL-80 SELF-METERED ESTIMATE, NOT a metered reading. Counts only Qwen/OpenCode calls through OUR OWN harness telemetry (currently ZERO \u2014 Qwen runs interactive-only via OpenCode today and emits no telemetry into this stack, confirmed live 2026-08-25), priced with Ryan's unpublished worked-example coefficients for qwen3.6-plus (0.2 credits/1K input, 0.02/1K cached, 1.2/1K output \u2014 see provisioning/prometheus/recording-rules.yml's ai-qwen-credits-estimate group). Denominator is the static Qwen Token Plan Individual/Pro quota (40,000 credits / rolling 7d window, config constant, not a metric). The Alibaba console (or `qwencloud usage summary` once Individual-plan recognition ships) is the ONLY source of truth for real remaining credits \u2014 this gauge is a directional stopgap, never a bill."
+    },
+    {
+      "id": 232,
+      "type": "stat",
+      "title": "Qwen Credits \u2014 Estimated Used / 40,000 (7d, ESTIMATE)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 138
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "ai:qwen_credits_estimate_7d:sum",
+          "legendFormat": "Estimated credits used (7d)",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "noValue": "0 (no Qwen telemetry yet)",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#5794F2",
+                "value": null
+              }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background_solid",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "textMode": "value_and_name",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false,
+          "fields": ""
+        }
+      },
+      "description": "Estimated credits consumed against the static 40,000-credit / rolling-7d quota (Individual, Pro tier, confirmed with Ryan 2026-08-25). SELF-METERED ESTIMATE derived from our own token counters, not a vendor reading \u2014 see the gauge panel to the left for the full honesty note and provisioning/prometheus/recording-rules.yml's ai-qwen-credits-estimate group for the derivation."
+    },
+    {
+      "id": 233,
+      "type": "text",
+      "title": "Qwen Credits Estimate \u2014 Methodology & Reset",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 138
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "**Current window resets:** 2026-09-01T05:18 (local-console-time, assumed America/Chicago \u2014 Alibaba's console timezone is not independently confirmed) \u2014 then **re-anchors to the first call after each reset**; there is no fixed weekday/time to rely on going forward.\n\n**Quota:** 40,000 credits / rolling 7 days (Individual, Pro tier).\n\n**How this is computed:** a SELF-METERED ESTIMATE, not a vendor reading. Sums our own emitted token counts for Qwen/OpenCode harness calls (`ai:tokens:sum{provider=\"qwen\"}`) and prices them at Ryan's worked-example coefficients for the qwen3.6-plus model tier (2026-08-25): ~0.2 credits/1K input, ~0.02/1K cached, ~1.2/1K output. These coefficients are **unpublished by Alibaba and per-model** \u2014 do not treat them as a rate card, and do not assume they generalize to other Qwen model tiers.\n\n**Scope:** counts only calls that flow through our own harnesses (relay / OpenCode). Any Qwen usage outside this fleet's telemetry is invisible here.\n\n**Source of truth:** the Alibaba console, or `qwencloud usage summary`'s token_plan fields once Individual-plan recognition ships (tracked on **OTL-80**). Swap this whole block to that source the moment it's available \u2014 until then, treat every number on this row as directional, never a bill.\n\nFull derivation + honesty notes: `provisioning/prometheus/recording-rules.yml`'s `ai-qwen-credits-estimate` group."
+      },
+      "description": "Static plan constants (40,000-credit quota, window reset anchor) are documented as config in provisioning/prometheus/recording-rules.yml's ai-qwen-credits-estimate group, not hardcoded only here."
     },
       {
         "id": 240,

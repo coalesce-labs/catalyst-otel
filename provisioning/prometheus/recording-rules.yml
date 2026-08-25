@@ -434,3 +434,112 @@ groups:
               max_over_time(claude_code_cost_usage_USD_total{job="otel-collector"}[20m])
             ))
           )
+
+  # ---------------------------------------------------------------------
+  # OTL-80 Qwen dashboard block (SELF-METERED ESTIMATE, wired 2026-08-25,
+  # Ryan-directed): Ryan bought the Qwen Token Plan (Individual, Pro tier --
+  # 40,000 credits per rolling 7-day window). Neither Alibaba's `qwencloud`
+  # CLI (`usage summary`'s token_plan block returns subscribed:false for
+  # Individual plans -- an account-recognition gap, support ticket open),
+  # nor the OpenAI-compat endpoint (no quota headers), nor any public REST
+  # route exposes remaining credits today (see this ticket's earlier
+  # Usage-API-research comment: "Credit formula NOT published (dynamic,
+  # hidden consumption items) -- client-side estimation not viable for
+  # Qwen" -- true for an EXACT reading, superseded here only in the sense
+  # that Ryan has since supplied a worked-example coefficient set good
+  # enough for a directional estimate, not a real metered number).
+  # Decision (Ryan, 2026-08-25): ship the cheapest self-metered PROXY now
+  # from our own emitted telemetry; swap to the real source
+  # (`qwencloud usage summary`'s token_plan fields) the instant Alibaba
+  # fixes Individual-plan recognition -- do not wait on that fix to ship
+  # visibility.
+  #
+  # THIS IS AN ESTIMATE, NOT A METERED READING -- same honesty bar as the
+  # GLM re-rated-cost leg above (ai:cost_usd:sum{provider="glm"}), except
+  # Qwen's coefficients are NOT a vendor-published rate card the way
+  # GLM's z.ai pricing page is: they are Ryan's own worked-example numbers
+  # for the qwen3.6-plus model tier (2026-08-25), PER-MODEL and
+  # UNPUBLISHED by Alibaba -- do not assume they generalize to other Qwen
+  # model tiers without a fresh worked example, and do not let this number
+  # be read as a bill. Every panel built on this series must say so in its
+  # own title/description -- a consumer must not have to trace back to
+  # this comment to learn the number is synthetic.
+  #
+  # COEFFICIENTS (credits per 1,000 tokens, qwen3.6-plus, worked example
+  # 2026-08-25): input ~0.2, cached (cacheRead) ~0.02, output ~1.2.
+  # cacheCreation is folded into the input rate -- Qwen/DashScope, like
+  # GLM's z.ai endpoint (see the ai:cost_usd:sum{provider="glm"} note
+  # above), is not known to charge a separate cache-write premium; this is
+  # an unverified, conservative assumption inherited from the GLM lane, not
+  # a Qwen-specific confirmation -- flag it if a real reading later
+  # contradicts it.
+  #
+  # SOURCE: deliberately layered on ai:tokens:sum{provider="qwen"} (the
+  # ai-canonical-tokens group above), NOT on a raw metric name directly.
+  # That provider=qwen leg is itself still an inert OTL-81 structural
+  # placeholder today (matches zero series -- confirmed live 2026-08-25,
+  # no qwen_*/opencode_* series in Prometheus and no
+  # service_name=~"qwen.*|opencode.*" streams in Loki) pointing at a metric
+  # family that is still unverified (OpenCode's actual OTel exporter has
+  # not been confirmed -- Qwen today runs interactive-only via OpenCode,
+  # per CTC-1007). Building on that existing abstraction, instead of a raw
+  # metric name here, means this whole block goes from producing nothing to
+  # producing real numbers the moment OTL-80/CTC-1007's wiring lands and
+  # corrects that ONE upstream expr -- with zero edits needed in this
+  # group. A Prometheus recording rule over an absent series is inert, not
+  # an error, same as every other qwen leg in this file.
+  #
+  # WINDOW: same max_over_time(...[7d]) convention as the
+  # ai-canonical-efficiency group's denominator rules above (both read a
+  # raw-counter-shaped cumulative series over a rolling window at query
+  # time) -- not the heavier OTL-82/83 ratchet-accumulator pattern, which
+  # was purpose-built for short "per-interval bucket" delta panels, a
+  # different problem than this block's single rolling-7d total.
+  #
+  # STATIC PLAN CONSTANTS (config, not code -- update only if the plan
+  # itself changes; there is no metric that reports these):
+  #   qwen_plan_credits_per_window = 40000  (Individual, Pro tier, 7d window,
+  #     confirmed with Ryan 2026-08-25)
+  #   qwen_plan_window_reset_at    = 2026-09-01T05:18 local-console-time,
+  #     assumed America/Chicago (this fleet's own timezone -- Alibaba's
+  #     console timezone is not independently confirmed) = 1788257880 unix
+  #     seconds. Windows RE-ANCHOR to the first call after each reset going
+  #     forward -- there is no fixed weekday/time to hardcode beyond this
+  #     one known boundary. Refresh this constant (or, better, swap the
+  #     whole block to the real qwencloud usage-summary resetDate field)
+  #     once the CLI recognizes the Individual plan.
+  # ---------------------------------------------------------------------
+  - name: ai-qwen-credits-estimate
+    interval: 1m
+    rules:
+      - record: ai:qwen_credits_estimate:sum
+        labels:
+          coefficient_basis: worked_example_2026_08_25_qwen3_6_plus
+        expr: |
+          sum by (model, project, branch, linear_key, task_type, account, phase) (
+            (ai:tokens:sum{provider="qwen", token_type=~"input|cacheCreation"} * 0.2 / 1000)
+            or
+            (ai:tokens:sum{provider="qwen", token_type="cacheRead"} * 0.02 / 1000)
+            or
+            (ai:tokens:sum{provider="qwen", token_type="output"} * 1.2 / 1000)
+          )
+
+      # Rolling-7d credits total, all dims collapsed to one number -- the
+      # plan quota is fleet-wide, not per-ticket/per-model.
+      - record: ai:qwen_credits_estimate_7d:sum
+        expr: |
+          sum(max_over_time(ai:qwen_credits_estimate:sum[7d]))
+
+      # Percent of the static 40,000/7d quota -- see the STATIC PLAN
+      # CONSTANTS note above for why 40000 is hardcoded here rather than
+      # read from a metric.
+      - record: ai:qwen_credits_pct_of_quota:sum
+        expr: |
+          (ai:qwen_credits_estimate_7d:sum / 40000) * 100
+
+      # Reset-time ANNOTATION only (not a real quota reading) -- see the
+      # STATIC PLAN CONSTANTS note above. A constant unix-seconds gauge so
+      # a dashboard panel can reference it via PromQL instead of a
+      # hardcoded string, should a future round wire up a live countdown.
+      - record: ai:qwen_plan_window_reset_at:sum
+        expr: vector(1788257880)
