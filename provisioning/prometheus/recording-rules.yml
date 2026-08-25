@@ -365,27 +365,95 @@ groups:
   #       that accumulates per-session peaks forward permanently (state
   #       carried outside the query window)". That's what this group is.
   #
-  # MECHANISM: self-referential recording rule (a standard Prometheus
-  # "ratchet" pattern). Each 1m tick:
+  # MECHANISM (v1, OTL-82/83, 2026-08-24 -- SUPERSEDED, kept here because
+  # the failure mode is the whole reason v2 below looks the way it does):
+  # the original shipped construction was
   #   current = sum by (dims) (max_over_time(raw_counter[20m]))
   #   prior   = max_over_time(this_same_rule_name[20m])
   #   this_rule := max by (dims) (prior or current)
-  # `or` concatenates the prior and current vectors (identical label sets);
-  # `max by (dims)` then reduces any duplicate label-set pairs down to their
-  # elementwise max -- i.e. "whichever of prior-recorded-value or freshly-
-  # observed-value is larger, per series". The 20m self-lookback is
-  # comfortably wider than both the raw counters' ~15m per-session expiry
-  # (OTL-75) and this rule's own 1m eval cadence, so: (1) a session's peak is
-  # captured by `current` before it ages out of the RAW counter's own
-  # staleness window, and (2) once captured, the rule's OWN prior value is
-  # re-found and re-latched forward on every subsequent tick (each new
-  # recorded sample is itself well within reach of the next tick's 20m
-  # self-lookback), so the accumulated peak persists across gaps indefinitely
-  # instead of being re-derived from a bounded query window each time. This
-  # is genuinely monotonic non-decreasing by construction (each tick can only
-  # take the max of what it already had and what it just saw) -- not merely
-  # measured to dip less often, which is what distinguishes this from every
-  # earlier attempt in this PR's history.
+  # This IS genuinely monotonic non-decreasing (each tick can only take the
+  # max of what it already had and what it just saw) -- but monotonic
+  # non-decreasing is not the same property as "correctly tracks new
+  # increases", and this construction only has the first one. `current` is
+  # a SNAPSHOT of concurrently-visible cumulative totals, not a delta: it
+  # legitimately shrinks whenever fewer sessions are contributing to a dims
+  # combo than at some earlier peak (sessions retiring, concurrency
+  # dropping), and `max(prior, current)` then keeps the larger, stale
+  # `prior` forever -- frozen until FRESH activity independently
+  # re-exceeds the ENTIRE historical peak for that exact dims combo, which
+  # for a linear_key that saw one big concurrent burst can be hours away.
+  #
+  # OTL-87 (Ryan-directed, found live 2026-08-25 ~12:10): this is exactly
+  # what flatlined the 13 accum-consuming panels to ~0 during the day's
+  # busiest hours -- `ai:tokens_accum:sum - (... offset 1h)` read 0.0 for
+  # every one of 108 live per-ticket series while 5-6 worker lanes actively
+  # burned tokens below an earlier overnight peak. Confirmed structurally
+  # (this is the only self-referential group in the file; every other
+  # `ai:*` rule reads raw counters directly and is unaffected) and
+  # reproduced deterministically in `recording-rules.test.yml` (a
+  # 3-session burst-then-quiet fixture: the v1 expression above plateaus at
+  # the t=10m peak forever while a real, growing session accrues
+  # underneath it -- see that file's header for why `promtool test rules`
+  # can't validate the *self-referential* combinator end-to-end, only its
+  # two decomposed, fully-testable pieces below).
+  #
+  # MECHANISM (v2, OTL-87, 2026-08-25): a true delta-accumulator --
+  # `accum(t) = accum(t-1m) + Σ(real per-session increases since t-1m)` --
+  # split into two rules per metric so the combinator logic isn't
+  # duplicated three times inside one `expr:`:
+  #
+  #   1. `ai:tokens_accum_delta:sum` / `ai:cost_usd_accum_delta:sum`: the
+  #      per-dims sum of real per-session increases since the previous
+  #      evaluation, computed at the RAW SESSION level (session_id still
+  #      present) before the `sum by (dims)` aggregation collapses it away
+  #      -- computing the delta AFTER aggregating to dims would reintroduce
+  #      the exact same concurrency-snapshot problem one level up. Per raw
+  #      session series: `clamp_min(max_over_time(raw[20m]) -
+  #      max_over_time(raw[20m] offset 1m), 0) or (max_over_time(raw[20m])
+  #      unless max_over_time(raw[20m] offset 1m))`. The two `or`-joined
+  #      branches are a disjoint, no-double-count partition: the
+  #      subtraction covers sessions with both a current and a 1m-ago
+  #      sample (clamp_min absorbs a same-session_id counter reset --
+  #      OTL-75's documented ~15m-idle-then-resume-at-a-lower-value
+  #      behavior -- as a one-tick 0 instead of a negative subtraction);
+  #      `unless` covers sessions with no 1m-ago sample (brand new, or
+  #      reappeared after >20m absence) and credits their full current
+  #      value, matching this file's established "first sample counts in
+  #      full" convention. Recovery from a same-session_id reset is
+  #      bounded but not instant: `max_over_time(...[20m])` keeps the
+  #      PRE-reset peak visible on both sides of the subtraction until it
+  #      ages out of the 20-minute window OR the resumed ramp organically
+  #      re-exceeds it (whichever comes first) -- a self-healing,
+  #      bounded-by-the-reset's-own-size undercount, never a double-count,
+  #      and never dependent on any OTHER session's peak the way v1 was.
+  #   2. `ai:tokens_accum:sum` / `ai:cost_usd_accum:sum`: forward-latch the
+  #      delta onto the prior recorded total --
+  #      `(max_over_time(self[20m]) + delta) or max_over_time(self[20m])
+  #      or delta`. The `(A+B) or A or B` shape is required, not
+  #      stylistic: a bare `prior + delta` inner-joins and silently DROPS
+  #      any dims combo missing from either side (a quiet ticket has no
+  #      delta this tick; a brand-new ticket has no prior yet) -- which
+  #      would erase accumulated totals on every quiet tick, a worse bug
+  #      than the one being fixed. The 20-minute self-lookback (unchanged
+  #      from v1) is still what makes the accumulator survive Prometheus
+  #      eval gaps, same reasoning as v1's prior/current windows.
+  #
+  # FLAWED-WINDOW DECISION (OTL-87, no separate runbook doc exists for this
+  # in the repo -- see the OTL-85 backfill note below, and this file's own
+  # established convention of documenting these decisions inline): the v1
+  # rule was live 2026-08-24 ~08:54 through this fix's deploy, and
+  # permanently under-recorded every dims combo whose concurrency dropped
+  # below an earlier local peak during that window. Because v2 is also
+  # self-referential (required to survive session expiry), deploying it
+  # does not retroactively correct that window's stored samples -- v2
+  # picks up `prior` from whatever v1 last wrote and computes correct
+  # deltas forward from there, permanently under-counting by the v1
+  # shortfall unless backfilled. Recommendation: re-run an OTL-85-style
+  # `promtool` block-backfill for 2026-08-24 ~08:54 through deploy against
+  # the v2 expression (raw per-session counters for that same-day window
+  # should still be within Prometheus retention) -- not merely annotate
+  # it. Left for the coordinator to execute (per dispatch note), since it
+  # requires the live Prometheus TSDB this worktree has no access to.
   #
   # DIMS: the union of every label the 13 native-counter "per Interval" /
   # "Cumulative" dashboard panels this round converts group by (host_name /
@@ -415,25 +483,64 @@ groups:
   - name: ai-canonical-running-total
     interval: 1m
     rules:
+      # Per-dims sum of REAL per-session increases since the previous
+      # evaluation (1m ago) -- a plain delta, computed at the RAW SESSION
+      # level (session_id still present) before aggregating to dims, so a
+      # concurrency change (sessions starting/ending) never looks like a
+      # change in the total's rate of growth. `clamp_min(..., 0)` absorbs
+      # OTL-75's documented same-session_id collector-expiry-then-resume-
+      # at-a-lower-value case as a one-tick 0 instead of a negative
+      # subtraction (a bounded, one-tick undercount -- never a double-
+      # count); `unless` credits a genuinely new (or >20m-absent) session's
+      # first sample in full, matching every other ai:* rule's "first
+      # sample counts" convention (see the ai:tokens:sum header note).
+      - record: ai:tokens_accum_delta:sum
+        expr: |
+          sum by (host_name, hostname, model, type, project, branch, linear_key, task_type, account, phase) (
+            clamp_min(
+              max_over_time(claude_code_token_usage_tokens_total{job="otel-collector"}[20m])
+              - max_over_time(claude_code_token_usage_tokens_total{job="otel-collector"}[20m] offset 1m)
+              , 0
+            )
+            or
+            (
+              max_over_time(claude_code_token_usage_tokens_total{job="otel-collector"}[20m])
+              unless max_over_time(claude_code_token_usage_tokens_total{job="otel-collector"}[20m] offset 1m)
+            )
+          )
+
+      # Forward-latching accumulator: prior + this tick's real delta. The
+      # `(A+B) or A or B` shape is required, not stylistic -- a bare
+      # `prior + delta` inner-joins and silently DROPS any dims combo
+      # missing from either side (a quiet ticket has no delta this tick; a
+      # brand-new ticket has no prior yet), which would erase accumulated
+      # totals on every quiet tick -- a worse bug than the one being fixed.
       - record: ai:tokens_accum:sum
         expr: |
-          max by (host_name, hostname, model, type, project, branch, linear_key, task_type, account, phase) (
-            (max_over_time(ai:tokens_accum:sum[20m]))
+          (max_over_time(ai:tokens_accum:sum[20m]) + ai:tokens_accum_delta:sum)
+          or max_over_time(ai:tokens_accum:sum[20m])
+          or ai:tokens_accum_delta:sum
+
+      - record: ai:cost_usd_accum_delta:sum
+        expr: |
+          sum by (host_name, hostname, model, project, branch, linear_key, task_type, account, phase) (
+            clamp_min(
+              max_over_time(claude_code_cost_usage_USD_total{job="otel-collector"}[20m])
+              - max_over_time(claude_code_cost_usage_USD_total{job="otel-collector"}[20m] offset 1m)
+              , 0
+            )
             or
-            (sum by (host_name, hostname, model, type, project, branch, linear_key, task_type, account, phase) (
-              max_over_time(claude_code_token_usage_tokens_total{job="otel-collector"}[20m])
-            ))
+            (
+              max_over_time(claude_code_cost_usage_USD_total{job="otel-collector"}[20m])
+              unless max_over_time(claude_code_cost_usage_USD_total{job="otel-collector"}[20m] offset 1m)
+            )
           )
 
       - record: ai:cost_usd_accum:sum
         expr: |
-          max by (host_name, hostname, model, project, branch, linear_key, task_type, account, phase) (
-            (max_over_time(ai:cost_usd_accum:sum[20m]))
-            or
-            (sum by (host_name, hostname, model, project, branch, linear_key, task_type, account, phase) (
-              max_over_time(claude_code_cost_usage_USD_total{job="otel-collector"}[20m])
-            ))
-          )
+          (max_over_time(ai:cost_usd_accum:sum[20m]) + ai:cost_usd_accum_delta:sum)
+          or max_over_time(ai:cost_usd_accum:sum[20m])
+          or ai:cost_usd_accum_delta:sum
 
   # ---------------------------------------------------------------------
   # OTL-80 Qwen dashboard block (SELF-METERED ESTIMATE, wired 2026-08-25,

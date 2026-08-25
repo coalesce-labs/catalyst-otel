@@ -1,0 +1,253 @@
+# OTL-87: promtool unit tests for the ai-canonical-running-total group.
+# Run with: promtool test rules provisioning/prometheus/recording-rules.test.yml
+#
+# IMPORTANT CAVEAT, confirmed empirically while writing this fixture: promtool's
+# unit-test harness cannot chain a TRUE self-referential recording rule --
+# ANY rule whose expr names its own `record:` (even deep inside an `or`
+# fallback, even via a plain `offset` with no other function) evaluates to
+# empty/0 at every eval_time, regardless of what the non-self-referencing
+# fallback branch would otherwise produce. Verified with a 3-line minimal
+# repro (`max((self[20m]) or (current))` records 0 forever, even though
+# `current` alone is provably non-zero at every tick). This is the SAME
+# class of promtool limitation the ticket itself already names for
+# `promtool`'s backfill path ("could not chain the self-reference and
+# reduced to the raw branch") -- just surfacing differently in the `test`
+# subcommand. It is not evidence against self-referential rules working in
+# a real Prometheus server: OTL-82/83's original (buggy) rule already
+# proved the self-reference PLUMBING works live (108 real, continuously
+# forward-latching series) -- only the MATH built on top of it was wrong.
+#
+# So this fixture validates the fix in the two pieces that together are
+# ALL of the new logic, both fully testable without self-reference:
+#
+#   Group A: ai:tokens_accum_delta:sum / ai:cost_usd_accum_delta:sum -- the
+#     new per-session delta computation. This is the entire novel part of
+#     the fix (churn/reset/appearance robustness) and has NO self-reference,
+#     so it is fully, deterministically testable end-to-end.
+#
+#   Group B: the outer `(prior + delta) or prior or delta` sparse-addition
+#     combinator, proven standalone against stand-in "prior"/"delta" metrics
+#     (not the real self-referencing names) across all three partition
+#     cases (both present / prior-only / delta-only / both absent) plus the
+#     transitions between them. This is exactly the shape used for
+#     `ai:tokens_accum:sum := (max_over_time(ai:tokens_accum:sum[20m]) +
+#     ai:tokens_accum_delta:sum) or max_over_time(ai:tokens_accum:sum[20m])
+#     or ai:tokens_accum_delta:sum` in the real rule file, with
+#     `max_over_time(ai:tokens_accum:sum[20m])` (unresolvable here) standing
+#     in for the stub "prior" metric.
+#
+# Together, A + B cover 100% of the new rule's logic. The one thing they
+# cannot prove from inside this sandbox is the real multi-hour forward-latch
+# over actual wall-clock time against the live Prometheus -- that's the
+# live-proof the coordinator re-verifies post-deploy (both regimes), same as
+# the ticket's own Gherkin asks for.
+rule_files:
+  - recording-rules.yml
+
+evaluation_interval: 1m
+
+tests:
+  # =======================================================================
+  # Group A1: ai:tokens_accum_delta:sum -- burst regime, then quiet-below-
+  # peak regime (s1/s2 retire and go fully absent after t=10m; s3 keeps
+  # growing alone). This is the delta UNDER the accumulator -- what
+  # ai:tokens_accum:sum adds to itself every tick.
+  # =======================================================================
+  - interval: 1m
+    input_series:
+      - series: 'claude_code_token_usage_tokens_total{job="otel-collector",host_name="workerA",model="claude-sonnet-5",type="output",project="catalyst-otel",branch="OTL-87",linear_key="OTL-87",task_type="implement",account="acct1",phase="implement",session_id="s1"}'
+        values: "0+60x10"
+      - series: 'claude_code_token_usage_tokens_total{job="otel-collector",host_name="workerA",model="claude-sonnet-5",type="output",project="catalyst-otel",branch="OTL-87",linear_key="OTL-87",task_type="implement",account="acct1",phase="implement",session_id="s2"}'
+        values: "0+30x10"
+      - series: 'claude_code_token_usage_tokens_total{job="otel-collector",host_name="workerA",model="claude-sonnet-5",type="output",project="catalyst-otel",branch="OTL-87",linear_key="OTL-87",task_type="implement",account="acct1",phase="implement",session_id="s3"}'
+        values: "0+10x40"
+
+    promql_expr_test:
+      # Burst regime (t=1..10m): all three sessions ramping concurrently.
+      # Combined rate is 60+30+10=100/min, so delta should read 100 at any
+      # tick strictly inside the burst.
+      - expr: ai:tokens_accum_delta:sum{linear_key="OTL-87"}
+        eval_time: 3m
+        exp_samples:
+          - labels: 'ai:tokens_accum_delta:sum{host_name="workerA",model="claude-sonnet-5",type="output",project="catalyst-otel",branch="OTL-87",linear_key="OTL-87",task_type="implement",account="acct1",phase="implement"}'
+            value: 100
+
+      # THE BUG'S REGIME: t=15m, s1/s2 have been gone for 5 minutes (still
+      # well within their own 20m expiry window so no expiry weirdness yet)
+      # but are contributing NOTHING new -- only s3's continued growth
+      # should show up. This is the literal "delta > 0 matching actual burn
+      # during a quiet period after a larger historical peak" the ticket's
+      # second Gherkin demands, and the exact case the old max-latch rule
+      # reads as flat 0.
+      - expr: ai:tokens_accum_delta:sum{linear_key="OTL-87"}
+        eval_time: 15m
+        exp_samples:
+          - labels: 'ai:tokens_accum_delta:sum{host_name="workerA",model="claude-sonnet-5",type="output",project="catalyst-otel",branch="OTL-87",linear_key="OTL-87",task_type="implement",account="acct1",phase="implement"}'
+            value: 10
+
+      # Same assertion well past s1/s2's 20-minute expiry (t=35m) -- proves
+      # the fix doesn't merely delay the bug, it never reintroduces it: s3's
+      # lone +10/min keeps registering forever, independent of how long ago
+      # the historical peak happened.
+      - expr: ai:tokens_accum_delta:sum{linear_key="OTL-87"}
+        eval_time: 35m
+        exp_samples:
+          - labels: 'ai:tokens_accum_delta:sum{host_name="workerA",model="claude-sonnet-5",type="output",project="catalyst-otel",branch="OTL-87",linear_key="OTL-87",task_type="implement",account="acct1",phase="implement"}'
+            value: 10
+
+  # =======================================================================
+  # Group A2: brand-new session appearing MID-TEST already carrying an
+  # accumulated value (OTL-75's "short session's first sample already has
+  # accumulated tokens" case) -- must be credited in full, not treated as a
+  # 0 baseline that only counts growth AFTER the first sample.
+  # =======================================================================
+  - interval: 1m
+    input_series:
+      - series: 'claude_code_token_usage_tokens_total{job="otel-collector",host_name="workerC",model="claude-sonnet-5",type="output",project="catalyst-otel",branch="OTL-87",linear_key="OTL-87-new",task_type="implement",account="acct1",phase="implement",session_id="s4"}'
+        values: "_x24 50 60"
+
+    promql_expr_test:
+      # "_x24" is 24 absent samples at t=0..23; the first REAL sample lands
+      # at t=24 (value 50). First tick the new session is visible: full 50
+      # credited, not 0.
+      - expr: ai:tokens_accum_delta:sum{linear_key="OTL-87-new"}
+        eval_time: 24m
+        exp_samples:
+          - labels: 'ai:tokens_accum_delta:sum{host_name="workerC",model="claude-sonnet-5",type="output",project="catalyst-otel",branch="OTL-87",task_type="implement",linear_key="OTL-87-new",account="acct1",phase="implement"}'
+            value: 50
+      # Next tick: normal incremental tracking resumes (60-50=10).
+      - expr: ai:tokens_accum_delta:sum{linear_key="OTL-87-new"}
+        eval_time: 25m
+        exp_samples:
+          - labels: 'ai:tokens_accum_delta:sum{host_name="workerC",model="claude-sonnet-5",type="output",project="catalyst-otel",branch="OTL-87",task_type="implement",linear_key="OTL-87-new",account="acct1",phase="implement"}'
+            value: 10
+
+  # =======================================================================
+  # Group A3: same-session_id counter RESET (OTL-75's documented
+  # collector-expiry-then-resume-at-a-lower-value behavior). Must clamp to
+  # 0 on the drop tick (never subtract, never go negative). Recovery is
+  # NOT immediate, and that's expected, not a bug: `max_over_time(...[20m])`
+  # smooths over a 20-minute window for staleness-robustness (see the
+  # ai-canonical-running-total group's header comment), so the PRE-reset
+  # peak keeps dominating both sides of the subtraction (delta pinned at 0)
+  # until the resumed ramp organically re-exceeds that peak -- a bounded,
+  # self-healing undercount whose size is exactly the reset's drop, never a
+  # double-count and never permanent (contrast with the OLD rule, which
+  # would stay frozen until the ENTIRE FLEET-WIDE historical peak for this
+  # dims combo was re-exceeded, not just this one session's own pre-reset
+  # value).
+  # =======================================================================
+  - interval: 1m
+    input_series:
+      # Ramp +20/min to a peak of 100 at t=5, reset to 10 at t=6, then
+      # resume ramping +20/min from the new baseline.
+      - series: 'claude_code_token_usage_tokens_total{job="otel-collector",host_name="workerE",model="claude-sonnet-5",type="output",project="catalyst-otel",branch="OTL-87",linear_key="OTL-87-reset",task_type="implement",account="acct1",phase="implement",session_id="s5"}'
+        values: "0 20 40 60 80 100 10 30 50 70 90 110 130"
+
+    promql_expr_test:
+      # Pre-reset: normal +20/min tracking.
+      - expr: ai:tokens_accum_delta:sum{linear_key="OTL-87-reset"}
+        eval_time: 5m
+        exp_samples:
+          - labels: 'ai:tokens_accum_delta:sum{host_name="workerE",model="claude-sonnet-5",type="output",project="catalyst-otel",branch="OTL-87",linear_key="OTL-87-reset",task_type="implement",account="acct1",phase="implement"}'
+            value: 20
+      # The reset tick itself (100 -> 10): clamped to 0, not -90.
+      - expr: ai:tokens_accum_delta:sum{linear_key="OTL-87-reset"}
+        eval_time: 6m
+        exp_samples:
+          - labels: 'ai:tokens_accum_delta:sum{host_name="workerE",model="claude-sonnet-5",type="output",project="catalyst-otel",branch="OTL-87",linear_key="OTL-87-reset",task_type="implement",account="acct1",phase="implement"}'
+            value: 0
+      # t=10 (ramp value 90, still <= the pre-reset peak of 100): delta
+      # still pinned at 0 -- the 20-minute window still sees the old peak
+      # on both sides of the subtraction.
+      - expr: ai:tokens_accum_delta:sum{linear_key="OTL-87-reset"}
+        eval_time: 10m
+        exp_samples:
+          - labels: 'ai:tokens_accum_delta:sum{host_name="workerE",model="claude-sonnet-5",type="output",project="catalyst-otel",branch="OTL-87",linear_key="OTL-87-reset",task_type="implement",account="acct1",phase="implement"}'
+            value: 0
+      # t=11 (ramp value 110, now EXCEEDS the pre-reset peak of 100):
+      # current finally starts tracking the ramp again -- partial credit
+      # (110-100=10) on the crossing tick.
+      - expr: ai:tokens_accum_delta:sum{linear_key="OTL-87-reset"}
+        eval_time: 11m
+        exp_samples:
+          - labels: 'ai:tokens_accum_delta:sum{host_name="workerE",model="claude-sonnet-5",type="output",project="catalyst-otel",branch="OTL-87",linear_key="OTL-87-reset",task_type="implement",account="acct1",phase="implement"}'
+            value: 10
+      # t=12: fully recovered to normal +20/min tracking (130-110=20).
+      - expr: ai:tokens_accum_delta:sum{linear_key="OTL-87-reset"}
+        eval_time: 12m
+        exp_samples:
+          - labels: 'ai:tokens_accum_delta:sum{host_name="workerE",model="claude-sonnet-5",type="output",project="catalyst-otel",branch="OTL-87",linear_key="OTL-87-reset",task_type="implement",account="acct1",phase="implement"}'
+            value: 20
+
+  # =======================================================================
+  # Group A4: ai:cost_usd_accum_delta:sum mirrors the tokens construction
+  # (no `type` dim) -- one quiet-below-peak assertion to confirm the cost
+  # leg isn't a copy-paste mismatch.
+  # =======================================================================
+  - interval: 1m
+    input_series:
+      - series: 'claude_code_cost_usage_USD_total{job="otel-collector",host_name="workerD",model="claude-sonnet-5",project="catalyst-otel",branch="OTL-87",linear_key="OTL-87-cost",task_type="implement",account="acct1",phase="implement",session_id="c1"}'
+        values: "0+6x10"
+      - series: 'claude_code_cost_usage_USD_total{job="otel-collector",host_name="workerD",model="claude-sonnet-5",project="catalyst-otel",branch="OTL-87",linear_key="OTL-87-cost",task_type="implement",account="acct1",phase="implement",session_id="c2"}'
+        values: "0+1x40"
+
+    promql_expr_test:
+      - expr: ai:cost_usd_accum_delta:sum{linear_key="OTL-87-cost"}
+        eval_time: 25m
+        exp_samples:
+          - labels: 'ai:cost_usd_accum_delta:sum{host_name="workerD",model="claude-sonnet-5",project="catalyst-otel",branch="OTL-87",linear_key="OTL-87-cost",task_type="implement",account="acct1",phase="implement"}'
+            value: 1    # c1 retired (contributes 0), c2 alone still +1/min
+
+  # =======================================================================
+  # Group B: the outer sparse-addition combinator `(A+B) or A or B`, proven
+  # standalone against stub metrics standing in for "prior" (A) and "delta"
+  # (B) -- since promtool can't chain the real self-reference (see header),
+  # this proves the combining formula itself is correct in all partitions:
+  # both present, A-only (quiet ticket, carry prior forward), B-only
+  # (brand-new dims combo, bootstrap), both absent (no sample at all).
+  #   stub_prior{k="p1"}: real sample value=5 at t=0..9, then no more
+  #     samples (Prometheus's default 5m staleness lookback keeps it
+  #     resolvable through ~t=14, genuinely absent from ~t=15 on).
+  #   stub_delta{k="p1"}: no samples until t=4, real sample value=3 at
+  #     t=4..14, then no more (resolvable through ~t=19, gone by ~t=20).
+  # Eval times below are chosen with a comfortable margin either side of
+  # every 5-minute lookback boundary so the assertions aren't sensitive to
+  # the exact inclusive/exclusive edge.
+  # =======================================================================
+  - interval: 1m
+    input_series:
+      - series: 'stub_prior{k="p1"}'
+        values: "5x10"
+      - series: 'stub_delta{k="p1"}'
+        values: "_x4 3x11"
+
+    promql_expr_test:
+      # t=2m: prior-only (delta has no sample yet, not even via lookback)
+      # -> carry prior forward unchanged. The "or stub_prior" fallback
+      # returns stub_prior's own series verbatim, __name__ included --
+      # same shape the real rule's "or max_over_time(ai:tokens_accum:sum
+      # [20m])" fallback would produce.
+      - expr: (stub_prior + stub_delta) or stub_prior or stub_delta
+        eval_time: 2m
+        exp_samples:
+          - labels: 'stub_prior{k="p1"}'
+            value: 5
+      # t=8m: both present -> real sum.
+      - expr: (stub_prior + stub_delta) or stub_prior or stub_delta
+        eval_time: 8m
+        exp_samples:
+          - labels: '{k="p1"}'
+            value: 8
+      # t=16m: prior genuinely gone (last real sample t=9, 7 minutes ago,
+      # past the 5m lookback); delta still resolvable (last real sample
+      # t=14, 2 minutes ago) -> delta-only, bootstrap from delta.
+      - expr: (stub_prior + stub_delta) or stub_prior or stub_delta
+        eval_time: 16m
+        exp_samples:
+          - labels: 'stub_delta{k="p1"}'
+            value: 3
+      # t=25m: both long gone -> no sample at all (not a phantom 0).
+      - expr: (stub_prior + stub_delta) or stub_prior or stub_delta
+        eval_time: 25m
+        exp_samples: []
