@@ -75,13 +75,39 @@ groups:
     rules:
       # provider=anthropic: native claude_code_* token counter. `type` is
       # Claude's native label spelling; canonical dim is `token_type`.
+      #
+      # OTL-81: excludes model=~"^glm.*" -- GLM rides this SAME metric family
+      # (same OTel exporter, same Claude Code binary) but is a distinct
+      # provider lane split out below. IMPORTANT, verified live 2026-08-24:
+      # GLM series carry NO `account` label at all (checked
+      # `count by (account) (claude_code_token_usage_tokens_total)` --  only
+      # `account="acct6"` appears, GLM sessions have the label entirely
+      # absent). The ticket's/PR-brief's assumption that GLM is identified by
+      # `account="glm-coding"` is WRONG on this stack -- `model` is the only
+      # reliable discriminator (`glm-5.3[1m]`, `glm-5.2[1m]`, `glm-5.2`, ...).
       - record: ai:tokens:sum
         labels:
           provider: anthropic
         expr: |
           label_replace(
             sum by (model, type, project, branch, linear_key, task_type, catalyst_orchestration, account, phase) (
-              claude_code_token_usage_tokens_total
+              claude_code_token_usage_tokens_total{model!~"^glm.*"}
+            ),
+            "token_type", "$1", "type", "(.*)"
+          )
+
+      # provider=glm: same metric family as anthropic (Claude Code's own
+      # exporter), filtered to model=~"^glm.*". Token COUNTS here are
+      # accurate as reported -- only the $ price (ai:cost_usd:sum below) is
+      # wrong for this lane, which is why tokens and cost are split
+      # differently (tokens: raw counter is fine; cost: needs re-rating).
+      - record: ai:tokens:sum
+        labels:
+          provider: glm
+        expr: |
+          label_replace(
+            sum by (model, type, project, branch, linear_key, task_type, catalyst_orchestration, account, phase) (
+              claude_code_token_usage_tokens_total{model=~"^glm.*"}
             ),
             "token_type", "$1", "type", "(.*)"
           )
@@ -95,6 +121,23 @@ groups:
           provider: openai
         expr: |
           sum by (model, token_type) (codex_turn_token_usage_sum)
+
+      # provider=qwen: NOT YET EMITTING (OpenCode/Qwen lane -- OTL-80 tracks
+      # the qwencloud CLI wiring, key pending). Structural placeholder only:
+      # this expr matches zero series today and evaluates to no rows (a
+      # Prometheus recording rule on an absent metric is inert, not an
+      # error -- unlike a collector exporter, which crash-loops on an unmet
+      # dependency). Update the metric name once OpenCode's actual OTel
+      # exporter is confirmed (unverified today what family/service.name it
+      # would use) -- do not fabricate data before real telemetry lands.
+      # See dashboards/unified-dashboard.json's "Qwen Lane" text panel.
+      - record: ai:tokens:sum
+        labels:
+          provider: qwen
+        expr: |
+          sum by (model, token_type, project, branch, linear_key, task_type, account, phase) (
+            qwen_token_usage_tokens_total
+          )
 
   - name: ai-canonical-tool-calls
     interval: 1m
@@ -132,12 +175,48 @@ groups:
       # Codex's ESTIMATED-at-list-price figure lives only in dashboard
       # panels (Loki-sourced, labeled "estimated" in every title), never
       # under this recording-rule name.
+      #
+      # OTL-81: excludes model=~"^glm.*" -- see the ai:tokens:sum note above
+      # on why `model`, not `account="glm-coding"`, is the correct GLM
+      # discriminator on this stack.
       - record: ai:cost_usd:sum
         labels:
           provider: anthropic
         expr: |
           sum by (model, project, branch, linear_key, task_type, catalyst_orchestration, account, phase) (
-            claude_code_cost_usage_USD_total
+            claude_code_cost_usage_USD_total{model!~"^glm.*"}
+          )
+
+      # provider=glm: RE-RATED, not real, not estimated-at-list-price like
+      # Codex -- a third category. Claude Code's native
+      # claude_code_cost_usage_USD_total prices every session (GLM included)
+      # from its own Anthropic-protocol cost table; for a GLM session that
+      # number is measured (OTL-80) ~2.8x the true metered-equivalent price
+      # (~2.3x reproduced live against this recording rule's own 7d window,
+      # 2026-08-24: $48.54 raw vs $20.92 rerated). This leg recomputes cost
+      # from GLM's own token counts at GLM's AUTHORITATIVE first-party rates
+      # (docs.z.ai/guides/overview/pricing, fetched 2026-08-24) instead of
+      # trusting the native counter: GLM-5.3 = $1.40/M input, $0.26/M
+      # cached-input, $4.40/M output, NO separate cache-write fee (writes
+      # bill at the input rate, unlike Anthropic's 1.25x write premium).
+      # Applied uniformly to every model=~"^glm.*" series (5.3-only rate --
+      # 5-turbo/4.7 price differently per OTL-80's table; splitting by
+      # `model` is a follow-up once that matters for this fleet's mix). Like
+      # Codex's estimate, this is a list/metered-price PROXY, not a real
+      # charge -- GLM also runs on a flat $18/mo coding-plan subscription
+      # with no true per-token bill -- but it is the trustworthy per-lane
+      # figure for cost-comparison panels, unlike the raw native counter for
+      # this account, which must never be surfaced as GLM spend.
+      - record: ai:cost_usd:sum
+        labels:
+          provider: glm
+        expr: |
+          sum by (model, project, branch, linear_key, task_type, catalyst_orchestration, account, phase) (
+            (claude_code_token_usage_tokens_total{model=~"^glm.*", type=~"input|cacheCreation"} * 1.40 / 1e6)
+            or
+            (claude_code_token_usage_tokens_total{model=~"^glm.*", type="cacheRead"} * 0.26 / 1e6)
+            or
+            (claude_code_token_usage_tokens_total{model=~"^glm.*", type="output"} * 4.40 / 1e6)
           )
 
   # ---------------------------------------------------------------------

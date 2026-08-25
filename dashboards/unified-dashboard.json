@@ -2629,7 +2629,7 @@
           },
           "gridPos": {
             "h": 8,
-            "w": 24,
+            "w": 18,
             "x": 0,
             "y": 104
           },
@@ -2641,7 +2641,7 @@
                 "uid": "prometheus"
               },
               "editorMode": "code",
-              "expr": "count(claude_code_token_usage_tokens_total{linear_key=\"\"})\n/ scalar(count(claude_code_token_usage_tokens_total))",
+              "expr": "count(claude_code_token_usage_tokens_total{catalyst_orchestration=\"relay\", linear_key=\"\"})\n/ scalar(count(claude_code_token_usage_tokens_total{catalyst_orchestration=\"relay\"}) > 0 or vector(1))",
               "legendFormat": "unattributed fraction",
               "instant": false,
               "range": true
@@ -2683,7 +2683,71 @@
               "placement": "bottom"
             }
           },
-          "description": "OTL-67: Fraction of live claude_code_* series with no linear_key. Above 0.5 for 15m triggers the claude_code_attribution_missing alert. Healthy: 0 (all series attributed). See docs/runbook-otl-67-attribution.md."
+          "description": "OTL-67: Fraction of live claude_code_* series DISPATCHED VIA RELAY (catalyst_orchestration=\"relay\") that carry no linear_key. Rescoped 2026-08-24 (OTL-81 investigation): interactive/concierge sessions and in-process Agent-tool subagents structurally never carry a single ticket's linear_key (they are not relay-dispatched and often span many tickets) and were inflating this ratio to 40-60% overnight even though the relay-dispatch path itself was 100% attributed the whole time (verified live: every catalyst_orchestration=\"relay\" series in the 2026-08-24 18:30-21:20 CT window had a non-empty linear_key). This panel and the claude_code_attribution_missing alert now measure only the population the OTL-67 fix actually targets. See the companion 'Interactive / Non-Relay Session Volume' stat and docs/runbook-otl-67-attribution.md addendum."
+        },
+        {
+          "id": 230,
+          "title": "Interactive / Non-Relay Session Volume",
+          "type": "stat",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 6,
+            "x": 18,
+            "y": 104
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "editorMode": "code",
+              "expr": "count(count by (session_id) (claude_code_token_usage_tokens_total{catalyst_orchestration=\"\"}))",
+              "legendFormat": "interactive sessions",
+              "instant": true,
+              "range": false
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "decimals": 0,
+              "color": {
+                "mode": "thresholds"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "blue",
+                    "value": null
+                  }
+                ]
+              },
+              "mappings": []
+            },
+            "overrides": []
+          },
+          "options": {
+            "colorMode": "background_solid",
+            "graphMode": "area",
+            "justifyMode": "center",
+            "orientation": "auto",
+            "textMode": "value_and_name",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "values": false,
+              "fields": ""
+            }
+          },
+          "description": "OTL-81: count of distinct session_id with NO catalyst_orchestration label (concierge/interactive sessions, and Agent-tool subagents dispatched in-process \u2014 NOT relay-dispatched workers). These sessions are, by design, not scoped to one Linear ticket, so they never carry linear_key. Excluded from the Attribution Health denominator (panel 208) for that reason \u2014 this stat exists so a growing interactive/subagent share of the fleet mix is visible instead of silently discounted. See docs/runbook-otl-67-attribution.md addendum, 2026-08-24."
         }
       ]
     },
@@ -6155,6 +6219,612 @@
         "x": 12,
         "y": 47
       }
+    },
+    {
+      "id": 213,
+      "type": "row",
+      "title": "\u2464 Provider Lanes (Claude \u00b7 GLM \u00b7 Codex \u00b7 Qwen)",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 113
+      },
+      "panels": [],
+      "description": "OTL-81: cross-provider rollup. Claude + GLM ride the same claude_code_* metric family (GLM identified by model=~\"^glm\" \u2014 verified live 2026-08-24 this account carries NO `account` label, contradicting the ticket's account=\"glm-coding\" assumption; use the model regex, not account). Codex (openai) emits its own codex_* metric family / service_name=codex_exec, no real cost telemetry. Qwen not yet emitting (OTL-80 tracks the qwencloud CLI wiring) \u2014 structural placeholder only, see the text panel below and the ai:tokens:sum{provider=\"qwen\"} recording-rule leg in provisioning/prometheus/recording-rules.yml."
+    },
+    {
+      "id": 220,
+      "type": "stat",
+      "title": "Codex Turns",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 114
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "sum(count_over_time({service_name=~\"codex.*\"} | event_name=\"codex.turn_ttft\" [$__range]))",
+          "legendFormat": "Turns",
+          "instant": false,
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#73BF69",
+                "value": null
+              }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background_solid",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "textMode": "value_and_name",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false,
+          "fields": ""
+        }
+      },
+      "description": "Codex conversation turns fleet-wide. Loki count_over_time (NOT Prometheus increase() \u2014 native codex_* counters expire at metric_expiration:15m and a short/idle session reads zero under increase()). Matches dashboards/codex-usage.json's Turns KPI convention."
+    },
+    {
+      "id": 221,
+      "type": "stat",
+      "title": "Codex Tool Calls",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 114
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "sum(count_over_time({service_name=~\"codex.*\"} | event_name=\"codex.tool_result\" [$__range]))",
+          "legendFormat": "Tool Calls",
+          "instant": false,
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#FF9830",
+                "value": null
+              }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background_solid",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "textMode": "value_and_name",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false,
+          "fields": ""
+        }
+      },
+      "description": "Codex tool-call events fleet-wide, Loki count_over_time. See dashboards/codex-usage.json Tool Calls KPI."
+    },
+    {
+      "id": 222,
+      "type": "stat",
+      "title": "Codex Threads",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 114
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "sum(count_over_time({service_name=~\"codex.*\"} | event_name=\"codex.conversation_starts\" [$__range]))",
+          "legendFormat": "Threads",
+          "instant": false,
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#5794F2",
+                "value": null
+              }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background_solid",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "textMode": "value_and_name",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false,
+          "fields": ""
+        }
+      },
+      "description": "Codex conversations started fleet-wide, Loki count_over_time. See dashboards/codex-usage.json Threads KPI."
+    },
+    {
+      "id": 223,
+      "type": "stat",
+      "title": "GLM Spend (Rerated, Imputed \u2014 OTL-80 5.3 rates)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 114
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum((max_over_time(claude_code_token_usage_tokens_total{model=~\"^glm.*\", type=~\"input|cacheCreation\"}[$__range]) * 1.40 / 1e6) or (max_over_time(claude_code_token_usage_tokens_total{model=~\"^glm.*\", type=\"cacheRead\"}[$__range]) * 0.26 / 1e6) or (max_over_time(claude_code_token_usage_tokens_total{model=~\"^glm.*\", type=\"output\"}[$__range]) * 4.40 / 1e6) or vector(0))",
+          "legendFormat": "GLM (rerated)",
+          "editorMode": "code",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 2,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background_solid",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "textMode": "value_and_name",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false,
+          "fields": ""
+        }
+      },
+      "description": "OTL-80 authoritative first-party rates (docs.z.ai/guides/overview/pricing, fetched 2026-08-24): GLM-5.3 = $1.40/M input, $0.26/M cached-input, $4.40/M output, no separate cache-write fee (writes bill at the input rate). Applied uniformly to every model=~\"^glm.*\" series on this account (5.3-only rate \u2014 5-turbo/4.7 price differently per OTL-80, follow-up to split by model). This is the TRUSTWORTHY GLM dollar figure \u2014 use this, never the raw claude_code_cost_usage_USD_total for a glm model (see the panel beside this one)."
+    },
+    {
+      "id": 224,
+      "type": "stat",
+      "title": "GLM Spend (Raw, Client-Reported \u2014 reference only, ~2.3\u20132.8\u00d7 HIGH)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 114
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(max_over_time(claude_code_cost_usage_USD_total{model=~\"^glm.*\"}[$__range]) or vector(0))",
+          "legendFormat": "GLM (raw, DO NOT USE)",
+          "editorMode": "code",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 2,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background_solid",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "textMode": "value_and_name",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false,
+          "fields": ""
+        }
+      },
+      "description": "DO NOT report this number as GLM spend. Claude Code prices GLM sessions from its own Anthropic-protocol cost table, which OTL-80 measured at ~2.8x the true metered-equivalent rate on a probe request (~2.3x measured live against this dashboard's own 7d window 2026-08-24: $48.54 raw vs $20.92 rerated). Shown here ONLY so the gap between raw and rerated is visible side by side \u2014 the panel to the left is the number to use."
+    },
+    {
+      "id": 225,
+      "type": "timeseries",
+      "title": "Tokens by Provider (Claude \u00b7 GLM \u00b7 Codex)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 118
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (provider) (max_over_time(ai:tokens:sum[$__interval]))",
+          "legendFormat": "{{provider}}",
+          "instant": false,
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "stacking": {
+              "mode": "none"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        },
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "max",
+            "mean",
+            "sum"
+          ]
+        }
+      },
+      "description": "Cross-provider token volume via the ai:tokens:sum canonical recording rule (provisioning/prometheus/recording-rules.yml): provider=anthropic (real Claude, model!~\"^glm\"), provider=glm (model=~\"^glm\", split out 2026-08-24 for OTL-81), provider=openai (Codex_Desktop/app-server native token metric only \u2014 codex_exec headless emits no Prometheus token-usage series, see the recording-rules.yml header note). provider=qwen is a structural placeholder \u2014 its series appear automatically once Qwen telemetry exists (OTL-80)."
+    },
+    {
+      "id": 226,
+      "type": "timeseries",
+      "title": "Real + Rerated Spend by Provider (Claude \u00b7 GLM)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 118
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (provider) (max_over_time(ai:cost_usd:sum[$__interval]))",
+          "legendFormat": "{{provider}}",
+          "instant": false,
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "stacking": {
+              "mode": "none"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        },
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "max",
+            "mean",
+            "sum"
+          ]
+        }
+      },
+      "description": "provider=anthropic is REAL dollars (native claude_code_cost_usage_USD_total, model!~\"^glm\"). provider=glm is RERATED (OTL-80 authoritative rates, never the raw client-reported figure \u2014 see the recording rule comment). Codex is deliberately absent here: it has no real cost telemetry (see the Codex Estimated Spend panel, which is list-price and Loki-sourced \u2014 never blended into this Prometheus-sourced real+rerated panel)."
+    },
+    {
+      "id": 227,
+      "type": "stat",
+      "title": "Codex Estimated Spend (API List Price, All Models)",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 126
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "(((sum(sum_over_time({service_name=\"codex_exec\"} | event_name=\"codex.sse_event\" | model=\"gpt-5.6-sol\" | unwrap input_token_count [$__range])) or vector(0)) - (sum(sum_over_time({service_name=\"codex_exec\"} | event_name=\"codex.sse_event\" | model=\"gpt-5.6-sol\" | unwrap cached_token_count [$__range])) or vector(0))) * 0.000004 + (sum(sum_over_time({service_name=\"codex_exec\"} | event_name=\"codex.sse_event\" | model=\"gpt-5.6-sol\" | unwrap cached_token_count [$__range])) or vector(0)) * 0.0000004 + (sum(sum_over_time({service_name=\"codex_exec\"} | event_name=\"codex.sse_event\" | model=\"gpt-5.6-sol\" | unwrap output_token_count [$__range])) or vector(0)) * 0.00002) + (((sum(sum_over_time({service_name=\"codex_exec\"} | event_name=\"codex.sse_event\" | model=\"gpt-5.6-terra\" | unwrap input_token_count [$__range])) or vector(0)) - (sum(sum_over_time({service_name=\"codex_exec\"} | event_name=\"codex.sse_event\" | model=\"gpt-5.6-terra\" | unwrap cached_token_count [$__range])) or vector(0))) * 0.000002 + (sum(sum_over_time({service_name=\"codex_exec\"} | event_name=\"codex.sse_event\" | model=\"gpt-5.6-terra\" | unwrap cached_token_count [$__range])) or vector(0)) * 0.0000002 + (sum(sum_over_time({service_name=\"codex_exec\"} | event_name=\"codex.sse_event\" | model=\"gpt-5.6-terra\" | unwrap output_token_count [$__range])) or vector(0)) * 0.000012) + (((sum(sum_over_time({service_name=\"codex_exec\"} | event_name=\"codex.sse_event\" | model=\"gpt-5.6-luna\" | unwrap input_token_count [$__range])) or vector(0)) - (sum(sum_over_time({service_name=\"codex_exec\"} | event_name=\"codex.sse_event\" | model=\"gpt-5.6-luna\" | unwrap cached_token_count [$__range])) or vector(0))) * 0.0000002 + (sum(sum_over_time({service_name=\"codex_exec\"} | event_name=\"codex.sse_event\" | model=\"gpt-5.6-luna\" | unwrap cached_token_count [$__range])) or vector(0)) * 0.00000002 + (sum(sum_over_time({service_name=\"codex_exec\"} | event_name=\"codex.sse_event\" | model=\"gpt-5.6-luna\" | unwrap output_token_count [$__range])) or vector(0)) * 0.0000012)",
+          "legendFormat": "Codex (estimated)",
+          "instant": false,
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 2,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#5794F2",
+                "value": null
+              }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background_solid",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "textMode": "value_and_name",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false,
+          "fields": ""
+        }
+      },
+      "description": "CALCULATED at OpenAI's published API list price (provisioning/prometheus/codex-price-table.md), summed across all three observed models (gpt-5.6-sol / -terra / -luna, each leg guarded with `or vector(0)` so a model with zero traffic in the window doesn't null out the sum via vector-matching \u2014 extends dashboards/codex-usage.json's Cost (calculated) panel, which prices sol only; this fleet's live traffic 2026-08-24 is on gpt-5.6-terra per the CTC-981 control run, so the sol-only figure there under-counts). This laptop's Codex runs on a ChatGPT Plan Pro SUBSCRIPTION with NO real cost/credit telemetry (verified: rollout JSONL, OTLP feed, OpenAI Costs API all checked negative, see codex-price-table.md) \u2014 this is a list-price proxy for relative usage weight, never a real charge. Never summed with the Claude/GLM real+rerated panel."
+    },
+    {
+      "id": 228,
+      "type": "table",
+      "title": "Subscription Limit Windows \u2014 All Providers",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 126
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "ai_subscription_limit_used_percent",
+          "format": "table",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "custom": {
+            "align": "auto",
+            "displayMode": "color-background"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 50
+              },
+              {
+                "color": "red",
+                "value": 85
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true
+      },
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "environment": true,
+              "exported_job": true,
+              "instance": true,
+              "job": true,
+              "otel_scope_name": true,
+              "service_name": true
+            },
+            "renameByName": {
+              "Value": "used_pct"
+            }
+          }
+        }
+      ],
+      "description": "ai_subscription_limit_used_percent (collector signal_to_metrics rule, fed by scripts/ai-subscription-limit-scraper.sh) already carries all three lanes (verified live 2026-08-24): provider=anthropic \u00d7 account=acct1..6 (5h+7d), provider=glm \u00d7 account=glm-coding-pro (5h+7d), provider=openai \u00d7 account=codex-<chatgpt-account-id> (7d only \u2014 no 5h window observed for this plan). Qwen has no scraper yet \u2014 OTL-80 has the qwencloud CLI recipe (`qwencloud usage summary --format json`), not yet wired."
+    },
+    {
+      "id": 229,
+      "type": "text",
+      "title": "Qwen Lane \u2014 Not Yet Emitting",
+      "gridPos": {
+        "h": 4,
+        "w": 24,
+        "x": 0,
+        "y": 134
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "### Qwen (OpenCode) \u2014 no telemetry today\n\nQwen is interactive-only via OpenCode and emits **no telemetry into this stack** as of 2026-08-24 \u2014 zero `qwen_*`/`opencode_*` series in Prometheus, no `service_name=~\"qwen.*|opencode.*\"` streams in Loki (checked live). This is a **structural placeholder**, not a stale panel: `ai:tokens:sum{provider=\"qwen\"}` and `ai:cost_usd:sum` legs exist in `provisioning/prometheus/recording-rules.yml` today (inert \u2014 match zero series until real data lands), and the Tokens/Spend-by-Provider panels above already group by `provider`, so Qwen appears automatically once telemetry starts, no dashboard edit required.\n\n**To light this up:**\n1. Wire `qwencloud auth login` (account-level keychain, not the model key \u2014 zero ToS exposure) and the `qwencloud usage summary --format json` poll into `scripts/ai-subscription-limit-scraper.sh` alongside the existing claude/codex/glm scrapers \u2014 recipe + verified endpoint shape on **OTL-80**.\n2. Confirm what OpenCode's actual OTel exporter emits (metric family name, service.name) \u2014 unverified; update the recording-rule metric names in `recording-rules.yml` from the placeholder once real series are observed.\n\nCredit formula for Qwen is **not published** (dynamic, hidden consumption items per OTL-80 research) \u2014 client-side cost estimation is not viable there the way it is for GLM; the limit-window scrape is the only trustworthy Qwen usage signal available."
+      },
+      "description": "OTL-81 acceptance: 'the Qwen lane's series appear automatically once Qwen telemetry first arrives' \u2014 satisfied structurally (recording-rule leg + provider-grouped panels), not by fabricating data."
     }
   ],
   "refresh": "30s",
