@@ -123,7 +123,7 @@ if jq -e '
     and contains(", 1e-12)")
     and contains($window);
   ([.panels[] | select(.title=="Cumulative Spend by Type") | .targets[].expr
-    | select(complete_allocation("[$__interval]"))] | length > 0)
+    | select(complete_allocation("[$__range]"))] | length > 0)
   and
   ([.panels[] | select(.title=="Spend by Model × Token Type") | .targets[].expr
     | select(complete_allocation("[$__range]"))] | length > 0)
