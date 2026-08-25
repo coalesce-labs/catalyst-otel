@@ -398,7 +398,8 @@
           "displayMode": "table",
           "placement": "right",
           "calcs": [
-            "sum"
+            "lastNotNull",
+            "max"
           ],
           "showLegend": true,
           "width": 240,
@@ -474,7 +475,8 @@
           "displayMode": "table",
           "placement": "right",
           "calcs": [
-            "sum"
+            "lastNotNull",
+            "max"
           ],
           "showLegend": true,
           "width": 240,
@@ -596,7 +598,8 @@
           "displayMode": "table",
           "placement": "right",
           "calcs": [
-            "sum"
+            "lastNotNull",
+            "max"
           ],
           "showLegend": true,
           "width": 240,
@@ -733,7 +736,8 @@
           "displayMode": "table",
           "placement": "right",
           "calcs": [
-            "sum"
+            "lastNotNull",
+            "max"
           ],
           "showLegend": true,
           "width": 240,
@@ -824,6 +828,10 @@
             "legend": {
               "displayMode": "table",
               "placement": "right",
+              "calcs": [
+                "lastNotNull",
+                "max"
+              ],
               "showLegend": true,
               "width": 240
             },
@@ -832,20 +840,7 @@
               "sort": "none"
             }
           },
-          "transformations": [
-            {
-              "id": "calculateField",
-              "options": {
-                "mode": "cumulativeFunctions",
-                "cumulative": {
-                  "field": "Cost",
-                  "reducer": "sum"
-                },
-                "replaceFields": true
-              }
-            }
-          ],
-          "description": "Aggregated with max_over_time, not increase: these counters are cumulative PER SESSION (every series carries session_id) and expire 15m after their last sample, so increase() would treat a short session's first sample as its baseline and undercount. See OTL-75."
+          "description": "Aggregated with max_over_time, not increase: these counters are cumulative PER SESSION (every series carries session_id) and expire 15m after their last sample, so increase() would treat a short session's first sample as its baseline and undercount. See OTL-75. OTL-82: dropped the calculateField/cumulativeFunctions transform — the query already returns a running-total curve via max_over_time, so applying a second cumulative-sum on top double-counted (a genuinely quadratic-growth curve, not just a legend mismatch)."
         },
         {
           "id": 31,
@@ -969,6 +964,10 @@
             "legend": {
               "displayMode": "table",
               "placement": "right",
+              "calcs": [
+                "lastNotNull",
+                "max"
+              ],
               "showLegend": true,
               "width": 240
             },
@@ -977,64 +976,7 @@
               "sort": "desc"
             }
           },
-          "transformations": [
-            {
-              "id": "calculateField",
-              "options": {
-                "mode": "cumulativeFunctions",
-                "cumulative": {
-                  "field": "input",
-                  "reducer": "sum"
-                },
-                "replaceFields": false
-              }
-            },
-            {
-              "id": "calculateField",
-              "options": {
-                "mode": "cumulativeFunctions",
-                "cumulative": {
-                  "field": "output",
-                  "reducer": "sum"
-                },
-                "replaceFields": false
-              }
-            },
-            {
-              "id": "calculateField",
-              "options": {
-                "mode": "cumulativeFunctions",
-                "cumulative": {
-                  "field": "cacheRead",
-                  "reducer": "sum"
-                },
-                "replaceFields": false
-              }
-            },
-            {
-              "id": "calculateField",
-              "options": {
-                "mode": "cumulativeFunctions",
-                "cumulative": {
-                  "field": "cacheCreation",
-                  "reducer": "sum"
-                },
-                "replaceFields": false
-              }
-            },
-            {
-              "id": "organize",
-              "options": {
-                "excludeByName": {
-                  "input": true,
-                  "output": true,
-                  "cacheRead": true,
-                  "cacheCreation": true
-                }
-              }
-            }
-          ],
-          "description": "Aggregated with max_over_time, not increase: these counters are cumulative PER SESSION (every series carries session_id) and expire 15m after their last sample, so increase() would treat a short session's first sample as its baseline and undercount. See OTL-75."
+          "description": "Aggregated with max_over_time, not increase: these counters are cumulative PER SESSION (every series carries session_id) and expire 15m after their last sample, so increase() would treat a short session's first sample as its baseline and undercount. See OTL-75. OTL-82: dropped the calculateField/cumulativeFunctions transforms (one per field: input/output/cacheRead/cacheCreation) plus the organize transform that hid the originals \u2014 the query already returns a running-total curve via max_over_time, so summing it again per field double-counted (a genuinely quadratic-growth curve, not just a legend mismatch)."
         }
       ]
     },
@@ -1549,7 +1491,8 @@
               "displayMode": "table",
               "placement": "right",
               "calcs": [
-                "sum"
+                "lastNotNull",
+                "max"
               ],
               "showLegend": true,
               "sortBy": "Total",
@@ -1686,7 +1629,8 @@
               "displayMode": "table",
               "placement": "right",
               "calcs": [
-                "sum"
+                "lastNotNull",
+                "max"
               ],
               "showLegend": true,
               "sortBy": "Total",
@@ -3577,7 +3521,8 @@
               "showLegend": true,
               "width": 240,
               "calcs": [
-                "sum"
+                "lastNotNull",
+                "max"
               ]
             },
             "tooltip": {
@@ -3655,7 +3600,8 @@
               "showLegend": true,
               "width": 240,
               "calcs": [
-                "sum"
+                "lastNotNull",
+                "max"
               ]
             },
             "tooltip": {
@@ -4811,7 +4757,8 @@
           "displayMode": "table",
           "placement": "right",
           "calcs": [
-            "sum"
+            "lastNotNull",
+            "max"
           ],
           "showLegend": true,
           "width": 240,
@@ -4948,7 +4895,8 @@
           "displayMode": "table",
           "placement": "right",
           "calcs": [
-            "sum"
+            "lastNotNull",
+            "max"
           ],
           "showLegend": true,
           "width": 240,
@@ -6601,9 +6549,8 @@
           "displayMode": "table",
           "placement": "bottom",
           "calcs": [
-            "max",
-            "mean",
-            "sum"
+            "lastNotNull",
+            "max"
           ]
         }
       },
@@ -6659,9 +6606,8 @@
           "displayMode": "table",
           "placement": "bottom",
           "calcs": [
-            "max",
-            "mean",
-            "sum"
+            "lastNotNull",
+            "max"
           ]
         }
       },
