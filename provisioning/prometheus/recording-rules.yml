@@ -327,3 +327,110 @@ groups:
       - record: ai:phase_completions:sum
         expr: |
           sum by (phase, provider, model, outcome, account) (ai_phase_completion_total)
+
+  # ---------------------------------------------------------------------
+  # OTL-82 recording-rules round / OTL-83 (Ryan-directed, 2026-08-25): a
+  # genuinely monotonic, forward-latching accumulator for
+  # claude_code_token_usage_tokens_total and claude_code_cost_usage_USD_total
+  # -- built to close two gaps the query-time-only fixes in this PR's earlier
+  # commits (r2-r4) could not close on their own:
+  #
+  #   (a) The "per Interval" bucket-delta panels' legend Total needs to equal
+  #       the stat tiles' sum(max_over_time(counter[$__range])) figure. The
+  #       previous construction (OTL-82-r4: clamp_min(this bucket's
+  #       max_over_time - previous bucket's max_over_time, 0), both terms
+  #       independently re-evaluated against the RAW per-session counter at
+  #       query time) measured tokens within ~3-4% and cost within ~6-13%,
+  #       depending on bucket width and live fleet churn -- see the r4 panel
+  #       descriptions for the numbers. That error came from re-deriving each
+  #       term independently from a volatile, staleness-prone raw counter on
+  #       every dashboard query; two independent query-time evaluations of
+  #       (nearly) the same window over churning per-session series don't
+  #       agree exactly. Subtracting ONE exact, pre-computed, already-
+  #       monotonic series from itself (accum(t) - accum(t - $__interval)) is
+  #       a straightforward telescoping identity with no reconciliation
+  #       error: sum(all bucket deltas across a range) = accum(end) -
+  #       accum(start - $__interval) by construction, not by measurement.
+  #   (b) OTL-83: the OTL-82-r3/current "Cumulative" row (panels 261-264)
+  #       anchors to the dashboard's own start via `@ ${__from:date:seconds}`
+  #       (closes Codex's original P1 finding -- no more pre-loaded first
+  #       point), and matches the true window total exactly at the FINAL
+  #       point -- but the curve can still dip mid-chart: `max_over_time(raw
+  #       counter[$__range])` is a MOVING window that slides forward with
+  #       each rendered timestamp t, so a session that ages past its 15m
+  #       expiry (OTL-75) relative to t can silently drop out of that specific
+  #       t's window even though it was captured at an earlier t. No amount of
+  #       query-time window tuning against the raw counter can close this --
+  #       OTL-83's own "Fix shape" note calls for "a backend recording rule
+  #       that accumulates per-session peaks forward permanently (state
+  #       carried outside the query window)". That's what this group is.
+  #
+  # MECHANISM: self-referential recording rule (a standard Prometheus
+  # "ratchet" pattern). Each 1m tick:
+  #   current = sum by (dims) (max_over_time(raw_counter[20m]))
+  #   prior   = max_over_time(this_same_rule_name[20m])
+  #   this_rule := max by (dims) (prior or current)
+  # `or` concatenates the prior and current vectors (identical label sets);
+  # `max by (dims)` then reduces any duplicate label-set pairs down to their
+  # elementwise max -- i.e. "whichever of prior-recorded-value or freshly-
+  # observed-value is larger, per series". The 20m self-lookback is
+  # comfortably wider than both the raw counters' ~15m per-session expiry
+  # (OTL-75) and this rule's own 1m eval cadence, so: (1) a session's peak is
+  # captured by `current` before it ages out of the RAW counter's own
+  # staleness window, and (2) once captured, the rule's OWN prior value is
+  # re-found and re-latched forward on every subsequent tick (each new
+  # recorded sample is itself well within reach of the next tick's 20m
+  # self-lookback), so the accumulated peak persists across gaps indefinitely
+  # instead of being re-derived from a bounded query window each time. This
+  # is genuinely monotonic non-decreasing by construction (each tick can only
+  # take the max of what it already had and what it just saw) -- not merely
+  # measured to dip less often, which is what distinguishes this from every
+  # earlier attempt in this PR's history.
+  #
+  # DIMS: the union of every label the 13 native-counter "per Interval" /
+  # "Cumulative" dashboard panels this round converts group by (host_name /
+  # hostname -- alternate, mutually-exclusive spellings already reconciled
+  # downstream by the same label_replace("display", ...) pattern those panels
+  # used before this change; model; type; project; branch; linear_key;
+  # task_type; account; phase). Same label set already present on the raw
+  # counters -- this renames/re-aggregates already-native series, same as
+  # every other rule in this file; it does not introduce new label
+  # cardinality (see the ai:tokens:sum header note above).
+  #
+  # OUT OF SCOPE for this conversion (left on the raw counters, unconverted,
+  # deliberately): "Spend per Interval by Type" (id 210) and "Spend by Model
+  # x Token Type" (id 212) do a WEIGHTED ALLOCATION of native per-model cost
+  # across token-type proportions (input=1, output=5, cacheRead=.1,
+  # cacheCreation=2) -- a synthetic split, not a straight per-series
+  # accumulation, and scripts/validate-dashboard.sh's OTL-71 assertions
+  # literally grep those two panels' exprs for the raw counter names and the
+  # weight multipliers; converting them is a separate, riskier change than
+  # this round's scope. "Pull Requests per Interval" / "Commits per Interval"
+  # (id 90/91) are a different metric family (GitHub events) entirely, not
+  # token/cost counters. "Model Mix (Cost/Tokens)" piecharts (id 12/13) and
+  # the "Tokens/Spend by Model x Token Type" tables (id 211/212) are
+  # unaffected -- left on their existing $__range-windowed raw-counter
+  # queries.
+  # ---------------------------------------------------------------------
+  - name: ai-canonical-running-total
+    interval: 1m
+    rules:
+      - record: ai:tokens_accum:sum
+        expr: |
+          max by (host_name, hostname, model, type, project, branch, linear_key, task_type, account, phase) (
+            (max_over_time(ai:tokens_accum:sum[20m]))
+            or
+            (sum by (host_name, hostname, model, type, project, branch, linear_key, task_type, account, phase) (
+              max_over_time(claude_code_token_usage_tokens_total{job="otel-collector"}[20m])
+            ))
+          )
+
+      - record: ai:cost_usd_accum:sum
+        expr: |
+          max by (host_name, hostname, model, project, branch, linear_key, task_type, account, phase) (
+            (max_over_time(ai:cost_usd_accum:sum[20m]))
+            or
+            (sum by (host_name, hostname, model, project, branch, linear_key, task_type, account, phase) (
+              max_over_time(claude_code_cost_usage_USD_total{job="otel-collector"}[20m])
+            ))
+          )

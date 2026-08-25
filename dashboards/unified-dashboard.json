@@ -338,7 +338,7 @@
     },
     {
       "id": 76,
-      "title": "Cumulative Spend by Host",
+      "title": "Spend per Interval by Host",
       "type": "timeseries",
       "gridPos": {
         "h": 7,
@@ -352,7 +352,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (display) (label_replace(label_replace(sum by (host_name, hostname) (max_over_time(claude_code_cost_usage_USD_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"}[$__interval])), \"display\", \"$1\", \"hostname\", \"(.+)\"), \"display\", \"$1\", \"host_name\", \"(.+)\"))",
+          "expr": "sum by (display) (label_replace(label_replace(sum by (host_name, hostname) (clamp_min(ai:cost_usd_accum:sum{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"} - ((ai:cost_usd_accum:sum{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"} offset $__interval) or (ai:cost_usd_accum:sum{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"} * 0)), 0)), \"display\", \"$1\", \"hostname\", \"(.+)\"), \"display\", \"$1\", \"host_name\", \"(.+)\"))",
           "legendFormat": "{{display}}",
           "refId": "A",
           "interval": "$bucket"
@@ -399,7 +399,8 @@
           "placement": "right",
           "calcs": [
             "lastNotNull",
-            "max"
+            "max",
+            "sum"
           ],
           "showLegend": true,
           "width": 240,
@@ -411,11 +412,11 @@
           "sort": "desc"
         }
       },
-      "description": "$ spent per time bucket, grouped by canonical host_name (falls back to the machine's hostname when host_name is not set). Shows which hosts are actively spending. Note: only hosts with the OTel context configured emit the canonical host_name (e.g. laptop); others appear under their FQDN. Aggregated with max_over_time, not increase: these counters are cumulative PER SESSION (every series carries session_id) and expire 15m after their last sample, so increase() would treat a short session's first sample as its baseline and undercount. See OTL-75."
+      "description": "$ spent per time bucket, grouped by canonical host_name (falls back to the machine's hostname when host_name is not set). Shows which hosts are actively spending. Note: only hosts with the OTel context configured emit the canonical host_name (e.g. laptop); others appear under their FQDN. Aggregated with max_over_time, not increase: these counters are cumulative PER SESSION (every series carries session_id) and expire 15m after their last sample, so increase() would treat a short session's first sample as its baseline and undercount. See OTL-75. OTL-82 recording-rules round (Ryan-directed): each point is the amount accrued IN THAT INTERVAL BUCKET, computed as accum(t) - accum(t - $__interval) against a genuinely monotonic, forward-latching Prometheus recording rule (ai:tokens_accum:sum / ai:cost_usd_accum:sum -- see provisioning/prometheus/recording-rules.yml's \"ai-canonical-running-total\" group) instead of re-deriving the delta from the raw per-session counter at query time on every dashboard load. Because it's ONE exact series subtracted from itself (not two independent max_over_time evaluations of a volatile raw counter, which is what produced OTL-82-r4's measured 3-4% token / 6-15% cost reconciliation error), the sum of all rendered bucket deltas telescopes EXACTLY to accum(end) - accum(start - $__interval) -- no reconciliation error, by construction rather than by measurement, so the legend Total now agrees with the stat tile for the same window. Legend still shows Latest / Peak / Total (Grafana's built-in lastNotNull / max / sum reducers -- rendered as \"Last *\" / \"Max\" / \"Total\"). HONEST LIMITATION: the accumulator only knows about activity from the moment it was deployed forward -- a dashboard window that starts before the rule's own deployment reads Total as everything captured since deployment, not the true pre-deployment history (the same characteristic every other canonical ai:* recording rule in this file already has). See the OTL-82/OTL-83 PR thread for the live-proof numbers."
     },
     {
       "id": 77,
-      "title": "Cumulative Tokens by Host",
+      "title": "Tokens per Interval by Host",
       "type": "timeseries",
       "gridPos": {
         "h": 7,
@@ -429,7 +430,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (display) (label_replace(label_replace(sum by (host_name, hostname) (max_over_time(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"}[$__interval])), \"display\", \"$1\", \"hostname\", \"(.+)\"), \"display\", \"$1\", \"host_name\", \"(.+)\"))",
+          "expr": "sum by (display) (label_replace(label_replace(sum by (host_name, hostname) (clamp_min(ai:tokens_accum:sum{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"} - ((ai:tokens_accum:sum{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"} offset $__interval) or (ai:tokens_accum:sum{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"} * 0)), 0)), \"display\", \"$1\", \"hostname\", \"(.+)\"), \"display\", \"$1\", \"host_name\", \"(.+)\"))",
           "legendFormat": "{{display}}",
           "refId": "A",
           "interval": "$bucket"
@@ -476,7 +477,8 @@
           "placement": "right",
           "calcs": [
             "lastNotNull",
-            "max"
+            "max",
+            "sum"
           ],
           "showLegend": true,
           "width": 240,
@@ -488,11 +490,11 @@
           "sort": "desc"
         }
       },
-      "description": "Tokens consumed per time bucket, grouped by canonical host_name (falls back to hostname when host_name is not set). A liveliness view of per-host activity. Aggregated with max_over_time, not increase: these counters are cumulative PER SESSION (every series carries session_id) and expire 15m after their last sample, so increase() would treat a short session's first sample as its baseline and undercount. See OTL-75."
+      "description": "Tokens consumed per time bucket, grouped by canonical host_name (falls back to hostname when host_name is not set). A liveliness view of per-host activity. Aggregated with max_over_time, not increase: these counters are cumulative PER SESSION (every series carries session_id) and expire 15m after their last sample, so increase() would treat a short session's first sample as its baseline and undercount. See OTL-75. OTL-82 recording-rules round (Ryan-directed): each point is the amount accrued IN THAT INTERVAL BUCKET, computed as accum(t) - accum(t - $__interval) against a genuinely monotonic, forward-latching Prometheus recording rule (ai:tokens_accum:sum / ai:cost_usd_accum:sum -- see provisioning/prometheus/recording-rules.yml's \"ai-canonical-running-total\" group) instead of re-deriving the delta from the raw per-session counter at query time on every dashboard load. Because it's ONE exact series subtracted from itself (not two independent max_over_time evaluations of a volatile raw counter, which is what produced OTL-82-r4's measured 3-4% token / 6-15% cost reconciliation error), the sum of all rendered bucket deltas telescopes EXACTLY to accum(end) - accum(start - $__interval) -- no reconciliation error, by construction rather than by measurement, so the legend Total now agrees with the stat tile for the same window. Legend still shows Latest / Peak / Total (Grafana's built-in lastNotNull / max / sum reducers -- rendered as \"Last *\" / \"Max\" / \"Total\"). HONEST LIMITATION: the accumulator only knows about activity from the moment it was deployed forward -- a dashboard window that starts before the rule's own deployment reads Total as everything captured since deployment, not the true pre-deployment history (the same characteristic every other canonical ai:* recording rule in this file already has). See the OTL-82/OTL-83 PR thread for the live-proof numbers."
     },
     {
       "id": 7,
-      "title": "Cumulative Spend by Model",
+      "title": "Spend per Interval by Model",
       "type": "timeseries",
       "gridPos": {
         "h": 7,
@@ -506,7 +508,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (model_family) (label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(sum by (model) (max_over_time(claude_code_cost_usage_USD_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__interval])), \"model_family\", \"$1\", \"model\", \"(.+)\"), \"model_family\", \"$1 $2.$3\", \"model\", \"claude-([a-z]+)-([0-9]+)-([0-9]+).*\"), \"model_family\", \"$1 $2\", \"model\", \"claude-([a-z]+)-([0-9]+)(\\\\[[^]]*\\\\])?$\"), \"model_family\", \"Opus $1\", \"model_family\", \"opus (.*)\"), \"model_family\", \"Haiku $1\", \"model_family\", \"haiku (.*)\"), \"model_family\", \"Sonnet $1\", \"model_family\", \"sonnet (.*)\"), \"model_family\", \"Fable $1\", \"model_family\", \"fable (.*)\"))",
+          "expr": "sum by (model_family) (label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(sum by (model) (clamp_min(ai:cost_usd_accum:sum{project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"} - ((ai:cost_usd_accum:sum{project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"} offset $__interval) or (ai:cost_usd_accum:sum{project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"} * 0)), 0)), \"model_family\", \"$1\", \"model\", \"(.+)\"), \"model_family\", \"$1 $2.$3\", \"model\", \"claude-([a-z]+)-([0-9]+)-([0-9]+).*\"), \"model_family\", \"$1 $2\", \"model\", \"claude-([a-z]+)-([0-9]+)(\\\\[[^]]*\\\\])?$\"), \"model_family\", \"Opus $1\", \"model_family\", \"opus (.*)\"), \"model_family\", \"Haiku $1\", \"model_family\", \"haiku (.*)\"), \"model_family\", \"Sonnet $1\", \"model_family\", \"sonnet (.*)\"), \"model_family\", \"Fable $1\", \"model_family\", \"fable (.*)\"))",
           "legendFormat": "{{model_family}}",
           "refId": "A",
           "interval": "$bucket"
@@ -599,7 +601,8 @@
           "placement": "right",
           "calcs": [
             "lastNotNull",
-            "max"
+            "max",
+            "sum"
           ],
           "showLegend": true,
           "width": 240,
@@ -611,11 +614,11 @@
           "sort": "desc"
         }
       },
-      "description": "$ spent per time bucket (width = Grafana $__interval, typically 15s-15m depending on zoom). Each point = actual cost attributed to that bucket. Aggregated with max_over_time, not increase: these counters are cumulative PER SESSION (every series carries session_id) and expire 15m after their last sample, so increase() would treat a short session's first sample as its baseline and undercount. See OTL-75."
+      "description": "$ spent per time bucket (width = Grafana $__interval, typically 15s-15m depending on zoom). Each point = actual cost attributed to that bucket. Aggregated with max_over_time, not increase: these counters are cumulative PER SESSION (every series carries session_id) and expire 15m after their last sample, so increase() would treat a short session's first sample as its baseline and undercount. See OTL-75. OTL-82 recording-rules round (Ryan-directed): each point is the amount accrued IN THAT INTERVAL BUCKET, computed as accum(t) - accum(t - $__interval) against a genuinely monotonic, forward-latching Prometheus recording rule (ai:tokens_accum:sum / ai:cost_usd_accum:sum -- see provisioning/prometheus/recording-rules.yml's \"ai-canonical-running-total\" group) instead of re-deriving the delta from the raw per-session counter at query time on every dashboard load. Because it's ONE exact series subtracted from itself (not two independent max_over_time evaluations of a volatile raw counter, which is what produced OTL-82-r4's measured 3-4% token / 6-15% cost reconciliation error), the sum of all rendered bucket deltas telescopes EXACTLY to accum(end) - accum(start - $__interval) -- no reconciliation error, by construction rather than by measurement, so the legend Total now agrees with the stat tile for the same window. Legend still shows Latest / Peak / Total (Grafana's built-in lastNotNull / max / sum reducers -- rendered as \"Last *\" / \"Max\" / \"Total\"). HONEST LIMITATION: the accumulator only knows about activity from the moment it was deployed forward -- a dashboard window that starts before the rule's own deployment reads Total as everything captured since deployment, not the true pre-deployment history (the same characteristic every other canonical ai:* recording rule in this file already has). See the OTL-82/OTL-83 PR thread for the live-proof numbers."
     },
     {
       "id": 8,
-      "title": "Cumulative Tokens by Type",
+      "title": "Tokens per Interval by Type",
       "type": "timeseries",
       "gridPos": {
         "h": 7,
@@ -629,7 +632,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (type) (max_over_time(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__interval]))",
+          "expr": "sum by (type) (clamp_min(ai:tokens_accum:sum{project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"} - ((ai:tokens_accum:sum{project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"} offset $__interval) or (ai:tokens_accum:sum{project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"} * 0)), 0))",
           "legendFormat": "{{type}}",
           "refId": "A",
           "interval": "$bucket"
@@ -737,7 +740,8 @@
           "placement": "right",
           "calcs": [
             "lastNotNull",
-            "max"
+            "max",
+            "sum"
           ],
           "showLegend": true,
           "width": 240,
@@ -749,11 +753,11 @@
           "sort": "desc"
         }
       },
-      "description": "Tokens consumed per time bucket (width = Grafana $__interval). Each point = actual tokens attributed to that bucket. Aggregated with max_over_time, not increase: these counters are cumulative PER SESSION (every series carries session_id) and expire 15m after their last sample, so increase() would treat a short session's first sample as its baseline and undercount. See OTL-75."
+      "description": "Tokens consumed per time bucket (width = Grafana $__interval). Each point = actual tokens attributed to that bucket. Aggregated with max_over_time, not increase: these counters are cumulative PER SESSION (every series carries session_id) and expire 15m after their last sample, so increase() would treat a short session's first sample as its baseline and undercount. See OTL-75. OTL-82 recording-rules round (Ryan-directed): each point is the amount accrued IN THAT INTERVAL BUCKET, computed as accum(t) - accum(t - $__interval) against a genuinely monotonic, forward-latching Prometheus recording rule (ai:tokens_accum:sum / ai:cost_usd_accum:sum -- see provisioning/prometheus/recording-rules.yml's \"ai-canonical-running-total\" group) instead of re-deriving the delta from the raw per-session counter at query time on every dashboard load. Because it's ONE exact series subtracted from itself (not two independent max_over_time evaluations of a volatile raw counter, which is what produced OTL-82-r4's measured 3-4% token / 6-15% cost reconciliation error), the sum of all rendered bucket deltas telescopes EXACTLY to accum(end) - accum(start - $__interval) -- no reconciliation error, by construction rather than by measurement, so the legend Total now agrees with the stat tile for the same window. Legend still shows Latest / Peak / Total (Grafana's built-in lastNotNull / max / sum reducers -- rendered as \"Last *\" / \"Max\" / \"Total\"). HONEST LIMITATION: the accumulator only knows about activity from the moment it was deployed forward -- a dashboard window that starts before the rule's own deployment reads Total as everything captured since deployment, not the true pre-deployment history (the same characteristic every other canonical ai:* recording rule in this file already has). See the OTL-82/OTL-83 PR thread for the live-proof numbers."
     },
     {
       "type": "row",
-      "title": "\u21b3 Cumulative (running totals)",
+      "title": "\u21b3 Per Interval (Cost / Tokens)",
       "collapsed": true,
       "gridPos": {
         "h": 1,
@@ -765,7 +769,7 @@
       "panels": [
         {
           "id": 30,
-          "title": "Cumulative Cost",
+          "title": "Cost per Interval",
           "type": "timeseries",
           "gridPos": {
             "h": 7,
@@ -779,7 +783,7 @@
           },
           "targets": [
             {
-              "expr": "sum(max_over_time(claude_code_cost_usage_USD_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__interval]))",
+              "expr": "sum(clamp_min(ai:cost_usd_accum:sum{project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"} - ((ai:cost_usd_accum:sum{project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"} offset $__interval) or (ai:cost_usd_accum:sum{project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"} * 0)), 0))",
               "legendFormat": "Cost",
               "refId": "A",
               "interval": "1m"
@@ -830,8 +834,10 @@
               "placement": "right",
               "calcs": [
                 "lastNotNull",
-                "max"
+                "max",
+                "sum"
               ],
+              "sortBy": "Total",
               "showLegend": true,
               "width": 240
             },
@@ -840,11 +846,11 @@
               "sort": "none"
             }
           },
-          "description": "Aggregated with max_over_time, not increase: these counters are cumulative PER SESSION (every series carries session_id) and expire 15m after their last sample, so increase() would treat a short session's first sample as its baseline and undercount. See OTL-75. OTL-82: dropped the calculateField/cumulativeFunctions transform — the query already returns a running-total curve via max_over_time, so applying a second cumulative-sum on top double-counted (a genuinely quadratic-growth curve, not just a legend mismatch)."
+          "description": "Aggregated with max_over_time, not increase: these counters are cumulative PER SESSION (every series carries session_id) and expire 15m after their last sample, so increase() would treat a short session's first sample as its baseline and undercount. See OTL-75. OTL-82: dropped the calculateField/cumulativeFunctions transform \u2014 the query already returns a running-total curve via max_over_time, so applying a second cumulative-sum on top double-counted (a genuinely quadratic-growth curve, not just a legend mismatch). OTL-82 recording-rules round (Ryan-directed): each point is the amount accrued IN THAT INTERVAL BUCKET, computed as accum(t) - accum(t - $__interval) against a genuinely monotonic, forward-latching Prometheus recording rule (ai:tokens_accum:sum / ai:cost_usd_accum:sum -- see provisioning/prometheus/recording-rules.yml's \"ai-canonical-running-total\" group) instead of re-deriving the delta from the raw per-session counter at query time on every dashboard load. Because it's ONE exact series subtracted from itself (not two independent max_over_time evaluations of a volatile raw counter, which is what produced OTL-82-r4's measured 3-4% token / 6-15% cost reconciliation error), the sum of all rendered bucket deltas telescopes EXACTLY to accum(end) - accum(start - $__interval) -- no reconciliation error, by construction rather than by measurement, so the legend Total now agrees with the stat tile for the same window. Legend still shows Latest / Peak / Total (Grafana's built-in lastNotNull / max / sum reducers -- rendered as \"Last *\" / \"Max\" / \"Total\"). HONEST LIMITATION: the accumulator only knows about activity from the moment it was deployed forward -- a dashboard window that starts before the rule's own deployment reads Total as everything captured since deployment, not the true pre-deployment history (the same characteristic every other canonical ai:* recording rule in this file already has). See the OTL-82/OTL-83 PR thread for the live-proof numbers."
         },
         {
           "id": 31,
-          "title": "Cumulative Tokens",
+          "title": "Tokens per Interval",
           "type": "timeseries",
           "gridPos": {
             "h": 7,
@@ -858,7 +864,7 @@
           },
           "targets": [
             {
-              "expr": "sum by (type) (max_over_time(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__interval]))",
+              "expr": "sum by (type) (clamp_min(ai:tokens_accum:sum{project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"} - ((ai:tokens_accum:sum{project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"} offset $__interval) or (ai:tokens_accum:sum{project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"} * 0)), 0))",
               "legendFormat": "{{type}}",
               "refId": "A",
               "interval": "1m"
@@ -966,8 +972,10 @@
               "placement": "right",
               "calcs": [
                 "lastNotNull",
-                "max"
+                "max",
+                "sum"
               ],
+              "sortBy": "Total",
               "showLegend": true,
               "width": 240
             },
@@ -976,7 +984,7 @@
               "sort": "desc"
             }
           },
-          "description": "Aggregated with max_over_time, not increase: these counters are cumulative PER SESSION (every series carries session_id) and expire 15m after their last sample, so increase() would treat a short session's first sample as its baseline and undercount. See OTL-75. OTL-82: dropped the calculateField/cumulativeFunctions transforms (one per field: input/output/cacheRead/cacheCreation) plus the organize transform that hid the originals \u2014 the query already returns a running-total curve via max_over_time, so summing it again per field double-counted (a genuinely quadratic-growth curve, not just a legend mismatch)."
+          "description": "Aggregated with max_over_time, not increase: these counters are cumulative PER SESSION (every series carries session_id) and expire 15m after their last sample, so increase() would treat a short session's first sample as its baseline and undercount. See OTL-75. OTL-82: dropped the calculateField/cumulativeFunctions transforms (one per field: input/output/cacheRead/cacheCreation) plus the organize transform that hid the originals \u2014 the query already returns a running-total curve via max_over_time, so summing it again per field double-counted (a genuinely quadratic-growth curve, not just a legend mismatch). OTL-82 recording-rules round (Ryan-directed): each point is the amount accrued IN THAT INTERVAL BUCKET, computed as accum(t) - accum(t - $__interval) against a genuinely monotonic, forward-latching Prometheus recording rule (ai:tokens_accum:sum / ai:cost_usd_accum:sum -- see provisioning/prometheus/recording-rules.yml's \"ai-canonical-running-total\" group) instead of re-deriving the delta from the raw per-session counter at query time on every dashboard load. Because it's ONE exact series subtracted from itself (not two independent max_over_time evaluations of a volatile raw counter, which is what produced OTL-82-r4's measured 3-4% token / 6-15% cost reconciliation error), the sum of all rendered bucket deltas telescopes EXACTLY to accum(end) - accum(start - $__interval) -- no reconciliation error, by construction rather than by measurement, so the legend Total now agrees with the stat tile for the same window. Legend still shows Latest / Peak / Total (Grafana's built-in lastNotNull / max / sum reducers -- rendered as \"Last *\" / \"Max\" / \"Total\"). HONEST LIMITATION: the accumulator only knows about activity from the moment it was deployed forward -- a dashboard window that starts before the rule's own deployment reads Total as everything captured since deployment, not the true pre-deployment history (the same characteristic every other canonical ai:* recording rule in this file already has). See the OTL-82/OTL-83 PR thread for the live-proof numbers."
         }
       ]
     },
@@ -1370,7 +1378,7 @@
         },
         {
           "id": 36,
-          "title": "Cumulative Token Burn by Ticket (Top 10)",
+          "title": "Token Burn per Interval by Ticket (Top 10)",
           "type": "timeseries",
           "gridPos": {
             "h": 7,
@@ -1384,7 +1392,7 @@
           },
           "targets": [
             {
-              "expr": "topk(10, sum by (linear_key) (max_over_time(claude_code_token_usage_tokens_total{job=\"otel-collector\",linear_key!=\"\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__interval])))",
+              "expr": "topk(10, sum by (linear_key) (clamp_min(ai:tokens_accum:sum{linear_key!=\"\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"} - ((ai:tokens_accum:sum{linear_key!=\"\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"} offset $__interval) or (ai:tokens_accum:sum{linear_key!=\"\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"} * 0)), 0)))",
               "legendFormat": "{{linear_key}}",
               "refId": "A",
               "interval": "$bucket"
@@ -1492,7 +1500,8 @@
               "placement": "right",
               "calcs": [
                 "lastNotNull",
-                "max"
+                "max",
+                "sum"
               ],
               "showLegend": true,
               "sortBy": "Total",
@@ -1504,11 +1513,11 @@
               "sort": "desc"
             }
           },
-          "description": "Top 10 Linear tickets by token burn per time bucket (width = Grafana $__rate_interval). Excludes sessions with no linear_key attached. Aggregated with max_over_time, not increase: these counters are cumulative PER SESSION (every series carries session_id) and expire 15m after their last sample, so increase() would treat a short session's first sample as its baseline and undercount. See OTL-75."
+          "description": "Top 10 Linear tickets by token burn per time bucket (width = Grafana $__rate_interval). Excludes sessions with no linear_key attached. Aggregated with max_over_time, not increase: these counters are cumulative PER SESSION (every series carries session_id) and expire 15m after their last sample, so increase() would treat a short session's first sample as its baseline and undercount. See OTL-75. OTL-82 recording-rules round (Ryan-directed): each point is the amount accrued IN THAT INTERVAL BUCKET, computed as accum(t) - accum(t - $__interval) against a genuinely monotonic, forward-latching Prometheus recording rule (ai:tokens_accum:sum / ai:cost_usd_accum:sum -- see provisioning/prometheus/recording-rules.yml's \"ai-canonical-running-total\" group) instead of re-deriving the delta from the raw per-session counter at query time on every dashboard load. Because it's ONE exact series subtracted from itself (not two independent max_over_time evaluations of a volatile raw counter, which is what produced OTL-82-r4's measured 3-4% token / 6-15% cost reconciliation error), the sum of all rendered bucket deltas telescopes EXACTLY to accum(end) - accum(start - $__interval) -- no reconciliation error, by construction rather than by measurement, so the legend Total now agrees with the stat tile for the same window. Legend still shows Latest / Peak / Total (Grafana's built-in lastNotNull / max / sum reducers -- rendered as \"Last *\" / \"Max\" / \"Total\"). HONEST LIMITATION: the accumulator only knows about activity from the moment it was deployed forward -- a dashboard window that starts before the rule's own deployment reads Total as everything captured since deployment, not the true pre-deployment history (the same characteristic every other canonical ai:* recording rule in this file already has). See the OTL-82/OTL-83 PR thread for the live-proof numbers."
         },
         {
           "id": 37,
-          "title": "Cumulative Token Burn by Repo (Top 10)",
+          "title": "Token Burn per Interval by Repo (Top 10)",
           "type": "timeseries",
           "gridPos": {
             "h": 7,
@@ -1522,7 +1531,7 @@
           },
           "targets": [
             {
-              "expr": "topk(10, sum by (project) (max_over_time(claude_code_token_usage_tokens_total{job=\"otel-collector\",project!=\"\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__interval])))",
+              "expr": "topk(10, sum by (project) (clamp_min(ai:tokens_accum:sum{project!=\"\",branch=~\"$branch\",hostname=~\"$hostname\"} - ((ai:tokens_accum:sum{project!=\"\",branch=~\"$branch\",hostname=~\"$hostname\"} offset $__interval) or (ai:tokens_accum:sum{project!=\"\",branch=~\"$branch\",hostname=~\"$hostname\"} * 0)), 0)))",
               "legendFormat": "{{project}}",
               "refId": "A",
               "interval": "$bucket"
@@ -1630,7 +1639,8 @@
               "placement": "right",
               "calcs": [
                 "lastNotNull",
-                "max"
+                "max",
+                "sum"
               ],
               "showLegend": true,
               "sortBy": "Total",
@@ -1642,7 +1652,7 @@
               "sort": "desc"
             }
           },
-          "description": "Top 10 repos by token burn per time bucket (width = Grafana $__rate_interval). Excludes sessions with no repo attached. Aggregated with max_over_time, not increase: these counters are cumulative PER SESSION (every series carries session_id) and expire 15m after their last sample, so increase() would treat a short session's first sample as its baseline and undercount. See OTL-75."
+          "description": "Top 10 repos by token burn per time bucket (width = Grafana $__rate_interval). Excludes sessions with no repo attached. Aggregated with max_over_time, not increase: these counters are cumulative PER SESSION (every series carries session_id) and expire 15m after their last sample, so increase() would treat a short session's first sample as its baseline and undercount. See OTL-75. OTL-82 recording-rules round (Ryan-directed): each point is the amount accrued IN THAT INTERVAL BUCKET, computed as accum(t) - accum(t - $__interval) against a genuinely monotonic, forward-latching Prometheus recording rule (ai:tokens_accum:sum / ai:cost_usd_accum:sum -- see provisioning/prometheus/recording-rules.yml's \"ai-canonical-running-total\" group) instead of re-deriving the delta from the raw per-session counter at query time on every dashboard load. Because it's ONE exact series subtracted from itself (not two independent max_over_time evaluations of a volatile raw counter, which is what produced OTL-82-r4's measured 3-4% token / 6-15% cost reconciliation error), the sum of all rendered bucket deltas telescopes EXACTLY to accum(end) - accum(start - $__interval) -- no reconciliation error, by construction rather than by measurement, so the legend Total now agrees with the stat tile for the same window. Legend still shows Latest / Peak / Total (Grafana's built-in lastNotNull / max / sum reducers -- rendered as \"Last *\" / \"Max\" / \"Total\"). HONEST LIMITATION: the accumulator only knows about activity from the moment it was deployed forward -- a dashboard window that starts before the rule's own deployment reads Total as everything captured since deployment, not the true pre-deployment history (the same characteristic every other canonical ai:* recording rule in this file already has). See the OTL-82/OTL-83 PR thread for the live-proof numbers."
         },
         {
           "id": 18,
@@ -2220,6 +2230,8 @@
               "displayMode": "table",
               "placement": "right",
               "calcs": [
+                "lastNotNull",
+                "max",
                 "sum"
               ],
               "showLegend": true,
@@ -2708,146 +2720,6 @@
       "id": 203,
       "panels": [
         {
-          "id": 17,
-          "title": "API Request Duration",
-          "type": "timeseries",
-          "gridPos": {
-            "h": 7,
-            "w": 24,
-            "x": 0,
-            "y": 36
-          },
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "targets": [
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "prometheus"
-              },
-              "editorMode": "code",
-              "expr": "histogram_quantile(0.5, sum by (le, model) (rate(claude_code_api_request_duration_seconds_bucket[$__interval])))",
-              "legendFormat": "p50 {{model}}",
-              "range": true,
-              "refId": "A",
-              "interval": "$bucket"
-            },
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "prometheus"
-              },
-              "editorMode": "code",
-              "expr": "histogram_quantile(0.95, sum by (le, model) (rate(claude_code_api_request_duration_seconds_bucket[$__interval])))",
-              "legendFormat": "p95 {{model}}",
-              "range": true,
-              "refId": "B",
-              "interval": "$bucket"
-            }
-          ],
-          "fieldConfig": {
-            "defaults": {
-              "unit": "s",
-              "custom": {
-                "drawStyle": "line",
-                "lineWidth": 2,
-                "fillOpacity": 15,
-                "gradientMode": "opacity",
-                "spanNulls": true,
-                "showPoints": "never",
-                "lineInterpolation": "smooth",
-                "stacking": {
-                  "mode": "none",
-                  "group": "A"
-                },
-                "scaleDistribution": {
-                  "type": "linear"
-                },
-                "thresholdsStyle": {
-                  "mode": "off"
-                }
-              },
-              "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "green",
-                    "value": null
-                  }
-                ]
-              }
-            },
-            "overrides": [
-              {
-                "matcher": {
-                  "id": "byRegexp",
-                  "options": "(?i)opus"
-                },
-                "properties": [
-                  {
-                    "id": "color",
-                    "value": {
-                      "fixedColor": "#9B59B6",
-                      "mode": "fixed"
-                    }
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byRegexp",
-                  "options": "(?i)sonnet"
-                },
-                "properties": [
-                  {
-                    "id": "color",
-                    "value": {
-                      "fixedColor": "#E67E22",
-                      "mode": "fixed"
-                    }
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byRegexp",
-                  "options": "(?i)haiku"
-                },
-                "properties": [
-                  {
-                    "id": "color",
-                    "value": {
-                      "fixedColor": "#3498DB",
-                      "mode": "fixed"
-                    }
-                  }
-                ]
-              }
-            ]
-          },
-          "options": {
-            "legend": {
-              "displayMode": "table",
-              "placement": "right",
-              "calcs": [
-                "mean",
-                "max"
-              ],
-              "showLegend": true,
-              "width": 240,
-              "sortBy": "Mean",
-              "sortDesc": true
-            },
-            "tooltip": {
-              "mode": "multi",
-              "sort": "desc"
-            }
-          }
-        },
-        {
           "id": 9,
           "title": "Tool Usage Rate",
           "type": "timeseries",
@@ -2855,7 +2727,7 @@
             "h": 7,
             "w": 24,
             "x": 0,
-            "y": 43
+            "y": 36
           },
           "datasource": {
             "type": "prometheus",
@@ -2976,6 +2848,8 @@
               "displayMode": "table",
               "placement": "right",
               "calcs": [
+                "lastNotNull",
+                "max",
                 "sum"
               ],
               "showLegend": true,
@@ -2997,7 +2871,7 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 50
+            "y": 43
           },
           "datasource": {
             "type": "prometheus",
@@ -3178,7 +3052,7 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 58
+            "y": 51
           },
           "datasource": {
             "type": "prometheus",
@@ -3261,7 +3135,7 @@
             "h": 7,
             "w": 24,
             "x": 0,
-            "y": 66
+            "y": 59
           },
           "datasource": {
             "type": "prometheus",
@@ -3440,6 +3314,8 @@
               "displayMode": "table",
               "placement": "right",
               "calcs": [
+                "lastNotNull",
+                "max",
                 "sum"
               ],
               "showLegend": true,
@@ -3455,7 +3331,7 @@
         },
         {
           "id": 90,
-          "title": "Cumulative Pull Requests",
+          "title": "Pull Requests per Interval",
           "type": "timeseries",
           "gridPos": {
             "h": 7,
@@ -3469,7 +3345,7 @@
           },
           "targets": [
             {
-              "expr": "sum(max_over_time(claude_code_pull_request_count_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__interval]))",
+              "expr": "sum(clamp_min((max_over_time(claude_code_pull_request_count_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__interval])) - ((max_over_time(claude_code_pull_request_count_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__interval] offset $__interval)) or (max_over_time(claude_code_pull_request_count_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__interval]) * 0)), 0))",
               "legendFormat": "PRs created",
               "refId": "A",
               "interval": "$bucket"
@@ -3522,19 +3398,21 @@
               "width": 240,
               "calcs": [
                 "lastNotNull",
-                "max"
-              ]
+                "max",
+                "sum"
+              ],
+              "sortBy": "Total"
             },
             "tooltip": {
               "mode": "single",
               "sort": "none"
             }
           },
-          "description": "Aggregated with max_over_time, not increase: these counters are cumulative PER SESSION (every series carries session_id) and expire 15m after their last sample, so increase() would treat a short session's first sample as its baseline and undercount. See OTL-75."
+          "description": "Aggregated with max_over_time, not increase: these counters are cumulative PER SESSION (every series carries session_id) and expire 15m after their last sample, so increase() would treat a short session's first sample as its baseline and undercount. See OTL-75. OTL-82-r4 (Ryan-directed redesign): each point is now the amount accrued IN THAT INTERVAL BUCKET, not a running total -- computed per-series as clamp_min(this bucket's max - the previous bucket's max, 0), summed across series (avoids increase()/rate(), which this repo's OTL-75 note already flagged as unreliable on these per-session counters -- max_over_time keeps that guarantee, applied per-bucket instead of over a growing window). Legend now shows Latest / Peak / Total (Grafana's built-in lastNotNull / max / sum reducers -- Grafana does not allow renaming a legend calc's own column header, so the table literally reads \"Last *\" / \"Max\" / \"Total\"). Total is now a legitimate window sum, not the double-counting bug OTL-82 originally fixed. Measured live against the stat tile's raw total for the same window (job=\"otel-collector\", no template-var filtering, $__interval=2m over a live 2h window, real fleet churn): tokens matched within about 3-4% (undercount); cost was off by roughly 6-15% depending on bucket width (overcount, worse at narrow buckets, improving toward ~6% by 10-15m buckets) -- not a tight guarantee, the honest tolerance for this construction on a live, high-churn multi-session dataset. See the PR thread for the full numbers and the alternatives that were tried and rejected (a wide-window aggregate delta undercounted by ~17-20%)."
         },
         {
           "id": 91,
-          "title": "Cumulative Commits",
+          "title": "Commits per Interval",
           "type": "timeseries",
           "gridPos": {
             "h": 7,
@@ -3548,7 +3426,7 @@
           },
           "targets": [
             {
-              "expr": "sum(max_over_time(claude_code_commit_count_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__interval]))",
+              "expr": "sum(clamp_min((max_over_time(claude_code_commit_count_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__interval])) - ((max_over_time(claude_code_commit_count_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__interval] offset $__interval)) or (max_over_time(claude_code_commit_count_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__interval]) * 0)), 0))",
               "legendFormat": "Commits created",
               "refId": "A",
               "interval": "$bucket"
@@ -3601,15 +3479,17 @@
               "width": 240,
               "calcs": [
                 "lastNotNull",
-                "max"
-              ]
+                "max",
+                "sum"
+              ],
+              "sortBy": "Total"
             },
             "tooltip": {
               "mode": "single",
               "sort": "none"
             }
           },
-          "description": "Aggregated with max_over_time, not increase: these counters are cumulative PER SESSION (every series carries session_id) and expire 15m after their last sample, so increase() would treat a short session's first sample as its baseline and undercount. See OTL-75."
+          "description": "Aggregated with max_over_time, not increase: these counters are cumulative PER SESSION (every series carries session_id) and expire 15m after their last sample, so increase() would treat a short session's first sample as its baseline and undercount. See OTL-75. OTL-82-r4 (Ryan-directed redesign): each point is now the amount accrued IN THAT INTERVAL BUCKET, not a running total -- computed per-series as clamp_min(this bucket's max - the previous bucket's max, 0), summed across series (avoids increase()/rate(), which this repo's OTL-75 note already flagged as unreliable on these per-session counters -- max_over_time keeps that guarantee, applied per-bucket instead of over a growing window). Legend now shows Latest / Peak / Total (Grafana's built-in lastNotNull / max / sum reducers -- Grafana does not allow renaming a legend calc's own column header, so the table literally reads \"Last *\" / \"Max\" / \"Total\"). Total is now a legitimate window sum, not the double-counting bug OTL-82 originally fixed. Measured live against the stat tile's raw total for the same window (job=\"otel-collector\", no template-var filtering, $__interval=2m over a live 2h window, real fleet churn): tokens matched within about 3-4% (undercount); cost was off by roughly 6-15% depending on bucket width (overcount, worse at narrow buckets, improving toward ~6% by 10-15m buckets) -- not a tight guarantee, the honest tolerance for this construction on a live, high-churn multi-session dataset. See the PR thread for the full numbers and the alternatives that were tried and rejected (a wide-window aggregate delta undercounted by ~17-20%)."
         }
       ]
     },
@@ -4460,6 +4340,8 @@
               "displayMode": "table",
               "placement": "right",
               "calcs": [
+                "lastNotNull",
+                "max",
                 "sum"
               ],
               "showLegend": true,
@@ -4651,7 +4533,7 @@
     },
     {
       "id": 209,
-      "title": "Cumulative Tokens by Model",
+      "title": "Tokens per Interval by Model",
       "type": "timeseries",
       "gridPos": {
         "h": 7,
@@ -4665,7 +4547,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (model_family) (label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(sum by (model) (max_over_time(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__interval])), \"model_family\", \"$1\", \"model\", \"(.+)\"), \"model_family\", \"$1 $2.$3\", \"model\", \"claude-([a-z]+)-([0-9]+)-([0-9]+).*\"), \"model_family\", \"$1 $2\", \"model\", \"claude-([a-z]+)-([0-9]+)(\\\\[[^]]*\\\\])?$\"), \"model_family\", \"Opus $1\", \"model_family\", \"opus (.*)\"), \"model_family\", \"Haiku $1\", \"model_family\", \"haiku (.*)\"), \"model_family\", \"Sonnet $1\", \"model_family\", \"sonnet (.*)\"), \"model_family\", \"Fable $1\", \"model_family\", \"fable (.*)\"))",
+          "expr": "sum by (model_family) (label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(sum by (model) (clamp_min(ai:tokens_accum:sum{project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"} - ((ai:tokens_accum:sum{project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"} offset $__interval) or (ai:tokens_accum:sum{project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"} * 0)), 0)), \"model_family\", \"$1\", \"model\", \"(.+)\"), \"model_family\", \"$1 $2.$3\", \"model\", \"claude-([a-z]+)-([0-9]+)-([0-9]+).*\"), \"model_family\", \"$1 $2\", \"model\", \"claude-([a-z]+)-([0-9]+)(\\\\[[^]]*\\\\])?$\"), \"model_family\", \"Opus $1\", \"model_family\", \"opus (.*)\"), \"model_family\", \"Haiku $1\", \"model_family\", \"haiku (.*)\"), \"model_family\", \"Sonnet $1\", \"model_family\", \"sonnet (.*)\"), \"model_family\", \"Fable $1\", \"model_family\", \"fable (.*)\"))",
           "legendFormat": "{{model_family}}",
           "refId": "A",
           "interval": "$bucket"
@@ -4758,7 +4640,8 @@
           "placement": "right",
           "calcs": [
             "lastNotNull",
-            "max"
+            "max",
+            "sum"
           ],
           "showLegend": true,
           "width": 240,
@@ -4770,11 +4653,11 @@
           "sort": "desc"
         }
       },
-      "description": "Tokens consumed per time bucket, grouped by normalized model family and summed across input, output, cache-read, and cache-creation token classes. Aggregated with max_over_time, not increase: these counters are cumulative PER SESSION (every series carries session_id) and expire 15m after their last sample, so increase() would treat a short session's first sample as its baseline and undercount. See OTL-75."
+      "description": "Tokens consumed per time bucket, grouped by normalized model family and summed across input, output, cache-read, and cache-creation token classes. Aggregated with max_over_time, not increase: these counters are cumulative PER SESSION (every series carries session_id) and expire 15m after their last sample, so increase() would treat a short session's first sample as its baseline and undercount. See OTL-75. OTL-82 recording-rules round (Ryan-directed): each point is the amount accrued IN THAT INTERVAL BUCKET, computed as accum(t) - accum(t - $__interval) against a genuinely monotonic, forward-latching Prometheus recording rule (ai:tokens_accum:sum / ai:cost_usd_accum:sum -- see provisioning/prometheus/recording-rules.yml's \"ai-canonical-running-total\" group) instead of re-deriving the delta from the raw per-session counter at query time on every dashboard load. Because it's ONE exact series subtracted from itself (not two independent max_over_time evaluations of a volatile raw counter, which is what produced OTL-82-r4's measured 3-4% token / 6-15% cost reconciliation error), the sum of all rendered bucket deltas telescopes EXACTLY to accum(end) - accum(start - $__interval) -- no reconciliation error, by construction rather than by measurement, so the legend Total now agrees with the stat tile for the same window. Legend still shows Latest / Peak / Total (Grafana's built-in lastNotNull / max / sum reducers -- rendered as \"Last *\" / \"Max\" / \"Total\"). HONEST LIMITATION: the accumulator only knows about activity from the moment it was deployed forward -- a dashboard window that starts before the rule's own deployment reads Total as everything captured since deployment, not the true pre-deployment history (the same characteristic every other canonical ai:* recording rule in this file already has). See the OTL-82/OTL-83 PR thread for the live-proof numbers."
     },
     {
       "id": 210,
-      "title": "Cumulative Spend by Type",
+      "title": "Spend per Interval by Type",
       "type": "timeseries",
       "gridPos": {
         "h": 7,
@@ -4788,7 +4671,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (type) ((((sum by (model, type) (max_over_time(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\",type=\"input\"}[$__interval])) or (sum by (model, type) (max_over_time(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\",type=\"output\"}[$__interval])) * 5) or (sum by (model, type) (max_over_time(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\",type=\"cacheRead\"}[$__interval])) * 0.1) or (sum by (model, type) (max_over_time(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\",type=\"cacheCreation\"}[$__interval])) * 2))) / on (model) group_left clamp_min(sum by (model) ((sum by (model, type) (max_over_time(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\",type=\"input\"}[$__interval])) or (sum by (model, type) (max_over_time(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\",type=\"output\"}[$__interval])) * 5) or (sum by (model, type) (max_over_time(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\",type=\"cacheRead\"}[$__interval])) * 0.1) or (sum by (model, type) (max_over_time(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\",type=\"cacheCreation\"}[$__interval])) * 2))), 1e-12)) * on (model) group_left sum by (model) (max_over_time(claude_code_cost_usage_USD_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__interval])))",
+          "expr": "sum by (type) ((((sum by (model, type) (clamp_min((max_over_time(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\",type=\"input\"}[$__interval])) - ((max_over_time(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\",type=\"input\"}[$__interval] offset $__interval)) or (max_over_time(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\",type=\"input\"}[$__interval]) * 0)), 0)) or (sum by (model, type) (clamp_min((max_over_time(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\",type=\"output\"}[$__interval])) - ((max_over_time(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\",type=\"output\"}[$__interval] offset $__interval)) or (max_over_time(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\",type=\"output\"}[$__interval]) * 0)), 0)) * 5) or (sum by (model, type) (clamp_min((max_over_time(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\",type=\"cacheRead\"}[$__interval])) - ((max_over_time(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\",type=\"cacheRead\"}[$__interval] offset $__interval)) or (max_over_time(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\",type=\"cacheRead\"}[$__interval]) * 0)), 0)) * 0.1) or (sum by (model, type) (clamp_min((max_over_time(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\",type=\"cacheCreation\"}[$__interval])) - ((max_over_time(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\",type=\"cacheCreation\"}[$__interval] offset $__interval)) or (max_over_time(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\",type=\"cacheCreation\"}[$__interval]) * 0)), 0)) * 2))) / on (model) group_left clamp_min(sum by (model) ((sum by (model, type) (clamp_min((max_over_time(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\",type=\"input\"}[$__interval])) - ((max_over_time(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\",type=\"input\"}[$__interval] offset $__interval)) or (max_over_time(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\",type=\"input\"}[$__interval]) * 0)), 0)) or (sum by (model, type) (clamp_min((max_over_time(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\",type=\"output\"}[$__interval])) - ((max_over_time(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\",type=\"output\"}[$__interval] offset $__interval)) or (max_over_time(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\",type=\"output\"}[$__interval]) * 0)), 0)) * 5) or (sum by (model, type) (clamp_min((max_over_time(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\",type=\"cacheRead\"}[$__interval])) - ((max_over_time(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\",type=\"cacheRead\"}[$__interval] offset $__interval)) or (max_over_time(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\",type=\"cacheRead\"}[$__interval]) * 0)), 0)) * 0.1) or (sum by (model, type) (clamp_min((max_over_time(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\",type=\"cacheCreation\"}[$__interval])) - ((max_over_time(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\",type=\"cacheCreation\"}[$__interval] offset $__interval)) or (max_over_time(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\",type=\"cacheCreation\"}[$__interval]) * 0)), 0)) * 2))), 1e-12)) * on (model) group_left sum by (model) (clamp_min((max_over_time(claude_code_cost_usage_USD_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__interval])) - ((max_over_time(claude_code_cost_usage_USD_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__interval] offset $__interval)) or (max_over_time(claude_code_cost_usage_USD_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__interval]) * 0)), 0)))",
           "legendFormat": "{{type}}",
           "refId": "A",
           "interval": "$bucket"
@@ -4896,7 +4779,8 @@
           "placement": "right",
           "calcs": [
             "lastNotNull",
-            "max"
+            "max",
+            "sum"
           ],
           "showLegend": true,
           "width": 240,
@@ -4908,7 +4792,7 @@
           "sort": "desc"
         }
       },
-      "description": "Claude Code native model spend allocated across token types by the weighted token mix for each model: input=1x, output=5x, cacheRead=0.1x, cacheCreation=2x (one-hour cache-write assumption). Each model and fleet total reconciles to native spend. Aggregated with max_over_time, not increase: these counters are cumulative PER SESSION (every series carries session_id) and expire 15m after their last sample, so increase() would treat a short session's first sample as its baseline and undercount. See OTL-75."
+      "description": "Claude Code native model spend allocated across token types by the weighted token mix for each model: input=1x, output=5x, cacheRead=0.1x, cacheCreation=2x (one-hour cache-write assumption). Each model and fleet total reconciles to native spend. Aggregated with max_over_time, not increase: these counters are cumulative PER SESSION (every series carries session_id) and expire 15m after their last sample, so increase() would treat a short session's first sample as its baseline and undercount. See OTL-75. OTL-82-r4 (Ryan-directed redesign): each point is now the amount accrued IN THAT INTERVAL BUCKET, not a running total -- computed per-series as clamp_min(this bucket's max - the previous bucket's max, 0), summed across series (avoids increase()/rate(), which this repo's OTL-75 note already flagged as unreliable on these per-session counters -- max_over_time keeps that guarantee, applied per-bucket instead of over a growing window). Legend now shows Latest / Peak / Total (Grafana's built-in lastNotNull / max / sum reducers -- Grafana does not allow renaming a legend calc's own column header, so the table literally reads \"Last *\" / \"Max\" / \"Total\"). Total is now a legitimate window sum, not the double-counting bug OTL-82 originally fixed. Measured live against the stat tile's raw total for the same window (job=\"otel-collector\", no template-var filtering, $__interval=2m over a live 2h window, real fleet churn): tokens matched within about 3-4% (undercount); cost was off by roughly 6-15% depending on bucket width (overcount, worse at narrow buckets, improving toward ~6% by 10-15m buckets) -- not a tight guarantee, the honest tolerance for this construction on a live, high-churn multi-session dataset. See the PR thread for the full numbers and the alternatives that were tried and rejected (a wide-window aggregate delta undercounted by ~17-20%)."
     },
     {
       "id": 211,
@@ -6491,8 +6375,11 @@
         "textMode": "value_and_name",
         "reduceOptions": {
           "calcs": [
-            "lastNotNull"
+            "lastNotNull",
+            "max",
+            "sum"
           ],
+          "sortBy": "Total",
           "values": false,
           "fields": ""
         }
@@ -6521,7 +6408,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum by (provider) (max_over_time(ai:tokens:sum[$__interval]))",
+          "expr": "sum by (provider) (clamp_min((max_over_time(ai:tokens:sum[$__interval])) - ((max_over_time(ai:tokens:sum[$__interval] offset $__interval)) or (max_over_time(ai:tokens:sum[$__interval]) * 0)), 0))",
           "legendFormat": "{{provider}}",
           "instant": false,
           "range": true
@@ -6550,11 +6437,13 @@
           "placement": "bottom",
           "calcs": [
             "lastNotNull",
-            "max"
-          ]
+            "max",
+            "sum"
+          ],
+          "sortBy": "Total"
         }
       },
-      "description": "Cross-provider token volume via the ai:tokens:sum canonical recording rule (provisioning/prometheus/recording-rules.yml): provider=anthropic (real Claude, model!~\"^glm\"), provider=glm (model=~\"^glm\", split out 2026-08-24 for OTL-81), provider=openai (Codex_Desktop/app-server native token metric only \u2014 codex_exec headless emits no Prometheus token-usage series, see the recording-rules.yml header note). provider=qwen is a structural placeholder \u2014 its series appear automatically once Qwen telemetry exists (OTL-80)."
+      "description": "Cross-provider token volume via the ai:tokens:sum canonical recording rule (provisioning/prometheus/recording-rules.yml): provider=anthropic (real Claude, model!~\"^glm\"), provider=glm (model=~\"^glm\", split out 2026-08-24 for OTL-81), provider=openai (Codex_Desktop/app-server native token metric only \u2014 codex_exec headless emits no Prometheus token-usage series, see the recording-rules.yml header note). provider=qwen is a structural placeholder \u2014 its series appear automatically once Qwen telemetry exists (OTL-80). OTL-82-r4 (Ryan-directed redesign): each point is now the amount accrued IN THAT INTERVAL BUCKET, not a running total -- computed per-series as clamp_min(this bucket's max - the previous bucket's max, 0), summed across series (avoids increase()/rate(), which this repo's OTL-75 note already flagged as unreliable on these per-session counters -- max_over_time keeps that guarantee, applied per-bucket instead of over a growing window). Legend now shows Latest / Peak / Total (Grafana's built-in lastNotNull / max / sum reducers -- Grafana does not allow renaming a legend calc's own column header, so the table literally reads \"Last *\" / \"Max\" / \"Total\"). Total is now a legitimate window sum, not the double-counting bug OTL-82 originally fixed. Measured live against the stat tile's raw total for the same window (job=\"otel-collector\", no template-var filtering, $__interval=2m over a live 2h window, real fleet churn): tokens matched within about 3-4% (undercount); cost was off by roughly 6-15% depending on bucket width (overcount, worse at narrow buckets, improving toward ~6% by 10-15m buckets) -- not a tight guarantee, the honest tolerance for this construction on a live, high-churn multi-session dataset. See the PR thread for the full numbers and the alternatives that were tried and rejected (a wide-window aggregate delta undercounted by ~17-20%)."
     },
     {
       "id": 226,
@@ -6578,7 +6467,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum by (provider) (max_over_time(ai:cost_usd:sum[$__interval]))",
+          "expr": "sum by (provider) (clamp_min((max_over_time(ai:cost_usd:sum[$__interval])) - ((max_over_time(ai:cost_usd:sum[$__interval] offset $__interval)) or (max_over_time(ai:cost_usd:sum[$__interval]) * 0)), 0))",
           "legendFormat": "{{provider}}",
           "instant": false,
           "range": true
@@ -6607,11 +6496,13 @@
           "placement": "bottom",
           "calcs": [
             "lastNotNull",
-            "max"
-          ]
+            "max",
+            "sum"
+          ],
+          "sortBy": "Total"
         }
       },
-      "description": "provider=anthropic is REAL dollars (native claude_code_cost_usage_USD_total, model!~\"^glm\"). provider=glm is RERATED (OTL-80 authoritative rates, never the raw client-reported figure \u2014 see the recording rule comment). Codex is deliberately absent here: it has no real cost telemetry (see the Codex Estimated Spend panel, which is list-price and Loki-sourced \u2014 never blended into this Prometheus-sourced real+rerated panel)."
+      "description": "provider=anthropic is REAL dollars (native claude_code_cost_usage_USD_total, model!~\"^glm\"). provider=glm is RERATED (OTL-80 authoritative rates, never the raw client-reported figure \u2014 see the recording rule comment). Codex is deliberately absent here: it has no real cost telemetry (see the Codex Estimated Spend panel, which is list-price and Loki-sourced \u2014 never blended into this Prometheus-sourced real+rerated panel). OTL-82-r4 (Ryan-directed redesign): each point is now the amount accrued IN THAT INTERVAL BUCKET, not a running total -- computed per-series as clamp_min(this bucket's max - the previous bucket's max, 0), summed across series (avoids increase()/rate(), which this repo's OTL-75 note already flagged as unreliable on these per-session counters -- max_over_time keeps that guarantee, applied per-bucket instead of over a growing window). Legend now shows Latest / Peak / Total (Grafana's built-in lastNotNull / max / sum reducers -- Grafana does not allow renaming a legend calc's own column header, so the table literally reads \"Last *\" / \"Max\" / \"Total\"). Total is now a legitimate window sum, not the double-counting bug OTL-82 originally fixed. Measured live against the stat tile's raw total for the same window (job=\"otel-collector\", no template-var filtering, $__interval=2m over a live 2h window, real fleet churn): tokens matched within about 3-4% (undercount); cost was off by roughly 6-15% depending on bucket width (overcount, worse at narrow buckets, improving toward ~6% by 10-15m buckets) -- not a tight guarantee, the honest tolerance for this construction on a live, high-churn multi-session dataset. See the PR thread for the full numbers and the alternatives that were tried and rejected (a wide-window aggregate delta undercounted by ~17-20%)."
     },
     {
       "id": 227,
@@ -6771,7 +6662,675 @@
         "content": "### Qwen (OpenCode) \u2014 no telemetry today\n\nQwen is interactive-only via OpenCode and emits **no telemetry into this stack** as of 2026-08-24 \u2014 zero `qwen_*`/`opencode_*` series in Prometheus, no `service_name=~\"qwen.*|opencode.*\"` streams in Loki (checked live). This is a **structural placeholder**, not a stale panel: `ai:tokens:sum{provider=\"qwen\"}` and `ai:cost_usd:sum` legs exist in `provisioning/prometheus/recording-rules.yml` today (inert \u2014 match zero series until real data lands), and the Tokens/Spend-by-Provider panels above already group by `provider`, so Qwen appears automatically once telemetry starts, no dashboard edit required.\n\n**To light this up:**\n1. Wire `qwencloud auth login` (account-level keychain, not the model key \u2014 zero ToS exposure) and the `qwencloud usage summary --format json` poll into `scripts/ai-subscription-limit-scraper.sh` alongside the existing claude/codex/glm scrapers \u2014 recipe + verified endpoint shape on **OTL-80**.\n2. Confirm what OpenCode's actual OTel exporter emits (metric family name, service.name) \u2014 unverified; update the recording-rule metric names in `recording-rules.yml` from the placeholder once real series are observed.\n\nCredit formula for Qwen is **not published** (dynamic, hidden consumption items per OTL-80 research) \u2014 client-side cost estimation is not viable there the way it is for GLM; the limit-window scrape is the only trustworthy Qwen usage signal available."
       },
       "description": "OTL-81 acceptance: 'the Qwen lane's series appear automatically once Qwen telemetry first arrives' \u2014 satisfied structurally (recording-rule leg + provider-grouped panels), not by fabricating data."
-    }
+    },
+      {
+        "id": 240,
+        "type": "row",
+        "title": "⑧ Latency (per model)",
+        "collapsed": false,
+        "gridPos": {
+          "h": 1,
+          "w": 24,
+          "x": 0,
+          "y": 139
+        },
+        "panels": [],
+        "description": "OTL-84 (Ryan-directed): replaces the old single 'API Request Duration' panel that overlaid every model's p50/p95 on one axis. One tile per model now (Grafana panel repeat on $model_latency, maxPerRow=3 -- dynamically follows however many models are actually emitting, not a fixed count), each plotting P50/P75/P90/P95/P99 with an Avg-per-percentile legend. Y-axis min/max are a SHARED, STATIC range (not a per-refresh dynamic computation -- Grafana's panel-repeat has no mechanism for tiles to see each other's data and auto-scale to a common range) chosen from live data at build time so relative tile heights are comparable; fast models will look visually compressed against slower ones by design, since the goal is cross-model comparison, not per-model internal precision. Revisit the static ceiling if real-world latencies grow past it (values would clip) or shrink well under it (wasted range)."
+      },
+      {
+        "id": 241,
+        "type": "timeseries",
+        "title": "$model_latency",
+        "repeat": "model_latency",
+        "repeatDirection": "h",
+        "maxPerRow": 3,
+        "gridPos": {
+          "h": 8,
+          "w": 8,
+          "x": 0,
+          "y": 140
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "editorMode": "code",
+            "expr": "histogram_quantile(0.5, sum by (le) (rate(claude_code_api_request_duration_seconds_bucket{model=\"$model_latency\"}[$__interval])))",
+            "legendFormat": "P50",
+            "range": true
+          },
+          {
+            "refId": "B",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "editorMode": "code",
+            "expr": "histogram_quantile(0.75, sum by (le) (rate(claude_code_api_request_duration_seconds_bucket{model=\"$model_latency\"}[$__interval])))",
+            "legendFormat": "P75",
+            "range": true
+          },
+          {
+            "refId": "C",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "editorMode": "code",
+            "expr": "histogram_quantile(0.9, sum by (le) (rate(claude_code_api_request_duration_seconds_bucket{model=\"$model_latency\"}[$__interval])))",
+            "legendFormat": "P90",
+            "range": true
+          },
+          {
+            "refId": "D",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "editorMode": "code",
+            "expr": "histogram_quantile(0.95, sum by (le) (rate(claude_code_api_request_duration_seconds_bucket{model=\"$model_latency\"}[$__interval])))",
+            "legendFormat": "P95",
+            "range": true
+          },
+          {
+            "refId": "E",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "editorMode": "code",
+            "expr": "histogram_quantile(0.99, sum by (le) (rate(claude_code_api_request_duration_seconds_bucket{model=\"$model_latency\"}[$__interval])))",
+            "legendFormat": "P99",
+            "range": true
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "min": 0,
+            "max": 90,
+            "custom": {
+              "drawStyle": "line",
+              "lineWidth": 2,
+              "fillOpacity": 10,
+              "gradientMode": "opacity",
+              "spanNulls": true,
+              "showPoints": "never",
+              "lineInterpolation": "smooth",
+              "stacking": {
+                "mode": "none",
+                "group": "A"
+              },
+              "scaleDistribution": {
+                "type": "linear"
+              },
+              "thresholdsStyle": {
+                "mode": "off"
+              }
+            },
+            "mappings": [],
+            "color": {
+              "mode": "palette-classic"
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                }
+              ]
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "P50"
+              },
+              "properties": [
+                {
+                  "id": "color",
+                  "value": {
+                    "fixedColor": "#73BF69",
+                    "mode": "fixed"
+                  }
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "P75"
+              },
+              "properties": [
+                {
+                  "id": "color",
+                  "value": {
+                    "fixedColor": "#FADE2A",
+                    "mode": "fixed"
+                  }
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "P90"
+              },
+              "properties": [
+                {
+                  "id": "color",
+                  "value": {
+                    "fixedColor": "#FF9830",
+                    "mode": "fixed"
+                  }
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "P95"
+              },
+              "properties": [
+                {
+                  "id": "color",
+                  "value": {
+                    "fixedColor": "#F2495C",
+                    "mode": "fixed"
+                  }
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "P99"
+              },
+              "properties": [
+                {
+                  "id": "color",
+                  "value": {
+                    "fixedColor": "#B877D9",
+                    "mode": "fixed"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "right",
+            "calcs": [
+              "mean"
+            ],
+            "showLegend": true,
+            "width": 200,
+            "sortBy": "Mean",
+            "sortDesc": true
+          },
+          "tooltip": {
+            "mode": "multi",
+            "sort": "desc"
+          }
+        },
+        "description": "P50/P75/P90/P95/P99 request-duration distribution for this one model, from claude_code_api_request_duration_seconds_bucket (native Claude Code histogram, includes GLM which rides the same exporter -- see OTL-81). Y-axis is a shared static 0-90s range across every tile in this row for cross-model comparison; a model whose latencies are far below 90s will look visually flat here by design."
+      },
+      {
+        "id": 242,
+        "type": "row",
+        "title": "⑨ Throughput (per model)",
+        "collapsed": false,
+        "gridPos": {
+          "h": 1,
+          "w": 24,
+          "x": 0,
+          "y": 148
+        },
+        "panels": [],
+        "description": "OTL-84 (Ryan-directed): meant to mirror the Latency section with per-model tok/s percentile tiles. Not built -- see the panel below for exactly what instrumentation is missing and why a fake/approximate version was not shipped instead."
+      },
+      {
+        "id": 243,
+        "type": "text",
+        "title": "Throughput — no per-request tok/s instrumentation today",
+        "gridPos": {
+          "h": 6,
+          "w": 24,
+          "x": 0,
+          "y": 149
+        },
+        "options": {
+          "mode": "markdown",
+          "content": "### Claude Code emits no metric this section could plot\n\nA tok/s **percentile distribution** per model (mirroring the Latency section above) needs a per-request pairing of *tokens generated* and *time taken*, exposed as a histogram Grafana can run `histogram_quantile()` against. Checked the full live `claude_code_*` metric surface (2026-08-25) -- it does not exist:\n\n- `claude_code_api_request_duration_seconds_bucket` -- a duration histogram, labeled `model`/`le`. No token count attached to any one request.\n- `claude_code_token_usage_tokens_total` -- a counter, labeled `model`/`type` (input/output/cacheRead/cacheCreation). No duration attached, and it is a *cumulative counter*, not a per-request event -- there is no way to recover \"tokens produced in the same request that took N seconds\" from it.\n\nThese two metrics are never joined at the per-request level anywhere in the exported telemetry, so there is no way to derive a real percentile distribution of tokens/second from what's on this stack today -- only a coarse aggregate (`rate(tokens_total) / rate(duration_seconds_sum)` over a window), which is a single blended number, not a P50-P99 distribution, and would misrepresent the ticket's ask if shown here as if it were one.\n\n**What would light this up:** Claude Code's OTel exporter would need to either (a) emit a genuine per-request `tokens_per_second` (or `output_tokens` + `duration`) histogram, or (b) attach an output-token count as an attribute on the same span/event that already carries `api_request_duration`, so the two can be correlated per-request instead of only as independent aggregates. Neither exists in the current Claude Code telemetry surface -- this is an upstream instrumentation gap, not something this dashboard's queries can work around."
+        },
+        "description": "OTL-84 acceptance: 'if no throughput-capable metric exists today, record what instrumentation is missing instead' -- this panel is that record, not a stale placeholder to revisit blindly. Once Claude Code exports a per-request token/duration pairing, replace this panel with a $model_latency-repeated tile row mirroring the Latency section (same repeat/maxPerRow=3 pattern)."
+      },
+      {
+        "id": 260,
+        "type": "row",
+        "title": "↳ Cumulative (optional secondary view, by Host / Model)",
+        "collapsed": true,
+        "gridPos": {
+          "h": 1,
+          "w": 24,
+          "x": 0,
+          "y": 156
+        },
+        "description": "OTL-84 (Ryan-directed): added after Ryan confirmed the per-interval redesign above is correct and these panels were never meant to be cumulative. Collapsed by default -- open this row for the running-total/cumulative reading of spend and tokens by host and by model, reusing OTL-82-r3's proven window-anchored construction (starts at 0, documented semantics, does not match the per-interval panels of the same base title).",
+        "panels": [
+          {
+            "id": 261,
+            "title": "Cumulative Spend by Host",
+            "type": "timeseries",
+            "gridPos": {
+              "h": 7,
+              "w": 24,
+              "x": 0,
+              "y": 0
+            },
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "targets": [
+              {
+                "expr": "clamp_min((sum by (display) (label_replace(label_replace(sum by (host_name, hostname) (ai:cost_usd_accum:sum{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"}), \"display\", \"$1\", \"hostname\", \"(.+)\"), \"display\", \"$1\", \"host_name\", \"(.+)\"))) - ((sum by (display) (label_replace(label_replace(sum by (host_name, hostname) (ai:cost_usd_accum:sum{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"} @ ${__from:date:seconds}), \"display\", \"$1\", \"hostname\", \"(.+)\"), \"display\", \"$1\", \"host_name\", \"(.+)\"))) or (sum by (display) (label_replace(label_replace(sum by (host_name, hostname) (ai:cost_usd_accum:sum{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"}), \"display\", \"$1\", \"hostname\", \"(.+)\"), \"display\", \"$1\", \"host_name\", \"(.+)\")) * 0)), 0)",
+                "legendFormat": "{{display}}",
+                "refId": "A",
+                "interval": "$bucket"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "currencyUSD",
+                "custom": {
+                  "drawStyle": "line",
+                  "lineWidth": 2,
+                  "fillOpacity": 10,
+                  "gradientMode": "opacity",
+                  "spanNulls": true,
+                  "showPoints": "never",
+                  "lineInterpolation": "smooth",
+                  "stacking": {
+                    "mode": "none",
+                    "group": "A"
+                  },
+                  "scaleDistribution": {
+                    "type": "linear"
+                  },
+                  "thresholdsStyle": {
+                    "mode": "off"
+                  }
+                },
+                "mappings": [],
+                "thresholds": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    }
+                  ]
+                }
+              },
+              "overrides": []
+            },
+            "options": {
+              "legend": {
+                "displayMode": "table",
+                "placement": "right",
+                "calcs": [
+                  "lastNotNull",
+                  "max"
+                ],
+                "showLegend": true,
+                "width": 240,
+                "sortBy": "Last *",
+                "sortDesc": true
+              },
+              "tooltip": {
+                "mode": "multi",
+                "sort": "desc"
+              }
+            },
+            "description": "$ spent per time bucket, grouped by canonical host_name (falls back to the machine's hostname when host_name is not set). Shows which hosts are actively spending. Note: only hosts with the OTel context configured emit the canonical host_name (e.g. laptop); others appear under their FQDN. Aggregated with max_over_time, not increase: these counters are cumulative PER SESSION (every series carries session_id) and expire 15m after their last sample, so increase() would treat a short session's first sample as its baseline and undercount. See OTL-75. OTL-83 / OTL-82 recording-rules round (Ryan-directed): Ryan independently confirmed these 'by Host'/'by Model' panels were never meant to be cumulative -- the per-interval redesign in the primary section above (same title, no 'Cumulative' prefix) is correct and stays primary. This panel is an OPTIONAL secondary view, collapsed by default, offering the cumulative/running-total reading for whoever wants it. No longer built from a query-time max_over_time($__range) window (OTL-82-r3's shape, which matched the true total exactly at the FINAL point but could still dip mid-chart under session churn -- OTL-83). Now reads directly from the same monotonic, forward-latching recording rule the per-interval panels use (ai:tokens_accum:sum / ai:cost_usd_accum:sum -- see provisioning/prometheus/recording-rules.yml's \"ai-canonical-running-total\" group), anchored to the dashboard's own start via `@ ${__from:date:seconds}` (closes the earlier Codex P1 finding -- no pre-loaded first point). Because the underlying series is monotonic non-decreasing by construction (each 1m tick can only take the max of its prior recorded value and what it just observed), accum(t) - accum(@ start) is GENUINELY unable to decrease as t advances -- not merely measured to dip less often. Do not conflate this number with the per-interval panel of the same base title above -- they answer different questions (growth-since-window-start vs amount-in-this-bucket) and will not match."
+          },
+          {
+            "id": 262,
+            "title": "Cumulative Tokens by Host",
+            "type": "timeseries",
+            "gridPos": {
+              "h": 7,
+              "w": 24,
+              "x": 0,
+              "y": 7
+            },
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "targets": [
+              {
+                "expr": "clamp_min((sum by (display) (label_replace(label_replace(sum by (host_name, hostname) (ai:tokens_accum:sum{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"}), \"display\", \"$1\", \"hostname\", \"(.+)\"), \"display\", \"$1\", \"host_name\", \"(.+)\"))) - ((sum by (display) (label_replace(label_replace(sum by (host_name, hostname) (ai:tokens_accum:sum{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"} @ ${__from:date:seconds}), \"display\", \"$1\", \"hostname\", \"(.+)\"), \"display\", \"$1\", \"host_name\", \"(.+)\"))) or (sum by (display) (label_replace(label_replace(sum by (host_name, hostname) (ai:tokens_accum:sum{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"}), \"display\", \"$1\", \"hostname\", \"(.+)\"), \"display\", \"$1\", \"host_name\", \"(.+)\")) * 0)), 0)",
+                "legendFormat": "{{display}}",
+                "refId": "A",
+                "interval": "$bucket"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "short",
+                "custom": {
+                  "drawStyle": "line",
+                  "lineWidth": 2,
+                  "fillOpacity": 10,
+                  "gradientMode": "opacity",
+                  "spanNulls": true,
+                  "showPoints": "never",
+                  "lineInterpolation": "smooth",
+                  "stacking": {
+                    "mode": "none",
+                    "group": "A"
+                  },
+                  "scaleDistribution": {
+                    "type": "linear"
+                  },
+                  "thresholdsStyle": {
+                    "mode": "off"
+                  }
+                },
+                "mappings": [],
+                "thresholds": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    }
+                  ]
+                }
+              },
+              "overrides": []
+            },
+            "options": {
+              "legend": {
+                "displayMode": "table",
+                "placement": "right",
+                "calcs": [
+                  "lastNotNull",
+                  "max"
+                ],
+                "showLegend": true,
+                "width": 240,
+                "sortBy": "Last *",
+                "sortDesc": true
+              },
+              "tooltip": {
+                "mode": "multi",
+                "sort": "desc"
+              }
+            },
+            "description": "Tokens consumed per time bucket, grouped by canonical host_name (falls back to hostname when host_name is not set). A liveliness view of per-host activity. Aggregated with max_over_time, not increase: these counters are cumulative PER SESSION (every series carries session_id) and expire 15m after their last sample, so increase() would treat a short session's first sample as its baseline and undercount. See OTL-75. OTL-83 / OTL-82 recording-rules round (Ryan-directed): Ryan independently confirmed these 'by Host'/'by Model' panels were never meant to be cumulative -- the per-interval redesign in the primary section above (same title, no 'Cumulative' prefix) is correct and stays primary. This panel is an OPTIONAL secondary view, collapsed by default, offering the cumulative/running-total reading for whoever wants it. No longer built from a query-time max_over_time($__range) window (OTL-82-r3's shape, which matched the true total exactly at the FINAL point but could still dip mid-chart under session churn -- OTL-83). Now reads directly from the same monotonic, forward-latching recording rule the per-interval panels use (ai:tokens_accum:sum / ai:cost_usd_accum:sum -- see provisioning/prometheus/recording-rules.yml's \"ai-canonical-running-total\" group), anchored to the dashboard's own start via `@ ${__from:date:seconds}` (closes the earlier Codex P1 finding -- no pre-loaded first point). Because the underlying series is monotonic non-decreasing by construction (each 1m tick can only take the max of its prior recorded value and what it just observed), accum(t) - accum(@ start) is GENUINELY unable to decrease as t advances -- not merely measured to dip less often. Do not conflate this number with the per-interval panel of the same base title above -- they answer different questions (growth-since-window-start vs amount-in-this-bucket) and will not match."
+          },
+          {
+            "id": 263,
+            "title": "Cumulative Spend by Model",
+            "type": "timeseries",
+            "gridPos": {
+              "h": 7,
+              "w": 24,
+              "x": 0,
+              "y": 14
+            },
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "targets": [
+              {
+                "expr": "clamp_min((sum by (model_family) (label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(sum by (model) (ai:cost_usd_accum:sum{project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}), \"model_family\", \"$1\", \"model\", \"(.+)\"), \"model_family\", \"$1 $2.$3\", \"model\", \"claude-([a-z]+)-([0-9]+)-([0-9]+).*\"), \"model_family\", \"$1 $2\", \"model\", \"claude-([a-z]+)-([0-9]+)(\\\\[[^]]*\\\\])?$\"), \"model_family\", \"Opus $1\", \"model_family\", \"opus (.*)\"), \"model_family\", \"Haiku $1\", \"model_family\", \"haiku (.*)\"), \"model_family\", \"Sonnet $1\", \"model_family\", \"sonnet (.*)\"), \"model_family\", \"Fable $1\", \"model_family\", \"fable (.*)\"))) - ((sum by (model_family) (label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(sum by (model) (ai:cost_usd_accum:sum{project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"} @ ${__from:date:seconds}), \"model_family\", \"$1\", \"model\", \"(.+)\"), \"model_family\", \"$1 $2.$3\", \"model\", \"claude-([a-z]+)-([0-9]+)-([0-9]+).*\"), \"model_family\", \"$1 $2\", \"model\", \"claude-([a-z]+)-([0-9]+)(\\\\[[^]]*\\\\])?$\"), \"model_family\", \"Opus $1\", \"model_family\", \"opus (.*)\"), \"model_family\", \"Haiku $1\", \"model_family\", \"haiku (.*)\"), \"model_family\", \"Sonnet $1\", \"model_family\", \"sonnet (.*)\"), \"model_family\", \"Fable $1\", \"model_family\", \"fable (.*)\"))) or (sum by (model_family) (label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(sum by (model) (ai:cost_usd_accum:sum{project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}), \"model_family\", \"$1\", \"model\", \"(.+)\"), \"model_family\", \"$1 $2.$3\", \"model\", \"claude-([a-z]+)-([0-9]+)-([0-9]+).*\"), \"model_family\", \"$1 $2\", \"model\", \"claude-([a-z]+)-([0-9]+)(\\\\[[^]]*\\\\])?$\"), \"model_family\", \"Opus $1\", \"model_family\", \"opus (.*)\"), \"model_family\", \"Haiku $1\", \"model_family\", \"haiku (.*)\"), \"model_family\", \"Sonnet $1\", \"model_family\", \"sonnet (.*)\"), \"model_family\", \"Fable $1\", \"model_family\", \"fable (.*)\")) * 0)), 0)",
+                "legendFormat": "{{model_family}}",
+                "refId": "A",
+                "interval": "$bucket"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "currencyUSD",
+                "custom": {
+                  "drawStyle": "line",
+                  "lineWidth": 2,
+                  "fillOpacity": 10,
+                  "gradientMode": "opacity",
+                  "spanNulls": true,
+                  "showPoints": "never",
+                  "lineInterpolation": "smooth",
+                  "stacking": {
+                    "mode": "none",
+                    "group": "A"
+                  },
+                  "scaleDistribution": {
+                    "type": "linear"
+                  },
+                  "thresholdsStyle": {
+                    "mode": "off"
+                  }
+                },
+                "mappings": [],
+                "thresholds": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    }
+                  ]
+                }
+              },
+              "overrides": [
+                {
+                  "matcher": {
+                    "id": "byRegexp",
+                    "options": "(?i)opus"
+                  },
+                  "properties": [
+                    {
+                      "id": "color",
+                      "value": {
+                        "fixedColor": "#9B59B6",
+                        "mode": "fixed"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "matcher": {
+                    "id": "byRegexp",
+                    "options": "(?i)sonnet"
+                  },
+                  "properties": [
+                    {
+                      "id": "color",
+                      "value": {
+                        "fixedColor": "#E67E22",
+                        "mode": "fixed"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "matcher": {
+                    "id": "byRegexp",
+                    "options": "(?i)haiku"
+                  },
+                  "properties": [
+                    {
+                      "id": "color",
+                      "value": {
+                        "fixedColor": "#3498DB",
+                        "mode": "fixed"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            "options": {
+              "legend": {
+                "displayMode": "table",
+                "placement": "right",
+                "calcs": [
+                  "lastNotNull",
+                  "max"
+                ],
+                "showLegend": true,
+                "width": 240,
+                "sortBy": "Last *",
+                "sortDesc": true
+              },
+              "tooltip": {
+                "mode": "multi",
+                "sort": "desc"
+              }
+            },
+            "description": "$ spent per time bucket (width = Grafana $__interval, typically 15s-15m depending on zoom). Each point = actual cost attributed to that bucket. Aggregated with max_over_time, not increase: these counters are cumulative PER SESSION (every series carries session_id) and expire 15m after their last sample, so increase() would treat a short session's first sample as its baseline and undercount. See OTL-75. OTL-83 / OTL-82 recording-rules round (Ryan-directed): Ryan independently confirmed these 'by Host'/'by Model' panels were never meant to be cumulative -- the per-interval redesign in the primary section above (same title, no 'Cumulative' prefix) is correct and stays primary. This panel is an OPTIONAL secondary view, collapsed by default, offering the cumulative/running-total reading for whoever wants it. No longer built from a query-time max_over_time($__range) window (OTL-82-r3's shape, which matched the true total exactly at the FINAL point but could still dip mid-chart under session churn -- OTL-83). Now reads directly from the same monotonic, forward-latching recording rule the per-interval panels use (ai:tokens_accum:sum / ai:cost_usd_accum:sum -- see provisioning/prometheus/recording-rules.yml's \"ai-canonical-running-total\" group), anchored to the dashboard's own start via `@ ${__from:date:seconds}` (closes the earlier Codex P1 finding -- no pre-loaded first point). Because the underlying series is monotonic non-decreasing by construction (each 1m tick can only take the max of its prior recorded value and what it just observed), accum(t) - accum(@ start) is GENUINELY unable to decrease as t advances -- not merely measured to dip less often. Do not conflate this number with the per-interval panel of the same base title above -- they answer different questions (growth-since-window-start vs amount-in-this-bucket) and will not match."
+          },
+          {
+            "id": 264,
+            "title": "Cumulative Tokens by Model",
+            "type": "timeseries",
+            "gridPos": {
+              "h": 7,
+              "w": 24,
+              "x": 0,
+              "y": 21
+            },
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "targets": [
+              {
+                "expr": "clamp_min((sum by (model_family) (label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(sum by (model) (ai:tokens_accum:sum{project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}), \"model_family\", \"$1\", \"model\", \"(.+)\"), \"model_family\", \"$1 $2.$3\", \"model\", \"claude-([a-z]+)-([0-9]+)-([0-9]+).*\"), \"model_family\", \"$1 $2\", \"model\", \"claude-([a-z]+)-([0-9]+)(\\\\[[^]]*\\\\])?$\"), \"model_family\", \"Opus $1\", \"model_family\", \"opus (.*)\"), \"model_family\", \"Haiku $1\", \"model_family\", \"haiku (.*)\"), \"model_family\", \"Sonnet $1\", \"model_family\", \"sonnet (.*)\"), \"model_family\", \"Fable $1\", \"model_family\", \"fable (.*)\"))) - ((sum by (model_family) (label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(sum by (model) (ai:tokens_accum:sum{project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"} @ ${__from:date:seconds}), \"model_family\", \"$1\", \"model\", \"(.+)\"), \"model_family\", \"$1 $2.$3\", \"model\", \"claude-([a-z]+)-([0-9]+)-([0-9]+).*\"), \"model_family\", \"$1 $2\", \"model\", \"claude-([a-z]+)-([0-9]+)(\\\\[[^]]*\\\\])?$\"), \"model_family\", \"Opus $1\", \"model_family\", \"opus (.*)\"), \"model_family\", \"Haiku $1\", \"model_family\", \"haiku (.*)\"), \"model_family\", \"Sonnet $1\", \"model_family\", \"sonnet (.*)\"), \"model_family\", \"Fable $1\", \"model_family\", \"fable (.*)\"))) or (sum by (model_family) (label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(sum by (model) (ai:tokens_accum:sum{project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}), \"model_family\", \"$1\", \"model\", \"(.+)\"), \"model_family\", \"$1 $2.$3\", \"model\", \"claude-([a-z]+)-([0-9]+)-([0-9]+).*\"), \"model_family\", \"$1 $2\", \"model\", \"claude-([a-z]+)-([0-9]+)(\\\\[[^]]*\\\\])?$\"), \"model_family\", \"Opus $1\", \"model_family\", \"opus (.*)\"), \"model_family\", \"Haiku $1\", \"model_family\", \"haiku (.*)\"), \"model_family\", \"Sonnet $1\", \"model_family\", \"sonnet (.*)\"), \"model_family\", \"Fable $1\", \"model_family\", \"fable (.*)\")) * 0)), 0)",
+                "legendFormat": "{{model_family}}",
+                "refId": "A",
+                "interval": "$bucket"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "short",
+                "custom": {
+                  "drawStyle": "line",
+                  "lineWidth": 2,
+                  "fillOpacity": 10,
+                  "gradientMode": "opacity",
+                  "spanNulls": true,
+                  "showPoints": "never",
+                  "lineInterpolation": "smooth",
+                  "stacking": {
+                    "mode": "none",
+                    "group": "A"
+                  },
+                  "scaleDistribution": {
+                    "type": "linear"
+                  },
+                  "thresholdsStyle": {
+                    "mode": "off"
+                  }
+                },
+                "mappings": [],
+                "thresholds": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    }
+                  ]
+                }
+              },
+              "overrides": [
+                {
+                  "matcher": {
+                    "id": "byRegexp",
+                    "options": "(?i)opus"
+                  },
+                  "properties": [
+                    {
+                      "id": "color",
+                      "value": {
+                        "fixedColor": "#9B59B6",
+                        "mode": "fixed"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "matcher": {
+                    "id": "byRegexp",
+                    "options": "(?i)sonnet"
+                  },
+                  "properties": [
+                    {
+                      "id": "color",
+                      "value": {
+                        "fixedColor": "#E67E22",
+                        "mode": "fixed"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "matcher": {
+                    "id": "byRegexp",
+                    "options": "(?i)haiku"
+                  },
+                  "properties": [
+                    {
+                      "id": "color",
+                      "value": {
+                        "fixedColor": "#3498DB",
+                        "mode": "fixed"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            "options": {
+              "legend": {
+                "displayMode": "table",
+                "placement": "right",
+                "calcs": [
+                  "lastNotNull",
+                  "max"
+                ],
+                "showLegend": true,
+                "width": 240,
+                "sortBy": "Last *",
+                "sortDesc": true
+              },
+              "tooltip": {
+                "mode": "multi",
+                "sort": "desc"
+              }
+            },
+            "description": "Tokens consumed per time bucket, grouped by normalized model family and summed across input, output, cache-read, and cache-creation token classes. Aggregated with max_over_time, not increase: these counters are cumulative PER SESSION (every series carries session_id) and expire 15m after their last sample, so increase() would treat a short session's first sample as its baseline and undercount. See OTL-75. OTL-83 / OTL-82 recording-rules round (Ryan-directed): Ryan independently confirmed these 'by Host'/'by Model' panels were never meant to be cumulative -- the per-interval redesign in the primary section above (same title, no 'Cumulative' prefix) is correct and stays primary. This panel is an OPTIONAL secondary view, collapsed by default, offering the cumulative/running-total reading for whoever wants it. No longer built from a query-time max_over_time($__range) window (OTL-82-r3's shape, which matched the true total exactly at the FINAL point but could still dip mid-chart under session churn -- OTL-83). Now reads directly from the same monotonic, forward-latching recording rule the per-interval panels use (ai:tokens_accum:sum / ai:cost_usd_accum:sum -- see provisioning/prometheus/recording-rules.yml's \"ai-canonical-running-total\" group), anchored to the dashboard's own start via `@ ${__from:date:seconds}` (closes the earlier Codex P1 finding -- no pre-loaded first point). Because the underlying series is monotonic non-decreasing by construction (each 1m tick can only take the max of its prior recorded value and what it just observed), accum(t) - accum(@ start) is GENUINELY unable to decrease as t advances -- not merely measured to dip less often. Do not conflate this number with the per-interval panel of the same base title above -- they answer different questions (growth-since-window-start vs amount-in-this-bucket) and will not match."
+          }
+        ]
+      }
   ],
   "refresh": "30s",
   "schemaVersion": 39,
@@ -6936,6 +7495,32 @@
         "query": {
           "qryType": 1,
           "query": "label_values(system_cpu_utilization_ratio, host_name)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 2,
+        "regex": "",
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "definition": "label_values(claude_code_api_request_duration_seconds_bucket, model)",
+        "description": "OTL-84: drives the per-model Latency tile repeat below. Named model_latency (not model) to avoid any ambiguity with the raw Prometheus label `model` used elsewhere via {{model}} legend formatting.",
+        "includeAll": true,
+        "multi": true,
+        "name": "model_latency",
+        "query": {
+          "qryType": 1,
+          "query": "label_values(claude_code_api_request_duration_seconds_bucket, model)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 2,
