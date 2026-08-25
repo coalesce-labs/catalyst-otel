@@ -2720,146 +2720,6 @@
       "id": 203,
       "panels": [
         {
-          "id": 17,
-          "title": "API Request Duration",
-          "type": "timeseries",
-          "gridPos": {
-            "h": 7,
-            "w": 24,
-            "x": 0,
-            "y": 36
-          },
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "targets": [
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "prometheus"
-              },
-              "editorMode": "code",
-              "expr": "histogram_quantile(0.5, sum by (le, model) (rate(claude_code_api_request_duration_seconds_bucket[$__interval])))",
-              "legendFormat": "p50 {{model}}",
-              "range": true,
-              "refId": "A",
-              "interval": "$bucket"
-            },
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "prometheus"
-              },
-              "editorMode": "code",
-              "expr": "histogram_quantile(0.95, sum by (le, model) (rate(claude_code_api_request_duration_seconds_bucket[$__interval])))",
-              "legendFormat": "p95 {{model}}",
-              "range": true,
-              "refId": "B",
-              "interval": "$bucket"
-            }
-          ],
-          "fieldConfig": {
-            "defaults": {
-              "unit": "s",
-              "custom": {
-                "drawStyle": "line",
-                "lineWidth": 2,
-                "fillOpacity": 15,
-                "gradientMode": "opacity",
-                "spanNulls": true,
-                "showPoints": "never",
-                "lineInterpolation": "smooth",
-                "stacking": {
-                  "mode": "none",
-                  "group": "A"
-                },
-                "scaleDistribution": {
-                  "type": "linear"
-                },
-                "thresholdsStyle": {
-                  "mode": "off"
-                }
-              },
-              "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "green",
-                    "value": null
-                  }
-                ]
-              }
-            },
-            "overrides": [
-              {
-                "matcher": {
-                  "id": "byRegexp",
-                  "options": "(?i)opus"
-                },
-                "properties": [
-                  {
-                    "id": "color",
-                    "value": {
-                      "fixedColor": "#9B59B6",
-                      "mode": "fixed"
-                    }
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byRegexp",
-                  "options": "(?i)sonnet"
-                },
-                "properties": [
-                  {
-                    "id": "color",
-                    "value": {
-                      "fixedColor": "#E67E22",
-                      "mode": "fixed"
-                    }
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byRegexp",
-                  "options": "(?i)haiku"
-                },
-                "properties": [
-                  {
-                    "id": "color",
-                    "value": {
-                      "fixedColor": "#3498DB",
-                      "mode": "fixed"
-                    }
-                  }
-                ]
-              }
-            ]
-          },
-          "options": {
-            "legend": {
-              "displayMode": "table",
-              "placement": "right",
-              "calcs": [
-                "mean",
-                "max"
-              ],
-              "showLegend": true,
-              "width": 240,
-              "sortBy": "Mean",
-              "sortDesc": true
-            },
-            "tooltip": {
-              "mode": "multi",
-              "sort": "desc"
-            }
-          }
-        },
-        {
           "id": 9,
           "title": "Tool Usage Rate",
           "type": "timeseries",
@@ -2867,7 +2727,7 @@
             "h": 7,
             "w": 24,
             "x": 0,
-            "y": 43
+            "y": 36
           },
           "datasource": {
             "type": "prometheus",
@@ -3011,7 +2871,7 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 50
+            "y": 43
           },
           "datasource": {
             "type": "prometheus",
@@ -3192,7 +3052,7 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 58
+            "y": 51
           },
           "datasource": {
             "type": "prometheus",
@@ -3275,7 +3135,7 @@
             "h": 7,
             "w": 24,
             "x": 0,
-            "y": 66
+            "y": 59
           },
           "datasource": {
             "type": "prometheus",
@@ -6802,7 +6662,260 @@
         "content": "### Qwen (OpenCode) \u2014 no telemetry today\n\nQwen is interactive-only via OpenCode and emits **no telemetry into this stack** as of 2026-08-24 \u2014 zero `qwen_*`/`opencode_*` series in Prometheus, no `service_name=~\"qwen.*|opencode.*\"` streams in Loki (checked live). This is a **structural placeholder**, not a stale panel: `ai:tokens:sum{provider=\"qwen\"}` and `ai:cost_usd:sum` legs exist in `provisioning/prometheus/recording-rules.yml` today (inert \u2014 match zero series until real data lands), and the Tokens/Spend-by-Provider panels above already group by `provider`, so Qwen appears automatically once telemetry starts, no dashboard edit required.\n\n**To light this up:**\n1. Wire `qwencloud auth login` (account-level keychain, not the model key \u2014 zero ToS exposure) and the `qwencloud usage summary --format json` poll into `scripts/ai-subscription-limit-scraper.sh` alongside the existing claude/codex/glm scrapers \u2014 recipe + verified endpoint shape on **OTL-80**.\n2. Confirm what OpenCode's actual OTel exporter emits (metric family name, service.name) \u2014 unverified; update the recording-rule metric names in `recording-rules.yml` from the placeholder once real series are observed.\n\nCredit formula for Qwen is **not published** (dynamic, hidden consumption items per OTL-80 research) \u2014 client-side cost estimation is not viable there the way it is for GLM; the limit-window scrape is the only trustworthy Qwen usage signal available."
       },
       "description": "OTL-81 acceptance: 'the Qwen lane's series appear automatically once Qwen telemetry first arrives' \u2014 satisfied structurally (recording-rule leg + provider-grouped panels), not by fabricating data."
-    }
+    },
+      {
+        "id": 240,
+        "type": "row",
+        "title": "⑧ Latency (per model)",
+        "collapsed": false,
+        "gridPos": {
+          "h": 1,
+          "w": 24,
+          "x": 0,
+          "y": 139
+        },
+        "panels": [],
+        "description": "OTL-84 (Ryan-directed): replaces the old single 'API Request Duration' panel that overlaid every model's p50/p95 on one axis. One tile per model now (Grafana panel repeat on $model_latency, maxPerRow=3 -- dynamically follows however many models are actually emitting, not a fixed count), each plotting P50/P75/P90/P95/P99 with an Avg-per-percentile legend. Y-axis min/max are a SHARED, STATIC range (not a per-refresh dynamic computation -- Grafana's panel-repeat has no mechanism for tiles to see each other's data and auto-scale to a common range) chosen from live data at build time so relative tile heights are comparable; fast models will look visually compressed against slower ones by design, since the goal is cross-model comparison, not per-model internal precision. Revisit the static ceiling if real-world latencies grow past it (values would clip) or shrink well under it (wasted range)."
+      },
+      {
+        "id": 241,
+        "type": "timeseries",
+        "title": "$model_latency",
+        "repeat": "model_latency",
+        "repeatDirection": "h",
+        "maxPerRow": 3,
+        "gridPos": {
+          "h": 8,
+          "w": 8,
+          "x": 0,
+          "y": 140
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "editorMode": "code",
+            "expr": "histogram_quantile(0.5, sum by (le) (rate(claude_code_api_request_duration_seconds_bucket{model=\"$model_latency\"}[$__interval])))",
+            "legendFormat": "P50",
+            "range": true
+          },
+          {
+            "refId": "B",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "editorMode": "code",
+            "expr": "histogram_quantile(0.75, sum by (le) (rate(claude_code_api_request_duration_seconds_bucket{model=\"$model_latency\"}[$__interval])))",
+            "legendFormat": "P75",
+            "range": true
+          },
+          {
+            "refId": "C",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "editorMode": "code",
+            "expr": "histogram_quantile(0.9, sum by (le) (rate(claude_code_api_request_duration_seconds_bucket{model=\"$model_latency\"}[$__interval])))",
+            "legendFormat": "P90",
+            "range": true
+          },
+          {
+            "refId": "D",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "editorMode": "code",
+            "expr": "histogram_quantile(0.95, sum by (le) (rate(claude_code_api_request_duration_seconds_bucket{model=\"$model_latency\"}[$__interval])))",
+            "legendFormat": "P95",
+            "range": true
+          },
+          {
+            "refId": "E",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "editorMode": "code",
+            "expr": "histogram_quantile(0.99, sum by (le) (rate(claude_code_api_request_duration_seconds_bucket{model=\"$model_latency\"}[$__interval])))",
+            "legendFormat": "P99",
+            "range": true
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "min": 0,
+            "max": 90,
+            "custom": {
+              "drawStyle": "line",
+              "lineWidth": 2,
+              "fillOpacity": 10,
+              "gradientMode": "opacity",
+              "spanNulls": true,
+              "showPoints": "never",
+              "lineInterpolation": "smooth",
+              "stacking": {
+                "mode": "none",
+                "group": "A"
+              },
+              "scaleDistribution": {
+                "type": "linear"
+              },
+              "thresholdsStyle": {
+                "mode": "off"
+              }
+            },
+            "mappings": [],
+            "color": {
+              "mode": "palette-classic"
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                }
+              ]
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "P50"
+              },
+              "properties": [
+                {
+                  "id": "color",
+                  "value": {
+                    "fixedColor": "#73BF69",
+                    "mode": "fixed"
+                  }
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "P75"
+              },
+              "properties": [
+                {
+                  "id": "color",
+                  "value": {
+                    "fixedColor": "#FADE2A",
+                    "mode": "fixed"
+                  }
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "P90"
+              },
+              "properties": [
+                {
+                  "id": "color",
+                  "value": {
+                    "fixedColor": "#FF9830",
+                    "mode": "fixed"
+                  }
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "P95"
+              },
+              "properties": [
+                {
+                  "id": "color",
+                  "value": {
+                    "fixedColor": "#F2495C",
+                    "mode": "fixed"
+                  }
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "P99"
+              },
+              "properties": [
+                {
+                  "id": "color",
+                  "value": {
+                    "fixedColor": "#B877D9",
+                    "mode": "fixed"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "right",
+            "calcs": [
+              "mean"
+            ],
+            "showLegend": true,
+            "width": 200,
+            "sortBy": "Mean",
+            "sortDesc": true
+          },
+          "tooltip": {
+            "mode": "multi",
+            "sort": "desc"
+          }
+        },
+        "description": "P50/P75/P90/P95/P99 request-duration distribution for this one model, from claude_code_api_request_duration_seconds_bucket (native Claude Code histogram, includes GLM which rides the same exporter -- see OTL-81). Y-axis is a shared static 0-90s range across every tile in this row for cross-model comparison; a model whose latencies are far below 90s will look visually flat here by design."
+      },
+      {
+        "id": 242,
+        "type": "row",
+        "title": "⑨ Throughput (per model)",
+        "collapsed": false,
+        "gridPos": {
+          "h": 1,
+          "w": 24,
+          "x": 0,
+          "y": 148
+        },
+        "panels": [],
+        "description": "OTL-84 (Ryan-directed): meant to mirror the Latency section with per-model tok/s percentile tiles. Not built -- see the panel below for exactly what instrumentation is missing and why a fake/approximate version was not shipped instead."
+      },
+      {
+        "id": 243,
+        "type": "text",
+        "title": "Throughput — no per-request tok/s instrumentation today",
+        "gridPos": {
+          "h": 6,
+          "w": 24,
+          "x": 0,
+          "y": 149
+        },
+        "options": {
+          "mode": "markdown",
+          "content": "### Claude Code emits no metric this section could plot\n\nA tok/s **percentile distribution** per model (mirroring the Latency section above) needs a per-request pairing of *tokens generated* and *time taken*, exposed as a histogram Grafana can run `histogram_quantile()` against. Checked the full live `claude_code_*` metric surface (2026-08-25) -- it does not exist:\n\n- `claude_code_api_request_duration_seconds_bucket` -- a duration histogram, labeled `model`/`le`. No token count attached to any one request.\n- `claude_code_token_usage_tokens_total` -- a counter, labeled `model`/`type` (input/output/cacheRead/cacheCreation). No duration attached, and it is a *cumulative counter*, not a per-request event -- there is no way to recover \"tokens produced in the same request that took N seconds\" from it.\n\nThese two metrics are never joined at the per-request level anywhere in the exported telemetry, so there is no way to derive a real percentile distribution of tokens/second from what's on this stack today -- only a coarse aggregate (`rate(tokens_total) / rate(duration_seconds_sum)` over a window), which is a single blended number, not a P50-P99 distribution, and would misrepresent the ticket's ask if shown here as if it were one.\n\n**What would light this up:** Claude Code's OTel exporter would need to either (a) emit a genuine per-request `tokens_per_second` (or `output_tokens` + `duration`) histogram, or (b) attach an output-token count as an attribute on the same span/event that already carries `api_request_duration`, so the two can be correlated per-request instead of only as independent aggregates. Neither exists in the current Claude Code telemetry surface -- this is an upstream instrumentation gap, not something this dashboard's queries can work around."
+        },
+        "description": "OTL-84 acceptance: 'if no throughput-capable metric exists today, record what instrumentation is missing instead' -- this panel is that record, not a stale placeholder to revisit blindly. Once Claude Code exports a per-request token/duration pairing, replace this panel with a $model_latency-repeated tile row mirroring the Latency section (same repeat/maxPerRow=3 pattern)."
+      }
   ],
   "refresh": "30s",
   "schemaVersion": 39,
@@ -6967,6 +7080,32 @@
         "query": {
           "qryType": 1,
           "query": "label_values(system_cpu_utilization_ratio, host_name)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 2,
+        "regex": "",
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "definition": "label_values(claude_code_api_request_duration_seconds_bucket, model)",
+        "description": "OTL-84: drives the per-model Latency tile repeat below. Named model_latency (not model) to avoid any ambiguity with the raw Prometheus label `model` used elsewhere via {{model}} legend formatting.",
+        "includeAll": true,
+        "multi": true,
+        "name": "model_latency",
+        "query": {
+          "qryType": 1,
+          "query": "label_values(claude_code_api_request_duration_seconds_bucket, model)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 2,
