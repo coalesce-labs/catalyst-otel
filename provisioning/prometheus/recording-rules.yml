@@ -438,9 +438,10 @@ groups:
   #      from v1) is still what makes the accumulator survive Prometheus
   #      eval gaps, same reasoning as v1's prior/current windows.
   #
-  # FLAWED-WINDOW DECISION (OTL-87, no separate runbook doc exists for this
-  # in the repo -- see the OTL-85 backfill note below, and this file's own
-  # established convention of documenting these decisions inline): the v1
+  # FLAWED-WINDOW DECISION (OTL-87 -- no separate "OTL-85 runbook" doc
+  # exists anywhere in this repo for this kind of decision; recorded here
+  # instead, per this file's own established convention of documenting
+  # these decisions inline): the v1
   # rule was live 2026-08-24 ~08:54 through this fix's deploy, and
   # permanently under-recorded every dims combo whose concurrency dropped
   # below an earlier local peak during that window. Because v2 is also
