@@ -1,5 +1,5 @@
 # Claude Code Observability Stack
-.PHONY: help up down logs restart clean validate-config pull deploy
+.PHONY: help up down logs restart clean validate-config pull deploy dashboard-validate prometheus-test
 
 help: ## Show this help message
 	@echo "Claude Code Observability Stack"
@@ -104,7 +104,7 @@ demo-metrics: ## Generate demo metrics for testing
 	@echo "💡 To see real metrics, ensure Claude Code is configured with telemetry enabled"
 	@echo "📖 Run 'make setup-claude' for setup instructions"
 
-dashboard-validate: ## Validate dashboard JSON files
+dashboard-validate: ## Validate dashboard JSON files + Prometheus rules (OTL-89)
 	@echo "📊 Validating dashboard files..."
 	@for f in dashboards/*.json; do \
 		if [ -f "$$f" ]; then \
@@ -113,3 +113,8 @@ dashboard-validate: ## Validate dashboard JSON files
 	done
 	@echo "🔎 Running structural + content assertions (scripts/validate-dashboard.sh)..."
 	@bash scripts/validate-dashboard.sh
+	@echo "🔎 Running Prometheus rulefmt gate + promtool tests (scripts/validate-prometheus-rules.sh)..."
+	@bash scripts/validate-prometheus-rules.sh
+
+prometheus-test: ## Run promtool unit tests for the recording rules (OTL-87/OTL-89)
+	@promtool test rules provisioning/prometheus/tests/*.test.yml
