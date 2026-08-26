@@ -103,8 +103,11 @@ start time (check `curl .../api/v1/status/runtimeinfo` → `startTime`, or
 just use "when the `ai:*` rules were actually deployed and began evaluating
 live" if you know it) — otherwise the backfilled blocks and the live head
 block will both claim samples in the same window, which is exactly the
-overlap the promtool docs warn against. Use a comfortable buffer (20+
-minutes) before that boundary, not the exact instant.
+overlap the promtool docs warn against.
+
+⚠️ Superseded in part by Step 5a: do NOT pick a comfortable buffer. A margin
+is what creates a boundary dip. Pin the live rule's true first sample
+empirically and stop ~30 seconds short of it.
 
 ### Step 1b — validate the generated blocks BEFORE touching the server
 
@@ -179,6 +182,119 @@ reach ~2026-04-08; `ai:efficiency:*` will only reach as far back as
 `ai_subscription_limit_used_percent` has samples, which is bounded by
 Loki's 168h out-of-order window per
 `scripts/codex-limit-history-replay.sh` — see that script's header comment).
+
+## Step 5 — re-backfilling a window that ALREADY has (bad) samples
+
+Steps 1-4 cover the easy case: an empty stretch of history, where new
+blocks simply fill a hole. OTL-88 (2026-08-26) hit the harder case —
+2026-08-25 13:31-20:36 UTC already held samples, written live by the v1
+max-latch accumulator that OTL-87/PR #182 replaced. Three extra rules
+apply, all learned the hard way.
+
+### 5a — pin BOTH seams empirically; never pick a safety margin
+
+The OTL-85 seam lesson generalizes: a conservative buffer around the
+boundary is what CREATES a boundary dip, because whatever the rule was
+tracking can expire inside the buffer. Binary-scan the real sample
+timestamps instead. `max(timestamp(<series>))` stepped at 10s resolves a
+rule's true birth to the second — note that `timestamp(sum(x))` does NOT
+work (the aggregation restamps to eval time); it must be
+`max(timestamp(x))`.
+
+```bash
+# first sample of whichever rule bounds your window
+curl -sG .../api/v1/query_range \
+  --data-urlencode 'query=max(timestamp(ai:tokens_accum_delta:sum))' \
+  --data-urlencode 'start=...' --data-urlencode 'end=...' \
+  --data-urlencode 'step=10'
+```
+
+A rule shipped by the SAME PR as the fix is the cleanest birth marker for
+that deploy — OTL-88 used `ai:tokens_accum_delta:sum` (new in #182) to pin
+the #182 deploy at 1787690172.295 = 2026-08-25T20:36:12.295Z, and the
+`--end` was set so the last backfilled sample landed 9.6 seconds before
+it. The prose date in a PR description is not evidence; #182's own
+description was a full day off, and #187's correction was still three
+minutes off the true first sample.
+
+### 5b — promtool cannot chain a self-reference; accumulate in two passes
+
+OTL-85 recorded that `create-blocks-from rules` queries the LIVE server
+for a rule's self-reference branch, so a self-latching accumulator
+backfills as its raw branch only. That is fine when the raw branch is the
+whole story, but it will NOT reconstruct a running total — and dropping a
+non-accumulating raw-branch segment into the middle of an accumulator
+produces a step at its right-hand seam, which the "per Interval" panels
+render as a fresh phantom spike. Accumulate in two passes instead:
+
+1. **Pass A** — backfill only the DELTA rules
+   (`ai:tokens_accum_delta:sum` / `ai:cost_usd_accum_delta:sum`), byte-for-byte
+   as shipped. They are pure functions of the raw counters with no
+   self-reference, so promtool evaluates them retroactively without
+   complaint. Move those blocks into the live TSDB (they are new history
+   for a series that has no samples that far back, so nothing overlaps).
+2. **Pass B** — backfill the accumulator as
+   `anchor + sum_over_time(<delta series>[W])`, where the anchor is the
+   last pre-flaw sample pinned with `@` (e.g.
+   `last_over_time(ai:tokens_accum:sum[5m] @ 1787664560)`) and `W` is any
+   window WIDER than the whole flawed window. Pass A samples exist only
+   inside the window, so the sum self-clips to (window start, t] — no
+   growing-window trick needed. Give each `or` branch a `+ 0` so the
+   metric name is dropped on every branch, otherwise the branches never
+   match and the rule errors on a duplicate labelset.
+
+Do not try to do this in one pass with a subquery
+(`sum_over_time((<delta expr>)[W:1m])`). It is correct, but it re-evaluates
+the inner expression at every inner step for every outer step — hundreds of
+thousands of range evaluations against the live server.
+
+### 5c — delete the bad samples BEFORE inserting, via a temp admin container
+
+Overlapping blocks with duplicate timestamps resolve non-deterministically;
+the old samples must actually go. `otel-prometheus` does not run with
+`--web.enable-admin-api` and should not be changed to. Stop it and run a
+throwaway container over the same data directory instead:
+
+```bash
+docker compose stop otel-prometheus
+docker run -d --name tmp-admin-prom --network host \
+  -v /data/otel-stack-data/prometheus:/prometheus \
+  -v /path/to/minimal-config:/etc/prometheus:ro \
+  prom/prometheus:latest \
+  --config.file=/etc/prometheus/prometheus.yml \
+  --storage.tsdb.path=/prometheus \
+  --storage.tsdb.retention.time=2y \
+  --web.enable-admin-api \
+  --web.listen-address=:9401
+curl -X POST 'http://localhost:9401/api/v1/admin/tsdb/delete_series?match%5B%5D=<series>&start=...&end=...'
+curl -X POST 'http://localhost:9401/api/v1/admin/tsdb/clean_tombstones'
+```
+
+⚠️ **`--storage.tsdb.retention.time=2y` is not optional.** The default is
+15 days. A temp container started without it will silently delete every
+block older than that — i.e. the entire backfilled history you are here to
+protect.
+
+⚠️ Pick the listen port by checking `ss -ltn` first. `:9090` on this host is
+a stray Home Assistant Prometheus (the real one is `:9098`), and `:9401` was
+chosen for OTL-88 only after `:9099` turned out to be taken — a readiness
+probe against an occupied port cheerfully returns another service's 404.
+
+Order matters: delete → `clean_tombstones` → copy Pass B blocks in → start
+`otel-prometheus`. Copying first means the delete eats your own new samples.
+
+### 5d — what this can and cannot fix
+
+A reconstruction only repairs the window itself. Everything AFTER the
+window was computed by the live accumulator from whatever (too-low) base
+the broken rule left behind, so a faithful reconstruction ends higher than
+the live series resumes and there is a one-sample cliff at the seam. That
+is expected and benign here: every "per Interval" panel wraps its
+subtraction in `clamp_min(..., 0)`, so the cliff renders as a single
+understated bucket rather than a negative or a spike. Re-basing the whole
+post-window series to remove the cliff would mean rewriting all history
+since — do not do it without a Ryan-level decision. Say plainly in the
+report which direction the seam steps and by how much.
 
 ## If this looks riskier than the value once you're actually doing it
 
