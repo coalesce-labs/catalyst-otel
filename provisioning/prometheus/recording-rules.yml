@@ -456,6 +456,78 @@ groups:
   # it. Left for the coordinator to execute (per dispatch note), since it
   # requires the live Prometheus TSDB this worktree has no access to.
   #
+  # OTL-88 (Ryan-directed, found live 2026-08-25 ~139M-token/$102 spike):
+  # closes two DIFFERENT mechanisms, both traced to the same "20-minute
+  # self-lookback" idea above being exact only across BACK-TO-BACK 1-minute
+  # evaluations:
+  #
+  #   1. THE TICKET'S NAMED BUG (this file): `ai:tokens_accum_delta:sum` /
+  #      `ai:cost_usd_accum_delta:sum` compute each tick's contribution as
+  #      raw(t) - raw(t) offset 1m -- exact when the rule group's own
+  #      evaluation cadence keeps up with the raw counter's continuous
+  #      scrape cadence, but silently captures only the FINAL 60 SECONDS of
+  #      growth whenever the rule group's own ticks fall behind (a "slow
+  #      rule group": Prometheus keeps scraping normally, only this group's
+  #      own evaluation lags). Fix: a second, 20-minute-offset delta
+  #      (`ai:tokens_accum_delta_20m:sum` / `ai:cost_usd_accum_delta_20m:sum`
+  #      above) computed directly from raw counters, exact regardless of how
+  #      many intermediate ticks fired, combined with the existing 1-minute
+  #      fast path via an element-wise max (`(A > B) or B or (A unless B)`,
+  #      proven standalone against stub metrics in
+  #      `tests/recording-rules.test.yml` Group D, since promtool cannot
+  #      chain the real self-referential candidates -- see that file's own
+  #      header). Rejected alternative: widening the EXISTING 1-minute
+  #      rule's offset in place -- changes its semantics from "growth in the
+  #      last tick" to "growth over a trailing N-minute window," forces
+  #      rewriting every promtool assertion calibrated to 1-minute
+  #      granularity, and introduces a NEW steady-state precision loss (a
+  #      same-session_id reset-then-full-recovery cycle completing entirely
+  #      inside the wider window nets out at the endpoints and is silently
+  #      under-counted -- pinned by `tests/recording-rules.test.yml` Group
+  #      C2c -- where today's 1-minute cadence catches it incrementally).
+  #      The dual-candidate design changes nothing about the existing rule
+  #      (`ai:tokens_accum_delta:sum` / `ai:cost_usd_accum_delta:sum` stay
+  #      byte-for-byte unchanged) and only ADDS a corrective path that wins
+  #      the max() comparison exactly when the fast path would under-count.
+  #
+  #   2. THE LIVE-OBSERVED SPIKE (dashboards/unified-dashboard.json, NOT
+  #      this file): a structurally identical bug one layer up. The nine
+  #      "per Interval" panels (ids 7, 8, 30, 31, 36, 37, 76, 77, 209) do
+  #      their own `X - (X offset $__interval or X * 0)` arithmetic
+  #      directly against the cumulative `ai:tokens_accum:sum` /
+  #      `ai:cost_usd_accum:sum` series. When a Prometheus restart (or any
+  #      other gap in THIS RULE'S OWN recorded-sample history, independent
+  #      of mechanism 1 above) leaves a gap wider than the panel's implicit
+  #      staleness lookback around the `offset $__interval` point, the
+  #      `or (X * 0)` fallback -- correct for a genuinely brand-new dims
+  #      combo -- fires for an old, continuously-existing series instead,
+  #      and the panel attributes that series' ENTIRE historical cumulative
+  #      total to one bucket. This is the mechanism that actually produced
+  #      the 139M-token/$102 spike Ryan observed 2026-08-25, reproduced live
+  #      twice, including once on a restart (OTL-89/PR #185) that touched
+  #      ZERO lines of this file. Fix: each panel's `offset $__interval`
+  #      lookup widened to `max_over_time(X[20m] offset $__interval)`,
+  #      tolerating up to 20 minutes of gap in `ai:tokens_accum:sum`'s own
+  #      sample history around that point, while the `or (X * 0)`
+  #      bootstrap-for-genuinely-new-series fallback is otherwise untouched.
+  #      Fixing mechanism 1 alone does NOT close this -- a Prometheus
+  #      restart that touches no rule-file lines can still gap this file's
+  #      OWN output, which is exactly what the panel layer reads.
+  #
+  #   CORRECTED FLAWED-WINDOW DATE: this ticket's research found the v1
+  #   rule's actual birth epoch (`1787664852`, from OTL-85's ticket
+  #   description) is 2026-08-25 13:34:12 UTC (~08:34 CDT) -- a full day
+  #   LATER than the "2026-08-24 ~08:54" prose both PR #182's description
+  #   and the FLAWED-WINDOW DECISION note directly above this one currently
+  #   state. Whoever runs the eventual backfill should target 2026-08-25,
+  #   not 2026-08-24.
+  #
+  #   THIS FIX'S OWN TRANSITION WINDOW: any Prometheus restart between the
+  #   OTL-87/PR #182 deploy and this fix's own deploy inherits the SAME
+  #   gap-loss/panel-spike exposure this ticket closes -- the eventual
+  #   backfill's end boundary should be "this fix's deploy," matching the
+  #   existing convention above, not left ambiguous.
+  #
   # DIMS: the union of every label the 13 native-counter "per Interval" /
   # "Cumulative" dashboard panels this round converts group by (host_name /
   # hostname -- alternate, mutually-exclusive spellings already reconciled
@@ -510,18 +582,6 @@ groups:
             )
           )
 
-      # Forward-latching accumulator: prior + this tick's real delta. The
-      # `(A+B) or A or B` shape is required, not stylistic -- a bare
-      # `prior + delta` inner-joins and silently DROPS any dims combo
-      # missing from either side (a quiet ticket has no delta this tick; a
-      # brand-new ticket has no prior yet), which would erase accumulated
-      # totals on every quiet tick -- a worse bug than the one being fixed.
-      - record: ai:tokens_accum:sum
-        expr: |
-          (max_over_time(ai:tokens_accum:sum[20m]) + ai:tokens_accum_delta:sum)
-          or max_over_time(ai:tokens_accum:sum[20m])
-          or ai:tokens_accum_delta:sum
-
       - record: ai:cost_usd_accum_delta:sum
         expr: |
           sum by (host_name, hostname, model, project, branch, linear_key, task_type, account, phase) (
@@ -537,11 +597,100 @@ groups:
             )
           )
 
-      - record: ai:cost_usd_accum:sum
+      # OTL-88: gap-safe companion to ai:tokens_accum_delta:sum above. Identical per-session
+      # clamp_min/unless partition, offset widened from 1m to 20m (reusing this group's existing
+      # session-staleness-smoothing constant). At eval_time T this is an exact function of raw
+      # counter data in (T-20m-20m, T] -- growth over the last 20 minutes, computed directly from
+      # raw counters, independent of how many (if any) intermediate rule-group ticks fired. Used
+      # ONLY as a corrective candidate in the max-combination below -- it does not replace
+      # ai:tokens_accum_delta:sum, which stays the primary path for steady-state precision (see
+      # this file's OTL-88 header note for why: widening the primary rule's window in place would
+      # mask an interior same-session_id reset-then-recovery cycle that a 1-minute cadence catches
+      # incrementally; a 20-minute-wide comparison only sees the endpoints).
+      - record: ai:tokens_accum_delta_20m:sum
+        expr: |
+          sum by (host_name, hostname, model, type, project, branch, linear_key, task_type, account, phase) (
+            clamp_min(
+              max_over_time(claude_code_token_usage_tokens_total{job="otel-collector"}[20m])
+              - max_over_time(claude_code_token_usage_tokens_total{job="otel-collector"}[20m] offset 20m)
+              , 0
+            )
+            or
+            (
+              max_over_time(claude_code_token_usage_tokens_total{job="otel-collector"}[20m])
+              unless max_over_time(claude_code_token_usage_tokens_total{job="otel-collector"}[20m] offset 20m)
+            )
+          )
+
+      - record: ai:cost_usd_accum_delta_20m:sum
+        expr: |
+          sum by (host_name, hostname, model, project, branch, linear_key, task_type, account, phase) (
+            clamp_min(
+              max_over_time(claude_code_cost_usage_USD_total{job="otel-collector"}[20m])
+              - max_over_time(claude_code_cost_usage_USD_total{job="otel-collector"}[20m] offset 20m)
+              , 0
+            )
+            or
+            (
+              max_over_time(claude_code_cost_usage_USD_total{job="otel-collector"}[20m])
+              unless max_over_time(claude_code_cost_usage_USD_total{job="otel-collector"}[20m] offset 20m)
+            )
+          )
+
+      # OTL-88: fast path, byte-for-byte the same expression OTL-87 shipped -- exact for
+      # steady-state (back-to-back 1-minute evaluations), proven by the unchanged Group A/B tests.
+      # Renamed to an internal-only metric name (not consumed by any dashboard -- confirmed by
+      # grep) because the dashboard-facing name below is now the max-combination, not this rule
+      # directly.
+      - record: ai:tokens_accum_fast:sum
+        expr: |
+          (max_over_time(ai:tokens_accum:sum[20m]) + ai:tokens_accum_delta:sum)
+          or max_over_time(ai:tokens_accum:sum[20m])
+          or ai:tokens_accum_delta:sum
+
+      # OTL-88: gap-safe path, same forward-latch shape, anchored 20 minutes back (offset 20m on
+      # both the self-reference AND the delta it adds -- prior and delta MUST share the same
+      # anchor point or the arithmetic double-counts or gaps). Correct regardless of how many (if
+      # any) intermediate ticks fired between t-20m and t, since ai:tokens_accum_delta_20m:sum is
+      # computed directly from raw counters over that span, not from this rule's own tick history.
+      - record: ai:tokens_accum_20m:sum
+        expr: |
+          (max_over_time(ai:tokens_accum:sum[20m] offset 20m) + ai:tokens_accum_delta_20m:sum)
+          or max_over_time(ai:tokens_accum:sum[20m] offset 20m)
+          or ai:tokens_accum_delta_20m:sum
+
+      # OTL-88: the dashboard-exposed total -- element-wise max of the two candidates above (see
+      # Group D for the combinator's own proof). In steady state both candidates converge to the
+      # same correct value and the fast path's finer precision is preserved (max of two equal
+      # values). During a gap the fast path under-counts (this ticket's bug) while the gap-safe
+      # path directly recovers the true total from raw counters -- max() picks the larger,
+      # correct one. Never regresses below whatever was already latched, same guarantee as OTL-87.
+      - record: ai:tokens_accum:sum
+        expr: |
+          (ai:tokens_accum_fast:sum > ai:tokens_accum_20m:sum)
+          or ai:tokens_accum_20m:sum
+          or (ai:tokens_accum_fast:sum unless ai:tokens_accum_20m:sum)
+
+      # OTL-88: cost mirror of the fast/20m/max-combination triad above -- see the tokens leg's
+      # comments for the full rationale (identical shape, ai:cost_usd_accum_delta:sum /
+      # ai:cost_usd_accum_delta_20m:sum in place of the tokens delta rules).
+      - record: ai:cost_usd_accum_fast:sum
         expr: |
           (max_over_time(ai:cost_usd_accum:sum[20m]) + ai:cost_usd_accum_delta:sum)
           or max_over_time(ai:cost_usd_accum:sum[20m])
           or ai:cost_usd_accum_delta:sum
+
+      - record: ai:cost_usd_accum_20m:sum
+        expr: |
+          (max_over_time(ai:cost_usd_accum:sum[20m] offset 20m) + ai:cost_usd_accum_delta_20m:sum)
+          or max_over_time(ai:cost_usd_accum:sum[20m] offset 20m)
+          or ai:cost_usd_accum_delta_20m:sum
+
+      - record: ai:cost_usd_accum:sum
+        expr: |
+          (ai:cost_usd_accum_fast:sum > ai:cost_usd_accum_20m:sum)
+          or ai:cost_usd_accum_20m:sum
+          or (ai:cost_usd_accum_fast:sum unless ai:cost_usd_accum_20m:sum)
 
   # ---------------------------------------------------------------------
   # OTL-80 Qwen dashboard block (SELF-METERED ESTIMATE, wired 2026-08-25,

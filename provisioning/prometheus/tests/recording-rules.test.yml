@@ -257,3 +257,194 @@ tests:
       - expr: (stub_prior + stub_delta) or stub_prior or stub_delta
         eval_time: 25m
         exp_samples: []
+
+  # =======================================================================
+  # OTL-88 Group C1: reproduces the ticket's exact bug against the CURRENT
+  # (1-minute-offset) ai:tokens_accum_delta:sum. A single continuously-
+  # growing session, +50 tokens/min for 15 minutes. If the rule group only
+  # successfully evaluates at t=1m and next at t=11m (a 10-minute gap --
+  # restart/outage/slow group), the true growth from t=1m to t=11m is
+  # 500 tokens. The current rule's delta at t=11m only reflects growth from
+  # t=10m to t=11m (its fixed offset 1m), i.e. 50 -- NOT the 500 a correct
+  # gap-aware delta would report. This is provable without simulating a
+  # literal missed evaluation (promtool cannot do that for self-referential
+  # rules; this rule isn't self-referential, so no simulation is needed --
+  # we simply read its value at the eval_times a real evaluator would reach).
+  # =======================================================================
+  - interval: 1m
+    input_series:
+      - series: 'claude_code_token_usage_tokens_total{job="otel-collector",host_name="workerG",model="claude-sonnet-5",type="output",project="catalyst-otel",branch="OTL-88",linear_key="OTL-88-gap",task_type="implement",account="acct1",phase="implement",session_id="s6"}'
+        values: "0+50x15"
+
+    promql_expr_test:
+      # What a correct gap-aware delta covering t=1m..11m SHOULD report:
+      # true growth over that span is 500 (10 minutes at 50/min).
+      - expr: max_over_time(claude_code_token_usage_tokens_total{linear_key="OTL-88-gap"}[20m]) - max_over_time(claude_code_token_usage_tokens_total{linear_key="OTL-88-gap"}[20m] offset 10m)
+        eval_time: 11m
+        exp_samples:
+          - labels: '{job="otel-collector",host_name="workerG",model="claude-sonnet-5",type="output",project="catalyst-otel",branch="OTL-88",linear_key="OTL-88-gap",task_type="implement",account="acct1",phase="implement",session_id="s6"}'
+            value: 500
+
+      # What the CURRENT ai:tokens_accum_delta:sum actually reports at the
+      # same eval_time -- only the last 60 seconds, silently dropping the
+      # other 9 minutes of real growth this scenario represents.
+      - expr: ai:tokens_accum_delta:sum{linear_key="OTL-88-gap"}
+        eval_time: 11m
+        exp_samples:
+          - labels: 'ai:tokens_accum_delta:sum{host_name="workerG",model="claude-sonnet-5",type="output",project="catalyst-otel",branch="OTL-88",linear_key="OTL-88-gap",task_type="implement",account="acct1",phase="implement"}'
+            value: 50
+
+  # =======================================================================
+  # OTL-88 Group C2a: the NEW 20-minute delta rule, same scenario as C1 --
+  # proves it correctly reports the full 500-token gap growth the 1-minute
+  # rule missed (bootstrap-credit case, offset 20m finds nothing before
+  # t=0 for this session), and that it correctly reports NO sample once the
+  # session has aged out of the wide 20-minute window on BOTH sides (never
+  # fabricates growth for a fully-retired session).
+  # =======================================================================
+  - interval: 1m
+    input_series:
+      - series: 'claude_code_token_usage_tokens_total{job="otel-collector",host_name="workerG",model="claude-sonnet-5",type="output",project="catalyst-otel",branch="OTL-88",linear_key="OTL-88-gap",task_type="implement",account="acct1",phase="implement",session_id="s6"}'
+        values: "0+50x15"
+
+    promql_expr_test:
+      - expr: ai:tokens_accum_delta_20m:sum{linear_key="OTL-88-gap"}
+        eval_time: 11m
+        exp_samples:
+          - labels: 'ai:tokens_accum_delta_20m:sum{host_name="workerG",model="claude-sonnet-5",type="output",project="catalyst-otel",branch="OTL-88",linear_key="OTL-88-gap",task_type="implement",account="acct1",phase="implement"}'
+            value: 550   # full bootstrap credit: 11m * 50/min, since offset 20m finds nothing before t=0
+
+      # t=36m: last real sample (t=15, value 750) is now outside BOTH the
+      # (16,36] current window and the (-4,16] offset-20m window at once --
+      # both max_over_time() operands are absent, so the rule reports no
+      # sample at all (not a fabricated 0, not a stale growth number).
+      - expr: ai:tokens_accum_delta_20m:sum{linear_key="OTL-88-gap"}
+        eval_time: 36m
+        exp_samples: []
+
+  # =======================================================================
+  # OTL-88 Group C2b: genuine non-bootstrap, non-retired steady state for
+  # the 20-minute delta rule -- a session active well past t=20m should
+  # read a stable 20m * (its own rate) at any tick deep inside its active
+  # window, mirroring Group A1's steady-state assertions for the 1-minute
+  # rule.
+  # =======================================================================
+  - interval: 1m
+    input_series:
+      - series: 'claude_code_token_usage_tokens_total{job="otel-collector",host_name="workerH",model="claude-sonnet-5",type="output",project="catalyst-otel",branch="OTL-88",linear_key="OTL-88-steady20",task_type="implement",account="acct1",phase="implement",session_id="s7"}'
+        values: "0+50x35"
+
+    promql_expr_test:
+      # t=25m: 25 minutes into a continuous +50/min ramp -- the trailing
+      # 20-minute window's growth is exactly 20*50=1000, independent of how
+      # far into the session's history t=25m falls.
+      - expr: ai:tokens_accum_delta_20m:sum{linear_key="OTL-88-steady20"}
+        eval_time: 25m
+        exp_samples:
+          - labels: 'ai:tokens_accum_delta_20m:sum{host_name="workerH",model="claude-sonnet-5",type="output",project="catalyst-otel",branch="OTL-88",linear_key="OTL-88-steady20",task_type="implement",account="acct1",phase="implement"}'
+            value: 1000
+
+  # =======================================================================
+  # OTL-88 Group C2c: mirrors Group A3's same-session_id reset case, but at
+  # the 20-minute window -- the accepted, documented tradeoff from this
+  # plan's "Key discoveries": a reset-then-recovery cycle whose recovery
+  # crosses the pre-reset peak while STILL inside the trailing 20-minute
+  # window nets out at the window's own endpoints and is silently
+  # under-counted relative to what an incremental (never-give-back) sum of
+  # the same real per-tick growth would report. Ramp +5/min to a peak of
+  # 100 at t=20, reset to 20 at t=21, resume ramping +5/min (crossing the
+  # old peak of 100 again at t=37; by t=41 the ramp has reached 120,
+  # clearly past the old peak).
+  # =======================================================================
+  - interval: 1m
+    input_series:
+      - series: 'claude_code_token_usage_tokens_total{job="otel-collector",host_name="workerI",model="claude-sonnet-5",type="output",project="catalyst-otel",branch="OTL-88",linear_key="OTL-88-reset20",task_type="implement",account="acct1",phase="implement",session_id="s8"}'
+        values: "0+5x20 20 25+5x22"
+
+    promql_expr_test:
+      # t=41m: true incremental growth from t=21 (post-reset value 20) to
+      # t=41 (value 120) is a monotonic ramp with no further resets --
+      # 120-20=100 real tokens. But the wide-window comparison sees
+      # max_over_time([20m]) at t=41 (=120, window (21,41]) against
+      # max_over_time([20m] offset 20m) at t=41 (=100, window (1,21],
+      # dominated by the PRE-reset peak at t=20) -- 120-100=20, not the true
+      # 100. Accepted tradeoff, pinned here by a test rather than left as
+      # prose: the 20-minute corrective path can itself under-count within
+      # a single reset-then-recovery cycle that completes inside its own
+      # window, same shape as the 1-minute rule's existing (proven, Group
+      # A3) reset-recovery smoothing, just at a wider scale.
+      - expr: ai:tokens_accum_delta_20m:sum{linear_key="OTL-88-reset20"}
+        eval_time: 41m
+        exp_samples:
+          - labels: 'ai:tokens_accum_delta_20m:sum{host_name="workerI",model="claude-sonnet-5",type="output",project="catalyst-otel",branch="OTL-88",linear_key="OTL-88-reset20",task_type="implement",account="acct1",phase="implement"}'
+            value: 20
+
+  # =======================================================================
+  # OTL-88 Group D: the max-combination combinator `(A > B) or B or (A
+  # unless B)`, proven standalone -- covers both present w/ A larger, both
+  # present w/ B larger, A-only, B-only, and both-absent.
+  #   D1 (k="p1"): stub_a lives t=0..18 (19 samples, constant 10); stub_b
+  #     lives t=0..5 at 3 (A wins, A larger) then t=6..11 at 15 (B wins, B
+  #     larger), then stub_b goes fully silent while stub_a keeps going --
+  #     exercises A-larger, B-larger, and (once stub_b's 5m lookback
+  #     expires but stub_a is still live) A-only, plus both-absent once
+  #     stub_a's own lookback expires too. (Bare `axN` is N+1 total samples
+  #     of value `a`, same as `a+0xN` -- confirmed empirically against a
+  #     minimal probe fixture while writing this group, since it is easy to
+  #     misread as exactly N.)
+  #   D2 (k="p2"): the mirror-image lifetime (stub_a short, stub_b long) --
+  #     exercises B-only distinctly from the A-larger/B-larger cases above.
+  # =======================================================================
+  - interval: 1m
+    input_series:
+      - series: 'stub_a{k="p1"}'
+        values: "10x18"
+      - series: 'stub_b{k="p1"}'
+        values: "3x5 15x5"
+
+    promql_expr_test:
+      # t=2m: both present, A(10) > B(3) -- A wins.
+      - expr: (stub_a > stub_b) or stub_b or (stub_a unless stub_b)
+        eval_time: 2m
+        exp_samples:
+          - labels: 'stub_a{k="p1"}'
+            value: 10
+      # t=7m: both present, B(15) > A(10) -- B wins.
+      - expr: (stub_a > stub_b) or stub_b or (stub_a unless stub_b)
+        eval_time: 7m
+        exp_samples:
+          - labels: 'stub_b{k="p1"}'
+            value: 15
+      # t=16m: stub_b's last real sample was t=11 (5 minutes ago -- at/past
+      # the 5m default lookback boundary, genuinely gone); stub_a has a
+      # real sample at t=16 itself -- A-only, supplied by the
+      # `(stub_a unless stub_b)` branch (neither of the first two terms can
+      # produce a sample here).
+      - expr: (stub_a > stub_b) or stub_b or (stub_a unless stub_b)
+        eval_time: 16m
+        exp_samples:
+          - labels: 'stub_a{k="p1"}'
+            value: 10
+      # t=25m: stub_a's last real sample was t=18 (7 minutes ago, also past
+      # the 5m lookback) -- both genuinely gone, no sample at all.
+      - expr: (stub_a > stub_b) or stub_b or (stub_a unless stub_b)
+        eval_time: 25m
+        exp_samples: []
+
+  - interval: 1m
+    input_series:
+      - series: 'stub_a{k="p2"}'
+        values: "10x5"
+      - series: 'stub_b{k="p2"}'
+        values: "3x15"
+
+    promql_expr_test:
+      # t=10m: stub_a's last real sample was t=4 (6 minutes ago, past the
+      # 5m lookback -- gone); stub_b is still live -- B-only, supplied by
+      # the unconditional `or stub_b` branch (the case a brand-new dims
+      # combo's `delta`-only bootstrap takes in the real rule).
+      - expr: (stub_a > stub_b) or stub_b or (stub_a unless stub_b)
+        eval_time: 10m
+        exp_samples:
+          - labels: 'stub_b{k="p2"}'
+            value: 3

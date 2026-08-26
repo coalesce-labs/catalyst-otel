@@ -352,7 +352,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (display) (label_replace(label_replace(sum by (host_name, hostname) (clamp_min(ai:cost_usd_accum:sum{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"} - ((ai:cost_usd_accum:sum{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"} offset $__interval) or (ai:cost_usd_accum:sum{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"} * 0)), 0)), \"display\", \"$1\", \"hostname\", \"(.+)\"), \"display\", \"$1\", \"host_name\", \"(.+)\"))",
+          "expr": "sum by (display) (label_replace(label_replace(sum by (host_name, hostname) (clamp_min(ai:cost_usd_accum:sum{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"} - ((max_over_time(ai:cost_usd_accum:sum{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"}[20m] offset $__interval)) or (ai:cost_usd_accum:sum{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"} * 0)), 0)), \"display\", \"$1\", \"hostname\", \"(.+)\"), \"display\", \"$1\", \"host_name\", \"(.+)\"))",
           "legendFormat": "{{display}}",
           "refId": "A",
           "interval": "$bucket"
@@ -431,7 +431,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (display) (label_replace(label_replace(sum by (host_name, hostname) (clamp_min(ai:tokens_accum:sum{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"} - ((ai:tokens_accum:sum{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"} offset $__interval) or (ai:tokens_accum:sum{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"} * 0)), 0)), \"display\", \"$1\", \"hostname\", \"(.+)\"), \"display\", \"$1\", \"host_name\", \"(.+)\"))",
+          "expr": "sum by (display) (label_replace(label_replace(sum by (host_name, hostname) (clamp_min(ai:tokens_accum:sum{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"} - ((max_over_time(ai:tokens_accum:sum{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"}[20m] offset $__interval)) or (ai:tokens_accum:sum{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"} * 0)), 0)), \"display\", \"$1\", \"hostname\", \"(.+)\"), \"display\", \"$1\", \"host_name\", \"(.+)\"))",
           "legendFormat": "{{display}}",
           "refId": "A",
           "interval": "$bucket"
@@ -510,7 +510,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (model_family) (label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(sum by (model) (clamp_min(ai:cost_usd_accum:sum{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"} - ((ai:cost_usd_accum:sum{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"} offset $__interval) or (ai:cost_usd_accum:sum{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"} * 0)), 0)), \"model_family\", \"$1\", \"model\", \"(.+)\"), \"model_family\", \"$1 $2.$3\", \"model\", \"claude-([a-z]+)-([0-9]+)-([0-9]+).*\"), \"model_family\", \"$1 $2\", \"model\", \"claude-([a-z]+)-([0-9]+)(\\\\[[^]]*\\\\])?$\"), \"model_family\", \"Opus $1\", \"model_family\", \"opus (.*)\"), \"model_family\", \"Haiku $1\", \"model_family\", \"haiku (.*)\"), \"model_family\", \"Sonnet $1\", \"model_family\", \"sonnet (.*)\"), \"model_family\", \"Fable $1\", \"model_family\", \"fable (.*)\"))",
+          "expr": "sum by (model_family) (label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(sum by (model) (clamp_min(ai:cost_usd_accum:sum{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"} - ((max_over_time(ai:cost_usd_accum:sum{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"}[20m] offset $__interval)) or (ai:cost_usd_accum:sum{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"} * 0)), 0)), \"model_family\", \"$1\", \"model\", \"(.+)\"), \"model_family\", \"$1 $2.$3\", \"model\", \"claude-([a-z]+)-([0-9]+)-([0-9]+).*\"), \"model_family\", \"$1 $2\", \"model\", \"claude-([a-z]+)-([0-9]+)(\\\\[[^]]*\\\\])?$\"), \"model_family\", \"Opus $1\", \"model_family\", \"opus (.*)\"), \"model_family\", \"Haiku $1\", \"model_family\", \"haiku (.*)\"), \"model_family\", \"Sonnet $1\", \"model_family\", \"sonnet (.*)\"), \"model_family\", \"Fable $1\", \"model_family\", \"fable (.*)\"))",
           "legendFormat": "{{model_family}}",
           "refId": "A",
           "interval": "$bucket"
@@ -635,7 +635,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (type) (clamp_min(ai:tokens_accum:sum{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"} - ((ai:tokens_accum:sum{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"} offset $__interval) or (ai:tokens_accum:sum{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"} * 0)), 0))",
+          "expr": "sum by (type) (clamp_min(ai:tokens_accum:sum{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"} - ((max_over_time(ai:tokens_accum:sum{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"}[20m] offset $__interval)) or (ai:tokens_accum:sum{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"} * 0)), 0))",
           "legendFormat": "{{type}}",
           "refId": "A",
           "interval": "$bucket"
@@ -787,7 +787,7 @@
           },
           "targets": [
             {
-              "expr": "sum(clamp_min(ai:cost_usd_accum:sum{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"} - ((ai:cost_usd_accum:sum{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"} offset $__interval) or (ai:cost_usd_accum:sum{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"} * 0)), 0))",
+              "expr": "sum(clamp_min(ai:cost_usd_accum:sum{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"} - ((max_over_time(ai:cost_usd_accum:sum{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"}[20m] offset $__interval)) or (ai:cost_usd_accum:sum{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"} * 0)), 0))",
               "legendFormat": "Cost",
               "refId": "A",
               "interval": "1m"
@@ -869,7 +869,7 @@
           },
           "targets": [
             {
-              "expr": "sum by (type) (clamp_min(ai:tokens_accum:sum{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"} - ((ai:tokens_accum:sum{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"} offset $__interval) or (ai:tokens_accum:sum{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"} * 0)), 0))",
+              "expr": "sum by (type) (clamp_min(ai:tokens_accum:sum{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"} - ((max_over_time(ai:tokens_accum:sum{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"}[20m] offset $__interval)) or (ai:tokens_accum:sum{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"} * 0)), 0))",
               "legendFormat": "{{type}}",
               "refId": "A",
               "interval": "1m"
@@ -1398,7 +1398,7 @@
           },
           "targets": [
             {
-              "expr": "topk(10, sum by (linear_key) (clamp_min(ai:tokens_accum:sum{linear_key!=\"\",project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"} - ((ai:tokens_accum:sum{linear_key!=\"\",project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"} offset $__interval) or (ai:tokens_accum:sum{linear_key!=\"\",project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"} * 0)), 0)))",
+              "expr": "topk(10, sum by (linear_key) (clamp_min(ai:tokens_accum:sum{linear_key!=\"\",project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"} - ((max_over_time(ai:tokens_accum:sum{linear_key!=\"\",project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"}[20m] offset $__interval)) or (ai:tokens_accum:sum{linear_key!=\"\",project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"} * 0)), 0)))",
               "legendFormat": "{{linear_key}}",
               "refId": "A",
               "interval": "$bucket"
@@ -1538,7 +1538,7 @@
           },
           "targets": [
             {
-              "expr": "topk(10, sum by (project) (clamp_min(ai:tokens_accum:sum{project!=\"\",branch=~\"$branch\",host_name=~\"$hostname\"} - ((ai:tokens_accum:sum{project!=\"\",branch=~\"$branch\",host_name=~\"$hostname\"} offset $__interval) or (ai:tokens_accum:sum{project!=\"\",branch=~\"$branch\",host_name=~\"$hostname\"} * 0)), 0)))",
+              "expr": "topk(10, sum by (project) (clamp_min(ai:tokens_accum:sum{project!=\"\",branch=~\"$branch\",host_name=~\"$hostname\"} - ((max_over_time(ai:tokens_accum:sum{project!=\"\",branch=~\"$branch\",host_name=~\"$hostname\"}[20m] offset $__interval)) or (ai:tokens_accum:sum{project!=\"\",branch=~\"$branch\",host_name=~\"$hostname\"} * 0)), 0)))",
               "legendFormat": "{{project}}",
               "refId": "A",
               "interval": "$bucket"
@@ -4563,7 +4563,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (model_family) (label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(sum by (model) (clamp_min(ai:tokens_accum:sum{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"} - ((ai:tokens_accum:sum{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"} offset $__interval) or (ai:tokens_accum:sum{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"} * 0)), 0)), \"model_family\", \"$1\", \"model\", \"(.+)\"), \"model_family\", \"$1 $2.$3\", \"model\", \"claude-([a-z]+)-([0-9]+)-([0-9]+).*\"), \"model_family\", \"$1 $2\", \"model\", \"claude-([a-z]+)-([0-9]+)(\\\\[[^]]*\\\\])?$\"), \"model_family\", \"Opus $1\", \"model_family\", \"opus (.*)\"), \"model_family\", \"Haiku $1\", \"model_family\", \"haiku (.*)\"), \"model_family\", \"Sonnet $1\", \"model_family\", \"sonnet (.*)\"), \"model_family\", \"Fable $1\", \"model_family\", \"fable (.*)\"))",
+          "expr": "sum by (model_family) (label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(sum by (model) (clamp_min(ai:tokens_accum:sum{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"} - ((max_over_time(ai:tokens_accum:sum{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"}[20m] offset $__interval)) or (ai:tokens_accum:sum{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"} * 0)), 0)), \"model_family\", \"$1\", \"model\", \"(.+)\"), \"model_family\", \"$1 $2.$3\", \"model\", \"claude-([a-z]+)-([0-9]+)-([0-9]+).*\"), \"model_family\", \"$1 $2\", \"model\", \"claude-([a-z]+)-([0-9]+)(\\\\[[^]]*\\\\])?$\"), \"model_family\", \"Opus $1\", \"model_family\", \"opus (.*)\"), \"model_family\", \"Haiku $1\", \"model_family\", \"haiku (.*)\"), \"model_family\", \"Sonnet $1\", \"model_family\", \"sonnet (.*)\"), \"model_family\", \"Fable $1\", \"model_family\", \"fable (.*)\"))",
           "legendFormat": "{{model_family}}",
           "refId": "A",
           "interval": "$bucket"
