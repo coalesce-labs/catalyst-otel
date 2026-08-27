@@ -1,180 +1,16 @@
 {
-  "uid": "codex-usage",
-  "title": "Codex Usage",
-  "description": "Codex (OpenAI) CLI/desktop telemetry — turns, tokens, latency, tools, and events. No cost panels (ChatGPT-subscription auth emits no cost telemetry). Sparse-event/occurrence panels use Loki count_over_time, not expired-counter increase(). OTL fix 2026-08-24: the Turns/Tool Calls/Threads/Codex-Events/Codex-Errors Loki panels were matching the log BODY, which is always empty for structured codex.* events (all data rides as structured metadata) — fixed to metadata pipeline filters (`| event_name=\"...\"`, `| success=\"false\"`). TTFT/Turn-Latency/TTFM panels pointed at metric names that no longer exist (`*_seconds_bucket` was renamed to `*_duration_ms_milliseconds_bucket` upstream) — fixed + unit corrected to ms. IMPORTANT: codex_exec (headless relay workers) emits NO codex_conversation_turn_count_total / codex_turn_token_usage_* / codex_turn_e2e_duration_ms_* — Tokens, Cache Hit Rate, Turn Rate by Model, Tokens by Model, and Turn Latency reflect Codex Desktop/app-server ONLY. Headless relay turns/tokens/tool-calls by ticket live in the Codex — Relay Attribution row below (Loki + the few codex_exec-native Prometheus metrics: codex_tool_call_total, codex_thread_started_total, codex_turn_ttft/ttfm_duration_ms). Codex has NO real cost telemetry (verified 2026-08-24 across the rollout JSONLs, the OTLP feed, and the OpenAI platform Costs API -- see provisioning/prometheus/codex-price-table.md); the Codex — CALCULATED Cost row prices the same headless-relay tokens at OpenAI's published API list price and is labeled CALCULATED throughout -- never treat it as a real bill.",
-  "schemaVersion": 39,
-  "version": 2,
-  "editable": true,
-  "graphTooltip": 1,
-  "style": "dark",
-  "timezone": "browser",
-  "refresh": "30s",
-  "liveNow": false,
-  "fiscalYearStartMonth": 0,
-  "tags": [
-    "codex",
-    "observability"
-  ],
-  "time": {
-    "from": "now-1h",
-    "to": "now"
-  },
-  "timepicker": {},
   "annotations": {
     "list": []
   },
+  "description": "Codex (OpenAI) CLI/desktop telemetry \u2014 turns, tokens, latency, tools, and events. No cost panels (ChatGPT-subscription auth emits no cost telemetry). Sparse-event/occurrence panels use Loki count_over_time, not expired-counter increase(). OTL fix 2026-08-24: the Turns/Tool Calls/Threads/Codex-Events/Codex-Errors Loki panels were matching the log BODY, which is always empty for structured codex.* events (all data rides as structured metadata) \u2014 fixed to metadata pipeline filters (`| event_name=\"...\"`, `| success=\"false\"`). TTFT/Turn-Latency/TTFM panels pointed at metric names that no longer exist (`*_seconds_bucket` was renamed to `*_duration_ms_milliseconds_bucket` upstream) \u2014 fixed + unit corrected to ms. IMPORTANT: codex_exec (headless relay workers) emits NO codex_conversation_turn_count_total / codex_turn_token_usage_* / codex_turn_e2e_duration_ms_* \u2014 Tokens, Cache Hit Rate, Turn Rate by Model, Tokens by Model, and Turn Latency reflect Codex Desktop/app-server ONLY. Headless relay turns/tokens/tool-calls by ticket live in the Codex \u2014 Relay Attribution row below (Loki + the few codex_exec-native Prometheus metrics: codex_tool_call_total, codex_thread_started_total, codex_turn_ttft/ttfm_duration_ms). Codex has NO real cost telemetry (verified 2026-08-24 across the rollout JSONLs, the OTLP feed, and the OpenAI platform Costs API -- see provisioning/prometheus/codex-price-table.md); the Codex \u2014 CALCULATED Cost row prices the same headless-relay tokens at OpenAI's published API list price and is labeled CALCULATED throughout -- never treat it as a real bill.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
   "links": [],
-  "templating": {
-    "list": [
-      {
-        "name": "bucket",
-        "type": "interval",
-        "label": "Interval",
-        "query": "1m,5m,15m,30m,1h,6h,1d",
-        "current": {
-          "text": "5m",
-          "value": "5m"
-        },
-        "auto": false,
-        "auto_count": 30,
-        "auto_min": "10s",
-        "options": [],
-        "refresh": 2,
-        "hide": 0
-      },
-      {
-        "name": "model",
-        "type": "query",
-        "label": "Model",
-        "datasource": {
-          "type": "prometheus",
-          "uid": "prometheus"
-        },
-        "query": {
-          "qryType": 1,
-          "query": "label_values(codex_conversation_turn_count_total, model)",
-          "refId": "PrometheusVariableQueryEditor-VariableQuery"
-        },
-        "includeAll": true,
-        "allValue": ".*",
-        "multi": true,
-        "refresh": 2,
-        "sort": 1,
-        "current": {
-          "text": "All",
-          "value": "$__all"
-        },
-        "options": [],
-        "hide": 0
-      },
-      {
-        "name": "originator",
-        "type": "query",
-        "label": "Originator",
-        "datasource": {
-          "type": "prometheus",
-          "uid": "prometheus"
-        },
-        "query": {
-          "qryType": 1,
-          "query": "label_values(codex_tool_call_total, originator)",
-          "refId": "PrometheusVariableQueryEditor-VariableQuery"
-        },
-        "includeAll": true,
-        "allValue": ".*",
-        "multi": true,
-        "refresh": 2,
-        "sort": 1,
-        "current": {
-          "text": "All",
-          "value": "$__all"
-        },
-        "options": [],
-        "hide": 0
-      },
-      {
-        "name": "hostname",
-        "type": "query",
-        "label": "Host",
-        "datasource": {
-          "type": "prometheus",
-          "uid": "prometheus"
-        },
-        "query": {
-          "qryType": 1,
-          "query": "label_values(codex_conversation_turn_count_total, host_name)",
-          "refId": "PrometheusVariableQueryEditor-VariableQuery"
-        },
-        "includeAll": true,
-        "allValue": ".*",
-        "multi": true,
-        "refresh": 2,
-        "sort": 1,
-        "current": {
-          "text": "All",
-          "value": "$__all"
-        },
-        "options": [],
-        "hide": 0
-      },
-      {
-        "name": "linear_key",
-        "type": "query",
-        "label": "Ticket",
-        "description": "CTC-* relay ticket. Sourced from codex_tool_call_total, the one native codex_exec (headless) Prometheus metric confirmed to carry linear_key/project/task_type/branch/host_name (2026-08-24) -- codex_conversation_turn_count_total and codex_turn_token_usage_* carry NO ticket dims for headless (Desktop-only).",
-        "datasource": {
-          "type": "prometheus",
-          "uid": "prometheus"
-        },
-        "query": {
-          "qryType": 1,
-          "query": "label_values(codex_tool_call_total, linear_key)",
-          "refId": "PrometheusVariableQueryEditor-VariableQuery"
-        },
-        "includeAll": true,
-        "allValue": ".*",
-        "multi": true,
-        "refresh": 2,
-        "sort": 1,
-        "current": {
-          "text": "All",
-          "value": "$__all"
-        },
-        "options": [],
-        "hide": 0
-      },
-      {
-        "name": "project",
-        "type": "query",
-        "label": "Project",
-        "datasource": {
-          "type": "prometheus",
-          "uid": "prometheus"
-        },
-        "query": {
-          "qryType": 1,
-          "query": "label_values(codex_tool_call_total, project)",
-          "refId": "PrometheusVariableQueryEditor-VariableQuery"
-        },
-        "includeAll": true,
-        "allValue": ".*",
-        "multi": true,
-        "refresh": 2,
-        "sort": 1,
-        "current": {
-          "text": "All",
-          "value": "$__all"
-        },
-        "options": [],
-        "hide": 0
-      }
-    ]
-  },
+  "liveNow": false,
   "panels": [
     {
-      "id": 100,
-      "type": "row",
-      "title": "Codex — Overview",
       "collapsed": false,
       "gridPos": {
         "h": 1,
@@ -182,36 +18,23 @@
         "x": 0,
         "y": 0
       },
-      "panels": []
+      "id": 100,
+      "panels": [],
+      "title": "Codex \u2014 Overview",
+      "type": "row"
     },
     {
-      "id": 1,
-      "type": "stat",
-      "title": "Turns",
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 0,
-        "y": 1
-      },
       "datasource": {
         "type": "loki",
         "uid": "loki"
       },
-      "targets": [
-        {
-          "expr": "sum(count_over_time({service_name=~\"codex.*\"} | event_name=\"codex.turn_ttft\" | originator=~\"$originator\" [$__range]))",
-          "legendFormat": "Turns",
-          "refId": "A"
-        }
-      ],
       "fieldConfig": {
         "defaults": {
-          "unit": "short",
-          "decimals": 0,
           "color": {
             "mode": "thresholds"
           },
+          "decimals": 0,
+          "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -221,53 +44,53 @@
               }
             ]
           },
-          "mappings": []
+          "unit": "short"
         },
         "overrides": []
       },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 1
+      },
+      "id": 1,
       "options": {
         "colorMode": "background_solid",
         "graphMode": "area",
         "justifyMode": "center",
         "orientation": "auto",
-        "textMode": "value_and_name",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
           ],
-          "values": false,
-          "fields": ""
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name"
+      },
+      "targets": [
+        {
+          "expr": "sum(count_over_time({service_name=~\"codex.*\"} | event_name=\"codex.turn_ttft\" | originator=~\"$originator\" [$__range]))",
+          "legendFormat": "Turns",
+          "refId": "A"
         }
-      }
+      ],
+      "title": "Turns",
+      "type": "stat"
     },
     {
-      "id": 2,
-      "type": "stat",
-      "title": "Tokens",
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 4,
-        "y": 1
-      },
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "targets": [
-        {
-          "expr": "sum(increase(codex_turn_token_usage_sum{model=~\"$model\"}[$__range]))",
-          "legendFormat": "Tokens",
-          "refId": "A"
-        }
-      ],
       "fieldConfig": {
         "defaults": {
-          "unit": "short",
-          "decimals": 0,
           "color": {
             "mode": "thresholds"
           },
+          "decimals": 0,
+          "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -277,53 +100,53 @@
               }
             ]
           },
-          "mappings": []
+          "unit": "short"
         },
         "overrides": []
       },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 1
+      },
+      "id": 2,
       "options": {
         "colorMode": "background_solid",
         "graphMode": "area",
         "justifyMode": "center",
         "orientation": "auto",
-        "textMode": "value_and_name",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
           ],
-          "values": false,
-          "fields": ""
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name"
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(codex_turn_token_usage_sum{model=~\"$model\"}[$__range]))",
+          "legendFormat": "Tokens",
+          "refId": "A"
         }
-      }
+      ],
+      "title": "Tokens",
+      "type": "stat"
     },
     {
-      "id": 3,
-      "type": "stat",
-      "title": "Tool Calls",
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 8,
-        "y": 1
-      },
       "datasource": {
         "type": "loki",
         "uid": "loki"
       },
-      "targets": [
-        {
-          "expr": "sum(count_over_time({service_name=~\"codex.*\"} | event_name=\"codex.tool_result\" | originator=~\"$originator\" [$__range]))",
-          "legendFormat": "Tool Calls",
-          "refId": "A"
-        }
-      ],
       "fieldConfig": {
         "defaults": {
-          "unit": "short",
-          "decimals": 0,
           "color": {
             "mode": "thresholds"
           },
+          "decimals": 0,
+          "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -333,55 +156,55 @@
               }
             ]
           },
-          "mappings": []
+          "unit": "short"
         },
         "overrides": []
       },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 1
+      },
+      "id": 3,
       "options": {
         "colorMode": "background_solid",
         "graphMode": "area",
         "justifyMode": "center",
         "orientation": "auto",
-        "textMode": "value_and_name",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
           ],
-          "values": false,
-          "fields": ""
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name"
+      },
+      "targets": [
+        {
+          "expr": "sum(count_over_time({service_name=~\"codex.*\"} | event_name=\"codex.tool_result\" | originator=~\"$originator\" [$__range]))",
+          "legendFormat": "Tool Calls",
+          "refId": "A"
         }
-      }
+      ],
+      "title": "Tool Calls",
+      "type": "stat"
     },
     {
-      "id": 4,
-      "type": "stat",
-      "title": "Cache Hit Rate",
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 12,
-        "y": 1
-      },
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "targets": [
-        {
-          "expr": "sum(increase(codex_turn_token_usage_sum{token_type=~\"cached|cache.*\",model=~\"$model\"}[$__range])) / clamp_min(sum(increase(codex_turn_token_usage_sum{token_type=~\"cached|cache.*|input\",model=~\"$model\"}[$__range])), 1)",
-          "legendFormat": "Cache Hit Rate",
-          "refId": "A"
-        }
-      ],
       "fieldConfig": {
         "defaults": {
-          "unit": "percentunit",
-          "decimals": 1,
-          "min": 0,
-          "max": 1,
           "color": {
             "mode": "thresholds"
           },
+          "decimals": 1,
+          "mappings": [],
+          "max": 1,
+          "min": 0,
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -399,53 +222,53 @@
               }
             ]
           },
-          "mappings": []
+          "unit": "percentunit"
         },
         "overrides": []
       },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 12,
+        "y": 1
+      },
+      "id": 4,
       "options": {
         "colorMode": "background_solid",
         "graphMode": "area",
         "justifyMode": "center",
         "orientation": "auto",
-        "textMode": "value_and_name",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
           ],
-          "values": false,
-          "fields": ""
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name"
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(codex_turn_token_usage_sum{token_type=~\"cached|cache.*\",model=~\"$model\"}[$__range])) / clamp_min(sum(increase(codex_turn_token_usage_sum{token_type=~\"cached|cache.*|input\",model=~\"$model\"}[$__range])), 1)",
+          "legendFormat": "Cache Hit Rate",
+          "refId": "A"
         }
-      }
+      ],
+      "title": "Cache Hit Rate",
+      "type": "stat"
     },
     {
-      "id": 5,
-      "type": "stat",
-      "title": "Threads",
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 16,
-        "y": 1
-      },
       "datasource": {
         "type": "loki",
         "uid": "loki"
       },
-      "targets": [
-        {
-          "expr": "sum(count_over_time({service_name=~\"codex.*\"} | event_name=\"codex.conversation_starts\" | originator=~\"$originator\" [$__range]))",
-          "legendFormat": "Threads",
-          "refId": "A"
-        }
-      ],
       "fieldConfig": {
         "defaults": {
-          "unit": "short",
-          "decimals": 0,
           "color": {
             "mode": "thresholds"
           },
+          "decimals": 0,
+          "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -455,53 +278,53 @@
               }
             ]
           },
-          "mappings": []
+          "unit": "short"
         },
         "overrides": []
       },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 16,
+        "y": 1
+      },
+      "id": 5,
       "options": {
         "colorMode": "background_solid",
         "graphMode": "area",
         "justifyMode": "center",
         "orientation": "auto",
-        "textMode": "value_and_name",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
           ],
-          "values": false,
-          "fields": ""
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name"
+      },
+      "targets": [
+        {
+          "expr": "sum(count_over_time({service_name=~\"codex.*\"} | event_name=\"codex.conversation_starts\" | originator=~\"$originator\" [$__range]))",
+          "legendFormat": "Threads",
+          "refId": "A"
         }
-      }
+      ],
+      "title": "Threads",
+      "type": "stat"
     },
     {
-      "id": 6,
-      "type": "stat",
-      "title": "TTFT p50",
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 20,
-        "y": 1
-      },
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "targets": [
-        {
-          "expr": "histogram_quantile(0.5, sum by (le) (rate(codex_turn_ttft_duration_ms_milliseconds_bucket{model=~\"$model\"}[$__range])))",
-          "legendFormat": "TTFT p50",
-          "refId": "A"
-        }
-      ],
       "fieldConfig": {
         "defaults": {
-          "unit": "ms",
-          "decimals": 0,
           "color": {
             "mode": "thresholds"
           },
+          "decimals": 0,
+          "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -519,29 +342,42 @@
               }
             ]
           },
-          "mappings": []
+          "unit": "ms"
         },
         "overrides": []
       },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 1
+      },
+      "id": 6,
       "options": {
         "colorMode": "background_solid",
         "graphMode": "area",
         "justifyMode": "center",
         "orientation": "auto",
-        "textMode": "value_and_name",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
           ],
-          "values": false,
-          "fields": ""
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name"
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.5, sum by (le) (rate(codex_turn_ttft_duration_ms_milliseconds_bucket{model=~\"$model\"}[$__range])))",
+          "legendFormat": "TTFT p50",
+          "refId": "A"
         }
-      }
+      ],
+      "title": "TTFT p50",
+      "type": "stat"
     },
     {
-      "id": 200,
-      "type": "row",
-      "title": "Tokens & Turns",
       "collapsed": false,
       "gridPos": {
         "h": 1,
@@ -549,23 +385,78 @@
         "x": 0,
         "y": 5
       },
-      "panels": []
+      "id": 200,
+      "panels": [],
+      "title": "Tokens & Turns",
+      "type": "row"
     },
     {
-      "id": 10,
-      "type": "timeseries",
-      "title": "Token Rate by Type",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "group": "A",
+              "mode": "normal"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
       "gridPos": {
         "h": 7,
         "w": 12,
         "x": 0,
         "y": 6
       },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
+      "id": 10,
       "interval": "$bucket",
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "width": 280,
+          "calcs": [
+            "lastNotNull",
+            "max",
+            "sum"
+          ],
+          "sortBy": "Total",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
       "targets": [
         {
           "expr": "sum by (token_type) (rate(codex_turn_token_usage_sum{model=~\"$model\"}[$__interval]))",
@@ -573,23 +464,30 @@
           "refId": "A"
         }
       ],
+      "title": "Token Rate by Type",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "fieldConfig": {
         "defaults": {
-          "unit": "short",
           "custom": {
             "drawStyle": "line",
-            "lineWidth": 2,
             "fillOpacity": 10,
             "gradientMode": "opacity",
-            "spanNulls": true,
-            "showPoints": "never",
             "lineInterpolation": "smooth",
-            "stacking": {
-              "mode": "normal",
-              "group": "A"
-            },
+            "lineWidth": 2,
             "scaleDistribution": {
               "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
             },
             "thresholdsStyle": {
               "mode": "off"
@@ -604,40 +502,38 @@
                 "value": null
               }
             ]
-          }
+          },
+          "unit": "short"
         },
         "overrides": []
       },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "right",
-          "calcs": [
-            "sum",
-            "mean"
-          ]
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      }
-    },
-    {
-      "id": 11,
-      "type": "timeseries",
-      "title": "Turn Rate by Model",
       "gridPos": {
         "h": 7,
         "w": 12,
         "x": 12,
         "y": 6
       },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
+      "id": 11,
       "interval": "$bucket",
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "width": 280,
+          "calcs": [
+            "lastNotNull",
+            "max",
+            "sum"
+          ],
+          "sortBy": "Total",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
       "targets": [
         {
           "expr": "sum by (model) (rate(codex_conversation_turn_count_total{model=~\"$model\",originator=~\"$originator\",host_name=~\"$hostname\"}[$__interval]))",
@@ -645,23 +541,30 @@
           "refId": "A"
         }
       ],
+      "title": "Turn Rate by Model",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "fieldConfig": {
         "defaults": {
-          "unit": "short",
           "custom": {
             "drawStyle": "line",
-            "lineWidth": 2,
             "fillOpacity": 10,
             "gradientMode": "opacity",
-            "spanNulls": true,
-            "showPoints": "never",
             "lineInterpolation": "smooth",
-            "stacking": {
-              "mode": "none",
-              "group": "A"
-            },
+            "lineWidth": 2,
             "scaleDistribution": {
               "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
             },
             "thresholdsStyle": {
               "mode": "off"
@@ -676,40 +579,38 @@
                 "value": null
               }
             ]
-          }
+          },
+          "unit": "short"
         },
         "overrides": []
       },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "right",
-          "calcs": [
-            "sum",
-            "mean"
-          ]
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      }
-    },
-    {
-      "id": 12,
-      "type": "timeseries",
-      "title": "Tokens by Model",
       "gridPos": {
         "h": 7,
         "w": 24,
         "x": 0,
         "y": 13
       },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
+      "id": 12,
       "interval": "$bucket",
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "width": 280,
+          "calcs": [
+            "lastNotNull",
+            "max",
+            "sum"
+          ],
+          "sortBy": "Total",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
       "targets": [
         {
           "expr": "sum by (model) (rate(codex_turn_token_usage_sum{model=~\"$model\"}[$__interval]))",
@@ -717,23 +618,44 @@
           "refId": "A"
         }
       ],
+      "title": "Tokens by Model",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 20
+      },
+      "id": 300,
+      "panels": [],
+      "title": "Latency",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "codex_turn_e2e_duration_ms \u2014 Codex_Desktop / codex-app-server ONLY. Verified 2026-08-24: codex_exec (headless relay) never emits this histogram (turn e2e duration is not exported by the headless CLI). See dashboard-level note.",
       "fieldConfig": {
         "defaults": {
-          "unit": "short",
           "custom": {
             "drawStyle": "line",
-            "lineWidth": 2,
-            "fillOpacity": 10,
-            "gradientMode": "opacity",
-            "spanNulls": true,
-            "showPoints": "never",
+            "fillOpacity": 0,
+            "gradientMode": "none",
             "lineInterpolation": "smooth",
-            "stacking": {
-              "mode": "none",
-              "group": "A"
-            },
+            "lineWidth": 2,
             "scaleDistribution": {
               "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
             },
             "thresholdsStyle": {
               "mode": "off"
@@ -748,54 +670,37 @@
                 "value": null
               }
             ]
-          }
+          },
+          "unit": "ms"
         },
         "overrides": []
       },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "right",
-          "calcs": [
-            "sum",
-            "mean"
-          ]
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      }
-    },
-    {
-      "id": 300,
-      "type": "row",
-      "title": "Latency",
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 20
-      },
-      "panels": []
-    },
-    {
-      "id": 20,
-      "type": "timeseries",
-      "title": "Turn Latency (p50/p95)",
-      "description": "codex_turn_e2e_duration_ms — Codex_Desktop / codex-app-server ONLY. Verified 2026-08-24: codex_exec (headless relay) never emits this histogram (turn e2e duration is not exported by the headless CLI). See dashboard-level note.",
       "gridPos": {
         "h": 7,
         "w": 12,
         "x": 0,
         "y": 21
       },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
+      "id": 20,
       "interval": "$bucket",
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "width": 280,
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "sortBy": "Last *",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
       "targets": [
         {
           "expr": "histogram_quantile(0.5, sum by (le, model) (rate(codex_turn_e2e_duration_ms_milliseconds_bucket{model=~\"$model\"}[$__interval])))",
@@ -808,23 +713,31 @@
           "refId": "B"
         }
       ],
+      "title": "Turn Latency (p50/p95)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "codex_turn_ttft_duration_ms / codex_turn_ttfm_duration_ms \u2014 verified 2026-08-24 to be emitted by BOTH codex_exec (headless relay) and Codex_Desktop, unlike Turn Latency (e2e) which is Desktop-only.",
       "fieldConfig": {
         "defaults": {
-          "unit": "ms",
           "custom": {
             "drawStyle": "line",
-            "lineWidth": 2,
             "fillOpacity": 0,
             "gradientMode": "none",
-            "spanNulls": true,
-            "showPoints": "never",
             "lineInterpolation": "smooth",
-            "stacking": {
-              "mode": "none",
-              "group": "A"
-            },
+            "lineWidth": 2,
             "scaleDistribution": {
               "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
             },
             "thresholdsStyle": {
               "mode": "off"
@@ -839,41 +752,37 @@
                 "value": null
               }
             ]
-          }
+          },
+          "unit": "ms"
         },
         "overrides": []
       },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "right",
-          "calcs": [
-            "mean",
-            "max"
-          ]
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      }
-    },
-    {
-      "id": 21,
-      "type": "timeseries",
-      "title": "TTFT / TTFM Latency (p50/p95)",
-      "description": "codex_turn_ttft_duration_ms / codex_turn_ttfm_duration_ms — verified 2026-08-24 to be emitted by BOTH codex_exec (headless relay) and Codex_Desktop, unlike Turn Latency (e2e) which is Desktop-only.",
       "gridPos": {
         "h": 7,
         "w": 12,
         "x": 12,
         "y": 21
       },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
+      "id": 21,
       "interval": "$bucket",
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "width": 280,
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "sortBy": "Last *",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
       "targets": [
         {
           "expr": "histogram_quantile(0.5, sum by (le) (rate(codex_turn_ttft_duration_ms_milliseconds_bucket{model=~\"$model\"}[$__interval])))",
@@ -896,27 +805,31 @@
           "refId": "D"
         }
       ],
+      "title": "TTFT / TTFM Latency (p50/p95)",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 28
+      },
+      "id": 400,
+      "panels": [],
+      "title": "Tools",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "fieldConfig": {
         "defaults": {
-          "unit": "ms",
-          "custom": {
-            "drawStyle": "line",
-            "lineWidth": 2,
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "spanNulls": true,
-            "showPoints": "never",
-            "lineInterpolation": "smooth",
-            "stacking": {
-              "mode": "none",
-              "group": "A"
-            },
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
+          "color": {
+            "mode": "palette-classic"
           },
           "mappings": [],
           "thresholds": {
@@ -927,51 +840,24 @@
                 "value": null
               }
             ]
-          }
+          },
+          "unit": "short"
         },
         "overrides": []
       },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "right",
-          "calcs": [
-            "mean",
-            "max"
-          ]
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      }
-    },
-    {
-      "id": 400,
-      "type": "row",
-      "title": "Tools",
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 28
-      },
-      "panels": []
-    },
-    {
-      "id": 30,
-      "type": "barchart",
-      "title": "Tool Usage",
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 0,
         "y": 29
       },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
+      "id": 30,
+      "options": {
+        "legend": {
+          "showLegend": false
+        },
+        "orientation": "horizontal",
+        "showValue": "auto"
       },
       "targets": [
         {
@@ -982,80 +868,38 @@
           "refId": "A"
         }
       ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "color": {
-            "mode": "palette-classic"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "mappings": []
-        },
-        "overrides": []
-      },
-      "options": {
-        "orientation": "horizontal",
-        "showValue": "auto",
-        "legend": {
-          "showLegend": false
-        }
-      }
+      "title": "Tool Usage",
+      "type": "barchart"
     },
     {
-      "id": 31,
-      "type": "timeseries",
-      "title": "Tool Success Rate",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 29
-      },
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "interval": "$bucket",
-      "targets": [
-        {
-          "expr": "sum(rate(codex_tool_call_total{success=\"true\",originator=~\"$originator\"}[$__interval])) / clamp_min(sum(rate(codex_tool_call_total{originator=~\"$originator\"}[$__interval])), 0.0001)",
-          "legendFormat": "Success Rate",
-          "refId": "A"
-        }
-      ],
       "fieldConfig": {
         "defaults": {
-          "unit": "percentunit",
-          "min": 0,
-          "max": 1,
           "custom": {
             "drawStyle": "line",
-            "lineWidth": 2,
             "fillOpacity": 10,
             "gradientMode": "opacity",
-            "spanNulls": true,
-            "showPoints": "never",
             "lineInterpolation": "smooth",
-            "stacking": {
-              "mode": "none",
-              "group": "A"
-            },
+            "lineWidth": 2,
             "scaleDistribution": {
               "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
             },
             "thresholdsStyle": {
               "mode": "off"
             }
           },
           "mappings": [],
+          "max": 1,
+          "min": 0,
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -1072,28 +916,48 @@
                 "value": 0.95
               }
             ]
-          }
+          },
+          "unit": "percentunit"
         },
         "overrides": []
       },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 29
+      },
+      "id": 31,
+      "interval": "$bucket",
       "options": {
         "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "width": 280,
           "calcs": [
-            "mean"
-          ]
+            "lastNotNull",
+            "max"
+          ],
+          "sortBy": "Last *",
+          "sortDesc": true
         },
         "tooltip": {
           "mode": "single",
           "sort": "none"
         }
-      }
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(codex_tool_call_total{success=\"true\",originator=~\"$originator\"}[$__interval])) / clamp_min(sum(rate(codex_tool_call_total{originator=~\"$originator\"}[$__interval])), 0.0001)",
+          "legendFormat": "Success Rate",
+          "refId": "A"
+        }
+      ],
+      "title": "Tool Success Rate",
+      "type": "timeseries"
     },
     {
-      "id": 500,
-      "type": "row",
-      "title": "Logs",
       "collapsed": false,
       "gridPos": {
         "h": 1,
@@ -1101,31 +965,32 @@
         "x": 0,
         "y": 37
       },
-      "panels": []
+      "id": 500,
+      "panels": [],
+      "title": "Logs",
+      "type": "row"
     },
     {
-      "id": 40,
-      "type": "logs",
-      "title": "Codex Events",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
       "gridPos": {
         "h": 10,
         "w": 12,
         "x": 0,
         "y": 38
       },
-      "datasource": {
-        "type": "loki",
-        "uid": "loki"
-      },
+      "id": 40,
       "options": {
-        "showTime": true,
-        "showLabels": false,
-        "showCommonLabels": false,
-        "wrapLogMessage": false,
-        "prettifyLogMessage": false,
+        "dedupStrategy": "none",
         "enableLogDetails": true,
+        "prettifyLogMessage": false,
+        "showCommonLabels": false,
+        "showLabels": false,
+        "showTime": true,
         "sortOrder": "Descending",
-        "dedupStrategy": "none"
+        "wrapLogMessage": false
       },
       "targets": [
         {
@@ -1133,31 +998,31 @@
           "queryType": "range",
           "refId": "A"
         }
-      ]
+      ],
+      "title": "Codex Events",
+      "type": "logs"
     },
     {
-      "id": 41,
-      "type": "logs",
-      "title": "Codex Errors",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
       "gridPos": {
         "h": 10,
         "w": 12,
         "x": 12,
         "y": 38
       },
-      "datasource": {
-        "type": "loki",
-        "uid": "loki"
-      },
+      "id": 41,
       "options": {
-        "showTime": true,
-        "showLabels": false,
-        "showCommonLabels": false,
-        "wrapLogMessage": false,
-        "prettifyLogMessage": false,
+        "dedupStrategy": "none",
         "enableLogDetails": true,
+        "prettifyLogMessage": false,
+        "showCommonLabels": false,
+        "showLabels": false,
+        "showTime": true,
         "sortOrder": "Descending",
-        "dedupStrategy": "none"
+        "wrapLogMessage": false
       },
       "targets": [
         {
@@ -1165,12 +1030,11 @@
           "queryType": "range",
           "refId": "A"
         }
-      ]
+      ],
+      "title": "Codex Errors",
+      "type": "logs"
     },
     {
-      "id": 600,
-      "type": "row",
-      "title": "Codex — Relay Attribution (headless, by ticket / project / phase)",
       "collapsed": false,
       "gridPos": {
         "h": 1,
@@ -1178,22 +1042,49 @@
         "x": 0,
         "y": 48
       },
-      "panels": []
+      "id": 600,
+      "panels": [],
+      "title": "Codex \u2014 Relay Attribution (headless, by ticket / project / phase)",
+      "type": "row"
     },
     {
-      "id": 50,
-      "type": "barchart",
-      "title": "Tool Calls by Ticket",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "description": "codex_tool_call_total{linear_key} -- codex_exec (headless relay) IS a native emitter of this metric with ticket dims (verified 2026-08-24). Desktop sessions never set linear_key so they do not appear here.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
       "gridPos": {
         "h": 8,
         "w": 8,
         "x": 0,
         "y": 49
       },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
+      "id": 50,
+      "options": {
+        "legend": {
+          "showLegend": false
+        },
+        "orientation": "horizontal",
+        "showValue": "auto"
       },
       "targets": [
         {
@@ -1204,12 +1095,21 @@
           "refId": "A"
         }
       ],
+      "title": "Tool Calls by Ticket",
+      "type": "barchart"
+    },
+    {
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "description": "Loki-derived (codex_exec emits no native turn-count metric with ticket dims -- codex_conversation_turn_count_total is Desktop-only). Counts codex.turn_ttft events by linear_key.",
       "fieldConfig": {
         "defaults": {
-          "unit": "short",
           "color": {
             "mode": "palette-classic"
           },
+          "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -1219,32 +1119,23 @@
               }
             ]
           },
-          "mappings": []
+          "unit": "short"
         },
         "overrides": []
       },
-      "options": {
-        "orientation": "horizontal",
-        "showValue": "auto",
-        "legend": {
-          "showLegend": false
-        }
-      }
-    },
-    {
-      "id": 51,
-      "type": "barchart",
-      "title": "Turns by Ticket",
-      "description": "Loki-derived (codex_exec emits no native turn-count metric with ticket dims -- codex_conversation_turn_count_total is Desktop-only). Counts codex.turn_ttft events by linear_key.",
       "gridPos": {
         "h": 8,
         "w": 8,
         "x": 8,
         "y": 49
       },
-      "datasource": {
-        "type": "loki",
-        "uid": "loki"
+      "id": 51,
+      "options": {
+        "legend": {
+          "showLegend": false
+        },
+        "orientation": "horizontal",
+        "showValue": "auto"
       },
       "targets": [
         {
@@ -1255,12 +1146,20 @@
           "refId": "A"
         }
       ],
+      "title": "Turns by Ticket",
+      "type": "barchart"
+    },
+    {
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
       "fieldConfig": {
         "defaults": {
-          "unit": "short",
           "color": {
             "mode": "palette-classic"
           },
+          "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -1270,31 +1169,23 @@
               }
             ]
           },
-          "mappings": []
+          "unit": "short"
         },
         "overrides": []
       },
-      "options": {
-        "orientation": "horizontal",
-        "showValue": "auto",
-        "legend": {
-          "showLegend": false
-        }
-      }
-    },
-    {
-      "id": 52,
-      "type": "barchart",
-      "title": "Turns by Project",
       "gridPos": {
         "h": 8,
         "w": 8,
         "x": 16,
         "y": 49
       },
-      "datasource": {
-        "type": "loki",
-        "uid": "loki"
+      "id": 52,
+      "options": {
+        "legend": {
+          "showLegend": false
+        },
+        "orientation": "horizontal",
+        "showValue": "auto"
       },
       "targets": [
         {
@@ -1305,12 +1196,21 @@
           "refId": "A"
         }
       ],
+      "title": "Turns by Project",
+      "type": "barchart"
+    },
+    {
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "description": "task_type=relay-codex is the laptop relay dispatcher (see AGENTS.md relay-dispatch.sh); Desktop/other originators never set task_type and group under the empty bucket.",
       "fieldConfig": {
         "defaults": {
-          "unit": "short",
           "color": {
             "mode": "palette-classic"
           },
+          "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -1320,32 +1220,23 @@
               }
             ]
           },
-          "mappings": []
+          "unit": "short"
         },
         "overrides": []
       },
-      "options": {
-        "orientation": "horizontal",
-        "showValue": "auto",
-        "legend": {
-          "showLegend": false
-        }
-      }
-    },
-    {
-      "id": 53,
-      "type": "barchart",
-      "title": "Turns: relay-codex vs Desktop (by task_type)",
-      "description": "task_type=relay-codex is the laptop relay dispatcher (see AGENTS.md relay-dispatch.sh); Desktop/other originators never set task_type and group under the empty bucket.",
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 0,
         "y": 57
       },
-      "datasource": {
-        "type": "loki",
-        "uid": "loki"
+      "id": 53,
+      "options": {
+        "legend": {
+          "showLegend": false
+        },
+        "orientation": "horizontal",
+        "showValue": "auto"
       },
       "targets": [
         {
@@ -1356,12 +1247,37 @@
           "refId": "A"
         }
       ],
+      "title": "Turns: relay-codex vs Desktop (by task_type)",
+      "type": "barchart"
+    },
+    {
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "description": "codex_exec emits NO codex_turn_token_usage_* metric -- the only token-usage signal for headless relay work is Loki structured metadata on codex.sse_event (input_token_count/output_token_count/cached_token_count/reasoning_token_count/tool_token_count), verified 2026-08-24. unwrap sums those fields per ticket.",
       "fieldConfig": {
         "defaults": {
-          "unit": "short",
-          "color": {
-            "mode": "palette-classic"
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 60,
+            "gradientMode": "opacity",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "normal"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
           },
+          "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -1371,34 +1287,37 @@
               }
             ]
           },
-          "mappings": []
+          "unit": "short"
         },
         "overrides": []
       },
-      "options": {
-        "orientation": "horizontal",
-        "showValue": "auto",
-        "legend": {
-          "showLegend": false
-        }
-      }
-    },
-    {
-      "id": 54,
-      "type": "timeseries",
-      "title": "Relay Token Usage by Ticket (headless, input/output)",
-      "description": "codex_exec emits NO codex_turn_token_usage_* metric -- the only token-usage signal for headless relay work is Loki structured metadata on codex.sse_event (input_token_count/output_token_count/cached_token_count/reasoning_token_count/tool_token_count), verified 2026-08-24. unwrap sums those fields per ticket.",
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 12,
         "y": 57
       },
-      "datasource": {
-        "type": "loki",
-        "uid": "loki"
-      },
+      "id": 54,
       "interval": "$bucket",
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "width": 280,
+          "calcs": [
+            "lastNotNull",
+            "max",
+            "sum"
+          ],
+          "sortBy": "Total",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
       "targets": [
         {
           "expr": "sum by (linear_key) (sum_over_time({service_name=\"codex_exec\"} | event_name=\"codex.sse_event\" | linear_key!=\"\" | linear_key=~\"$linear_key\" | unwrap input_token_count [$__interval]))",
@@ -1411,23 +1330,31 @@
           "refId": "B"
         }
       ],
+      "title": "Relay Token Usage by Ticket (headless, input/output)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "description": "Same codex.sse_event unwrap source as the by-ticket panel, grouped by model instead -- the headless equivalent of the native 'Tokens by Model' panel above (which is Desktop-only).",
       "fieldConfig": {
         "defaults": {
-          "unit": "short",
           "custom": {
-            "drawStyle": "bars",
-            "lineWidth": 1,
-            "fillOpacity": 60,
+            "drawStyle": "line",
+            "fillOpacity": 10,
             "gradientMode": "opacity",
-            "spanNulls": false,
-            "showPoints": "never",
-            "lineInterpolation": "linear",
-            "stacking": {
-              "mode": "normal",
-              "group": "A"
-            },
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
             "scaleDistribution": {
               "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "group": "A",
+              "mode": "normal"
             },
             "thresholdsStyle": {
               "mode": "off"
@@ -1442,41 +1369,38 @@
                 "value": null
               }
             ]
-          }
+          },
+          "unit": "short"
         },
         "overrides": []
       },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "right",
-          "calcs": [
-            "sum",
-            "mean"
-          ]
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      }
-    },
-    {
-      "id": 55,
-      "type": "timeseries",
-      "title": "Relay Token Usage by Model (headless, output tokens)",
-      "description": "Same codex.sse_event unwrap source as the by-ticket panel, grouped by model instead -- the headless equivalent of the native 'Tokens by Model' panel above (which is Desktop-only).",
       "gridPos": {
         "h": 8,
         "w": 24,
         "x": 0,
         "y": 65
       },
-      "datasource": {
-        "type": "loki",
-        "uid": "loki"
-      },
+      "id": 55,
       "interval": "$bucket",
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "width": 280,
+          "calcs": [
+            "lastNotNull",
+            "max",
+            "sum"
+          ],
+          "sortBy": "Total",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
       "targets": [
         {
           "expr": "sum by (model) (sum_over_time({service_name=\"codex_exec\"} | event_name=\"codex.sse_event\" | model=~\"$model\" | unwrap output_token_count [$__interval]))",
@@ -1484,60 +1408,10 @@
           "refId": "A"
         }
       ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "custom": {
-            "drawStyle": "line",
-            "lineWidth": 2,
-            "fillOpacity": 10,
-            "gradientMode": "opacity",
-            "spanNulls": true,
-            "showPoints": "never",
-            "lineInterpolation": "smooth",
-            "stacking": {
-              "mode": "normal",
-              "group": "A"
-            },
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "right",
-          "calcs": [
-            "sum",
-            "mean"
-          ]
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      }
+      "title": "Relay Token Usage by Model (headless, output tokens)",
+      "type": "timeseries"
     },
     {
-      "id": 700,
-      "type": "row",
-      "title": "Codex — CALCULATED Cost (API list price -- NOT a real charge)",
       "collapsed": false,
       "gridPos": {
         "h": 1,
@@ -1545,37 +1419,24 @@
         "x": 0,
         "y": 73
       },
-      "panels": []
+      "id": 700,
+      "panels": [],
+      "title": "Codex \u2014 CALCULATED Cost (API list price -- NOT a real charge)",
+      "type": "row"
     },
     {
-      "id": 60,
-      "type": "stat",
-      "title": "Cost (calculated)",
-      "description": "CALCULATED by us at OpenAI's published API list price for gpt-5.6-sol (see provisioning/prometheus/codex-price-table.md, fetched from https://developers.openai.com/api/docs/pricing 2026-08-24). This laptop's Codex runs on a ChatGPT Plan Pro SUBSCRIPTION, not API billing -- verified no cost/credit telemetry exists anywhere (rollout JSONL rate_limits.credits, the OTLP feed, or the OpenAI platform Costs API, which is unreachable here -- no API key configured). Subscription usage has NO true marginal dollar cost. This number is what the same tokens would cost an API-billed caller -- treat as a proxy for RELATIVE usage weight, not an actual bill.",
-      "gridPos": {
-        "h": 8,
-        "w": 6,
-        "x": 0,
-        "y": 74
-      },
       "datasource": {
         "type": "loki",
         "uid": "loki"
       },
-      "targets": [
-        {
-          "expr": "(sum(sum_over_time({service_name=\"codex_exec\"} | event_name=\"codex.sse_event\" | model=\"gpt-5.6-sol\" | unwrap input_token_count [$__range])) - sum(sum_over_time({service_name=\"codex_exec\"} | event_name=\"codex.sse_event\" | model=\"gpt-5.6-sol\" | unwrap cached_token_count [$__range]))) * 0.000004 + sum(sum_over_time({service_name=\"codex_exec\"} | event_name=\"codex.sse_event\" | model=\"gpt-5.6-sol\" | unwrap cached_token_count [$__range])) * 0.0000004 + sum(sum_over_time({service_name=\"codex_exec\"} | event_name=\"codex.sse_event\" | model=\"gpt-5.6-sol\" | unwrap output_token_count [$__range])) * 0.00002",
-          "legendFormat": "Estimated Cost",
-          "refId": "A"
-        }
-      ],
+      "description": "CALCULATED by us at OpenAI's published API list price for gpt-5.6-sol (see provisioning/prometheus/codex-price-table.md, fetched from https://developers.openai.com/api/docs/pricing 2026-08-24). This laptop's Codex runs on a ChatGPT Plan Pro SUBSCRIPTION, not API billing -- verified no cost/credit telemetry exists anywhere (rollout JSONL rate_limits.credits, the OTLP feed, or the OpenAI platform Costs API, which is unreachable here -- no API key configured). Subscription usage has NO true marginal dollar cost. This number is what the same tokens would cost an API-billed caller -- treat as a proxy for RELATIVE usage weight, not an actual bill.",
       "fieldConfig": {
         "defaults": {
-          "unit": "currencyUSD",
-          "decimals": 2,
           "color": {
             "mode": "thresholds"
           },
+          "decimals": 2,
+          "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -1585,39 +1446,80 @@
               }
             ]
           },
-          "mappings": []
+          "unit": "currencyUSD"
         },
         "overrides": []
       },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 0,
+        "y": 74
+      },
+      "id": 60,
       "options": {
         "colorMode": "background_solid",
         "graphMode": "area",
         "justifyMode": "center",
         "orientation": "auto",
-        "textMode": "value_and_name",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
           ],
-          "values": false,
-          "fields": ""
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name"
+      },
+      "targets": [
+        {
+          "expr": "(sum(sum_over_time({service_name=\"codex_exec\"} | event_name=\"codex.sse_event\" | model=\"gpt-5.6-sol\" | unwrap input_token_count [$__range])) - sum(sum_over_time({service_name=\"codex_exec\"} | event_name=\"codex.sse_event\" | model=\"gpt-5.6-sol\" | unwrap cached_token_count [$__range]))) * 0.000004 + sum(sum_over_time({service_name=\"codex_exec\"} | event_name=\"codex.sse_event\" | model=\"gpt-5.6-sol\" | unwrap cached_token_count [$__range])) * 0.0000004 + sum(sum_over_time({service_name=\"codex_exec\"} | event_name=\"codex.sse_event\" | model=\"gpt-5.6-sol\" | unwrap output_token_count [$__range])) * 0.00002",
+          "legendFormat": "Estimated Cost",
+          "refId": "A"
         }
-      }
+      ],
+      "title": "Cost (calculated)",
+      "type": "stat"
     },
     {
-      "id": 61,
-      "type": "barchart",
-      "title": "Cost by Ticket (calculated)",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
       "description": "CALCULATED -- see the 'Cost (calculated)' stat panel's description. gpt-5.6-sol only (the only model this fleet has used to date); see provisioning/prometheus/codex-price-table.md to extend to terra/luna.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "decimals": 2,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "currencyUSD"
+        },
+        "overrides": []
+      },
       "gridPos": {
         "h": 8,
         "w": 18,
         "x": 6,
         "y": 74
       },
-      "datasource": {
-        "type": "loki",
-        "uid": "loki"
+      "id": 61,
+      "options": {
+        "legend": {
+          "showLegend": false
+        },
+        "orientation": "horizontal",
+        "showValue": "auto"
       },
       "targets": [
         {
@@ -1628,33 +1530,170 @@
           "refId": "A"
         }
       ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "currencyUSD",
-          "decimals": 2,
-          "color": {
-            "mode": "palette-classic"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "mappings": []
-        },
-        "overrides": []
-      },
-      "options": {
-        "orientation": "horizontal",
-        "showValue": "auto",
-        "legend": {
-          "showLegend": false
-        }
-      }
+      "title": "Cost by Ticket (calculated)",
+      "type": "barchart"
     }
-  ]
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "style": "dark",
+  "tags": [
+    "codex",
+    "observability"
+  ],
+  "templating": {
+    "list": [
+      {
+        "auto": false,
+        "auto_count": 30,
+        "auto_min": "10s",
+        "current": {
+          "text": "5m",
+          "value": "5m"
+        },
+        "hide": 0,
+        "label": "Interval",
+        "name": "bucket",
+        "options": [],
+        "query": "1m,5m,15m,30m,1h,6h,1d",
+        "refresh": 2,
+        "type": "interval"
+      },
+      {
+        "allValue": ".*",
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "hide": 0,
+        "includeAll": true,
+        "label": "Model",
+        "multi": true,
+        "name": "model",
+        "options": [],
+        "query": {
+          "qryType": 1,
+          "query": "label_values(codex_conversation_turn_count_total, model)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 2,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allValue": ".*",
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "hide": 0,
+        "includeAll": true,
+        "label": "Originator",
+        "multi": true,
+        "name": "originator",
+        "options": [],
+        "query": {
+          "qryType": 1,
+          "query": "label_values(codex_tool_call_total, originator)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 2,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allValue": ".*",
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "hide": 0,
+        "includeAll": true,
+        "label": "Host",
+        "multi": true,
+        "name": "hostname",
+        "options": [],
+        "query": {
+          "qryType": 1,
+          "query": "label_values(codex_conversation_turn_count_total, host_name)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 2,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allValue": ".*",
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "description": "CTC-* relay ticket. Sourced from codex_tool_call_total, the one native codex_exec (headless) Prometheus metric confirmed to carry linear_key/project/task_type/branch/host_name (2026-08-24) -- codex_conversation_turn_count_total and codex_turn_token_usage_* carry NO ticket dims for headless (Desktop-only).",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Ticket",
+        "multi": true,
+        "name": "linear_key",
+        "options": [],
+        "query": {
+          "qryType": 1,
+          "query": "label_values(codex_tool_call_total, linear_key)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 2,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allValue": ".*",
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "hide": 0,
+        "includeAll": true,
+        "label": "Project",
+        "multi": true,
+        "name": "project",
+        "options": [],
+        "query": {
+          "qryType": 1,
+          "query": "label_values(codex_tool_call_total, project)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 2,
+        "sort": 1,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Codex Usage",
+  "uid": "codex-usage",
+  "version": 5
 }
