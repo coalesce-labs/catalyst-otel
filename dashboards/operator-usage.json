@@ -1,106 +1,28 @@
 {
-  "uid": "operator-usage",
-  "title": "Operator Usage",
   "description": "Per-person Claude Code usage, keyed on the `operator` resource attribute. Use when more than one person shares an Anthropic account: the user.* attributes are identical for everyone on a shared account, so `operator` is the only reliable discriminator. Series with no `operator` label are matched by the All selector.",
-  "tags": [
-    "claude-code",
-    "operator",
-    "usage"
-  ],
-  "timezone": "browser",
   "editable": true,
-  "schemaVersion": 39,
-  "refresh": "30s",
-  "time": {
-    "from": "now-24h",
-    "to": "now"
-  },
-  "templating": {
-    "list": [
-      {
-        "name": "operator",
-        "label": "Operator",
-        "type": "query",
-        "datasource": {
-          "type": "prometheus",
-          "uid": "prometheus"
-        },
-        "query": "label_values(claude_code_token_usage_tokens_total, operator)",
-        "refresh": 2,
-        "includeAll": true,
-        "allValue": ".*",
-        "multi": true,
-        "current": {
-          "text": "All",
-          "value": "$__all"
-        }
-      },
-      {
-        "name": "session",
-        "label": "Session",
-        "type": "query",
-        "datasource": {
-          "type": "prometheus",
-          "uid": "prometheus"
-        },
-        "query": "label_values(claude_code_session_count_total{operator=~\"$operator\"}, session_id)",
-        "refresh": 2,
-        "includeAll": true,
-        "allValue": ".*",
-        "multi": true,
-        "current": {
-          "text": "All",
-          "value": "$__all"
-        },
-        "description": "Cascades from Operator and the dashboard time range. Pick one session to read it end to end."
-      }
-    ]
-  },
+  "id": null,
   "panels": [
     {
-      "type": "row",
-      "title": "Overview",
+      "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
         "y": 0
       },
-      "collapsed": false,
-      "panels": []
+      "panels": [],
+      "title": "Overview",
+      "type": "row"
     },
     {
-      "type": "stat",
-      "title": "Estimated cost",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "gridPos": {
-        "h": 5,
-        "w": 5,
-        "x": 0,
-        "y": 1
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "sum(max_over_time(claude_code_cost_usage_USD_total{operator=~\"$operator\"}[$__range])) or vector(0)",
-          "instant": true
-        }
-      ],
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
-        },
-        "colorMode": "background",
-        "graphMode": "none"
-      },
+      "description": "Sum of the per-session cost counter's maximum within the selected range.",
       "fieldConfig": {
         "defaults": {
-          "unit": "currencyUSD",
           "decimals": 3,
           "thresholds": {
             "mode": "absolute",
@@ -118,18 +40,51 @@
                 "value": 25
               }
             ]
-          }
+          },
+          "unit": "currencyUSD"
         },
         "overrides": []
       },
-      "description": "Sum of the per-session cost counter's maximum within the selected range."
+      "gridPos": {
+        "h": 5,
+        "w": 5,
+        "x": 0,
+        "y": 1
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(max_over_time(claude_code_cost_usage_USD_total{operator=~\"$operator\"}[$__range])) or vector(0)",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Estimated cost",
+      "type": "stat"
     },
     {
-      "type": "stat",
-      "title": "Tokens",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "blue",
+            "mode": "fixed"
+          },
+          "decimals": 0,
+          "unit": "short"
+        },
+        "overrides": []
       },
       "gridPos": {
         "h": 5,
@@ -137,40 +92,40 @@
         "x": 5,
         "y": 1
       },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "sum(max_over_time(claude_code_token_usage_tokens_total{operator=~\"$operator\"}[$__range])) or vector(0)",
-          "instant": true
-        }
-      ],
       "options": {
+        "colorMode": "value",
+        "graphMode": "none",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
           ]
-        },
-        "colorMode": "value",
-        "graphMode": "none"
+        }
       },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "decimals": 0,
-          "color": {
-            "mode": "fixed",
-            "fixedColor": "blue"
-          }
-        },
-        "overrides": []
-      }
+      "targets": [
+        {
+          "expr": "sum(max_over_time(claude_code_token_usage_tokens_total{operator=~\"$operator\"}[$__range])) or vector(0)",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Tokens",
+      "type": "stat"
     },
     {
-      "type": "stat",
-      "title": "Sessions",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "purple",
+            "mode": "fixed"
+          },
+          "decimals": 0,
+          "unit": "short"
+        },
+        "overrides": []
       },
       "gridPos": {
         "h": 5,
@@ -178,40 +133,41 @@
         "x": 10,
         "y": 1
       },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "sum(max_over_time(claude_code_session_count_total{operator=~\"$operator\"}[$__range])) or vector(0)",
-          "instant": true
-        }
-      ],
       "options": {
+        "colorMode": "value",
+        "graphMode": "none",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
           ]
-        },
-        "colorMode": "value",
-        "graphMode": "none"
+        }
       },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "decimals": 0,
-          "color": {
-            "mode": "fixed",
-            "fixedColor": "purple"
-          }
-        },
-        "overrides": []
-      }
+      "targets": [
+        {
+          "expr": "sum(max_over_time(claude_code_session_count_total{operator=~\"$operator\"}[$__range])) or vector(0)",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Sessions",
+      "type": "stat"
     },
     {
-      "type": "stat",
-      "title": "Prompts sent",
       "datasource": {
         "type": "loki",
         "uid": "loki"
+      },
+      "description": "Counts claude_code.user_prompt events. This includes local slash commands such as /status and /effort, which never call the API \u2014 so this can exceed the number of sessions that show tokens or cost.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "orange",
+            "mode": "fixed"
+          },
+          "decimals": 0,
+          "unit": "short"
+        },
+        "overrides": []
       },
       "gridPos": {
         "h": 5,
@@ -219,41 +175,40 @@
         "x": 14,
         "y": 1
       },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "sum(count_over_time({service_name=~\"claude-code.*\"} |= \"claude_code.user_prompt\" | operator=~\"$operator\" [$__range])) or vector(0)",
-          "queryType": "instant"
-        }
-      ],
       "options": {
+        "colorMode": "value",
+        "graphMode": "none",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
           ]
-        },
-        "colorMode": "value",
-        "graphMode": "none"
+        }
       },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "decimals": 0,
-          "color": {
-            "mode": "fixed",
-            "fixedColor": "orange"
-          }
-        },
-        "overrides": []
-      },
-      "description": "Counts claude_code.user_prompt events. This includes local slash commands such as /status and /effort, which never call the API \u2014 so this can exceed the number of sessions that show tokens or cost."
+      "targets": [
+        {
+          "expr": "sum(count_over_time({service_name=~\"claude-code.*\"} |= \"claude_code.user_prompt\" | operator=~\"$operator\" [$__range])) or vector(0)",
+          "queryType": "instant",
+          "refId": "A"
+        }
+      ],
+      "title": "Prompts sent",
+      "type": "stat"
     },
     {
-      "type": "stat",
-      "title": "Lines changed",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "green",
+            "mode": "fixed"
+          },
+          "decimals": 0,
+          "unit": "short"
+        },
+        "overrides": []
       },
       "gridPos": {
         "h": 5,
@@ -261,52 +216,56 @@
         "x": 19,
         "y": 1
       },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "sum(max_over_time(claude_code_lines_of_code_count_total{operator=~\"$operator\"}[$__range])) or vector(0)",
-          "instant": true
-        }
-      ],
       "options": {
+        "colorMode": "value",
+        "graphMode": "none",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
           ]
-        },
-        "colorMode": "value",
-        "graphMode": "none"
+        }
       },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "decimals": 0,
-          "color": {
-            "mode": "fixed",
-            "fixedColor": "green"
-          }
-        },
-        "overrides": []
-      }
+      "targets": [
+        {
+          "expr": "sum(max_over_time(claude_code_lines_of_code_count_total{operator=~\"$operator\"}[$__range])) or vector(0)",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Lines changed",
+      "type": "stat"
     },
     {
-      "type": "row",
-      "title": "Activity",
+      "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
         "y": 6
       },
-      "collapsed": false,
-      "panels": []
+      "panels": [],
+      "title": "Activity",
+      "type": "row"
     },
     {
-      "type": "timeseries",
-      "title": "Cumulative cost by operator",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
+      },
+      "description": "Cumulative spend, not a rate. Prometheus expires idle series after 15m, so rate() over sparse Claude Code counters reads near-zero and is misleading.",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "stepAfter",
+            "showPoints": "always",
+            "spanNulls": true
+          },
+          "min": 0,
+          "unit": "currencyUSD"
+        },
+        "overrides": []
       },
       "gridPos": {
         "h": 8,
@@ -314,45 +273,49 @@
         "x": 0,
         "y": 7
       },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "sum by (operator) (max_over_time(claude_code_cost_usage_USD_total{operator=~\"$operator\"}[$__interval]))",
-          "legendFormat": "{{operator}}"
-        }
-      ],
       "options": {
         "legend": {
           "displayMode": "table",
-          "placement": "bottom",
+          "placement": "right",
+          "showLegend": true,
+          "width": 280,
           "calcs": [
             "lastNotNull",
             "max"
-          ]
+          ],
+          "sortBy": "Last *",
+          "sortDesc": true
         }
       },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "currencyUSD",
-          "custom": {
-            "fillOpacity": 10,
-            "showPoints": "always",
-            "spanNulls": true,
-            "drawStyle": "line",
-            "lineInterpolation": "stepAfter"
-          },
-          "min": 0
-        },
-        "overrides": []
-      },
-      "description": "Cumulative spend, not a rate. Prometheus expires idle series after 15m, so rate() over sparse Claude Code counters reads near-zero and is misleading."
+      "targets": [
+        {
+          "expr": "sum by (operator) (max_over_time(claude_code_cost_usage_USD_total{operator=~\"$operator\"}[$__interval]))",
+          "legendFormat": "{{operator}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Cumulative cost by operator",
+      "type": "timeseries"
     },
     {
-      "type": "timeseries",
-      "title": "Cumulative tokens by type",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
+      },
+      "description": "Cumulative token counts. Same reason as the cost panel: rate() is unreliable on sparse counters.",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "stepAfter",
+            "showPoints": "always",
+            "spanNulls": true
+          },
+          "min": 0,
+          "unit": "short"
+        },
+        "overrides": []
       },
       "gridPos": {
         "h": 8,
@@ -360,45 +323,40 @@
         "x": 12,
         "y": 7
       },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "sum by (type) (max_over_time(claude_code_token_usage_tokens_total{operator=~\"$operator\"}[$__interval]))",
-          "legendFormat": "{{type}}"
-        }
-      ],
       "options": {
         "legend": {
           "displayMode": "table",
-          "placement": "bottom",
+          "placement": "right",
+          "showLegend": true,
+          "width": 280,
           "calcs": [
             "lastNotNull",
             "max"
-          ]
+          ],
+          "sortBy": "Last *",
+          "sortDesc": true
         }
       },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "custom": {
-            "fillOpacity": 10,
-            "showPoints": "always",
-            "spanNulls": true,
-            "drawStyle": "line",
-            "lineInterpolation": "stepAfter"
-          },
-          "min": 0
-        },
-        "overrides": []
-      },
-      "description": "Cumulative token counts. Same reason as the cost panel: rate() is unreliable on sparse counters."
+      "targets": [
+        {
+          "expr": "sum by (type) (max_over_time(claude_code_token_usage_tokens_total{operator=~\"$operator\"}[$__interval]))",
+          "legendFormat": "{{type}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Cumulative tokens by type",
+      "type": "timeseries"
     },
     {
-      "type": "piechart",
-      "title": "Model mix (tokens)",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
       },
       "gridPos": {
         "h": 8,
@@ -406,14 +364,6 @@
         "x": 0,
         "y": 15
       },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "sum by (model) (max_over_time(claude_code_token_usage_tokens_total{operator=~\"$operator\"}[$__range]))",
-          "legendFormat": "{{model}}",
-          "instant": true
-        }
-      ],
       "options": {
         "legend": {
           "displayMode": "list",
@@ -425,19 +375,27 @@
           ]
         }
       },
+      "targets": [
+        {
+          "expr": "sum by (model) (max_over_time(claude_code_token_usage_tokens_total{operator=~\"$operator\"}[$__range]))",
+          "instant": true,
+          "legendFormat": "{{model}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Model mix (tokens)",
+      "type": "piechart"
+    },
+    {
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "short"
         },
         "overrides": []
-      }
-    },
-    {
-      "type": "barchart",
-      "title": "Top tools",
-      "datasource": {
-        "type": "loki",
-        "uid": "loki"
       },
       "gridPos": {
         "h": 8,
@@ -445,32 +403,36 @@
         "x": 8,
         "y": 15
       },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "sort_desc(topk(10, sum by (tool_name) (count_over_time({service_name=~\"claude-code.*\"} |= \"claude_code.tool_result\" | operator=~\"$operator\" [$__range]))))",
-          "queryType": "instant"
-        }
-      ],
       "options": {
-        "orientation": "horizontal",
         "legend": {
           "showLegend": false
-        }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short"
         },
-        "overrides": []
-      }
+        "orientation": "horizontal"
+      },
+      "targets": [
+        {
+          "expr": "sort_desc(topk(10, sum by (tool_name) (count_over_time({service_name=~\"claude-code.*\"} |= \"claude_code.tool_result\" | operator=~\"$operator\" [$__range]))))",
+          "queryType": "instant",
+          "refId": "A"
+        }
+      ],
+      "title": "Top tools",
+      "type": "barchart"
     },
     {
-      "type": "timeseries",
-      "title": "Prompts over time",
       "datasource": {
         "type": "loki",
         "uid": "loki"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 60
+          },
+          "unit": "short"
+        },
+        "overrides": []
       },
       "gridPos": {
         "h": 8,
@@ -478,174 +440,102 @@
         "x": 16,
         "y": 15
       },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "sum by (operator) (count_over_time({service_name=~\"claude-code.*\"} |= \"claude_code.user_prompt\" | operator=~\"$operator\" [$__auto]))",
-          "legendFormat": "{{operator}}"
-        }
-      ],
       "options": {
         "legend": {
-          "displayMode": "list",
-          "placement": "bottom"
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": [
+            "lastNotNull",
+            "max",
+            "sum"
+          ],
+          "sortBy": "Total",
+          "sortDesc": true
         }
       },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "custom": {
-            "drawStyle": "bars",
-            "fillOpacity": 60
-          }
-        },
-        "overrides": []
-      }
+      "targets": [
+        {
+          "expr": "sum by (operator) (count_over_time({service_name=~\"claude-code.*\"} |= \"claude_code.user_prompt\" | operator=~\"$operator\" [$__auto]))",
+          "legendFormat": "{{operator}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Prompts over time",
+      "type": "timeseries"
     },
     {
-      "type": "row",
-      "title": "What they actually did",
+      "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
         "y": 23
       },
-      "collapsed": false,
-      "panels": []
+      "panels": [],
+      "title": "What they actually did",
+      "type": "row"
     },
     {
-      "type": "logs",
-      "title": "Prompts",
-      "description": "Full prompt text. Requires OTEL_LOG_USER_PROMPTS=1 on the client. Everyone on the team is logged this way, Ryan included.",
       "datasource": {
         "type": "loki",
         "uid": "loki"
       },
+      "description": "Full prompt text. Requires OTEL_LOG_USER_PROMPTS=1 on the client. Everyone on the team is logged this way, Ryan included.",
       "gridPos": {
         "h": 11,
         "w": 12,
         "x": 0,
         "y": 24
       },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "{service_name=~\"claude-code.*\"} |= \"claude_code.user_prompt\" | operator=~\"$operator\" | line_format \"[{{.operator}}] {{.prompt}}\""
-        }
-      ],
       "options": {
+        "enableLogDetails": true,
         "showTime": true,
         "sortOrder": "Descending",
-        "wrapLogMessage": true,
-        "enableLogDetails": true
-      }
+        "wrapLogMessage": true
+      },
+      "targets": [
+        {
+          "expr": "{service_name=~\"claude-code.*\"} |= \"claude_code.user_prompt\" | operator=~\"$operator\" | line_format \"[{{.operator}}] {{.prompt}}\"",
+          "refId": "A"
+        }
+      ],
+      "title": "Prompts",
+      "type": "logs"
     },
     {
-      "type": "logs",
-      "title": "Tool calls",
-      "description": "Requires OTEL_LOG_TOOL_DETAILS=1 on the client.",
       "datasource": {
         "type": "loki",
         "uid": "loki"
       },
+      "description": "Requires OTEL_LOG_TOOL_DETAILS=1 on the client.",
       "gridPos": {
         "h": 11,
         "w": 12,
         "x": 12,
         "y": 24
       },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "{service_name=~\"claude-code.*\"} |= \"claude_code.tool_result\" | operator=~\"$operator\" | line_format \"[{{.operator}}] {{.tool_name}} success={{.success}} {{.duration_ms}}ms\""
-        }
-      ],
       "options": {
+        "enableLogDetails": true,
         "showTime": true,
         "sortOrder": "Descending",
-        "wrapLogMessage": true,
-        "enableLogDetails": true
-      }
+        "wrapLogMessage": true
+      },
+      "targets": [
+        {
+          "expr": "{service_name=~\"claude-code.*\"} |= \"claude_code.tool_result\" | operator=~\"$operator\" | line_format \"[{{.operator}}] {{.tool_name}} success={{.success}} {{.duration_ms}}ms\"",
+          "refId": "A"
+        }
+      ],
+      "title": "Tool calls",
+      "type": "logs"
     },
     {
-      "type": "table",
-      "title": "Sessions",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "gridPos": {
-        "h": 9,
-        "w": 24,
-        "x": 0,
-        "y": 35
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "instant": true,
-          "format": "table",
-          "expr": "sum by (operator, host_name, session_id) (max_over_time(claude_code_session_count_total{operator=~\"$operator\"}[$__range]))"
-        },
-        {
-          "refId": "B",
-          "instant": true,
-          "format": "table",
-          "expr": "sum by (session_id, model) (max_over_time(claude_code_token_usage_tokens_total{operator=~\"$operator\"}[$__range]))"
-        },
-        {
-          "refId": "C",
-          "instant": true,
-          "format": "table",
-          "expr": "sum by (session_id) (max_over_time(claude_code_cost_usage_USD_total{operator=~\"$operator\"}[$__range]))"
-        }
-      ],
-      "transformations": [
-        {
-          "id": "joinByField",
-          "options": {
-            "byField": "session_id",
-            "mode": "outer"
-          }
-        },
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": {
-              "Time": true,
-              "Time 1": true,
-              "Time 2": true,
-              "Time 3": true
-            },
-            "renameByName": {
-              "Value #A": "sessions",
-              "Value #B": "tokens",
-              "Value #C": "cost (USD)"
-            },
-            "indexByName": {
-              "operator": 0,
-              "host_name": 1,
-              "session_id": 2,
-              "model": 3
-            }
-          }
-        },
-        {
-          "id": "sortBy",
-          "options": {
-            "sort": [
-              {
-                "field": "tokens",
-                "desc": true
-              }
-            ]
-          }
-        }
-      ],
-      "options": {
-        "showHeader": true
-      },
+      "description": "Every session that started, including ones that never called the API. Blank tokens/cost means the session only ran local slash commands.",
       "fieldConfig": {
         "defaults": {},
         "overrides": [
@@ -679,49 +569,177 @@
           }
         ]
       },
-      "description": "Every session that started, including ones that never called the API. Blank tokens/cost means the session only ran local slash commands."
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 35
+      },
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "expr": "sum by (operator, host_name, session_id) (max_over_time(claude_code_session_count_total{operator=~\"$operator\"}[$__range]))",
+          "format": "table",
+          "instant": true,
+          "refId": "A"
+        },
+        {
+          "expr": "sum by (session_id, model) (max_over_time(claude_code_token_usage_tokens_total{operator=~\"$operator\"}[$__range]))",
+          "format": "table",
+          "instant": true,
+          "refId": "B"
+        },
+        {
+          "expr": "sum by (session_id) (max_over_time(claude_code_cost_usage_USD_total{operator=~\"$operator\"}[$__range]))",
+          "format": "table",
+          "instant": true,
+          "refId": "C"
+        }
+      ],
+      "title": "Sessions",
+      "transformations": [
+        {
+          "id": "joinByField",
+          "options": {
+            "byField": "session_id",
+            "mode": "outer"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "Time 1": true,
+              "Time 2": true,
+              "Time 3": true
+            },
+            "indexByName": {
+              "host_name": 1,
+              "model": 3,
+              "operator": 0,
+              "session_id": 2
+            },
+            "renameByName": {
+              "Value #A": "sessions",
+              "Value #B": "tokens",
+              "Value #C": "cost (USD)"
+            }
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "sort": [
+              {
+                "desc": true,
+                "field": "tokens"
+              }
+            ]
+          }
+        }
+      ],
+      "type": "table"
     },
     {
-      "type": "row",
-      "title": "Conversation",
+      "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
         "y": 44
       },
-      "collapsed": false,
-      "panels": []
+      "panels": [],
+      "title": "Conversation",
+      "type": "row"
     },
     {
-      "type": "logs",
-      "title": "Conversation (prompts and responses, oldest first)",
-      "description": "Interleaves claude_code.user_prompt and claude_code.assistant_response by timestamp. Slash commands such as /status never call the model, so they appear as a USER line with no CLAUDE reply. The two events share a prompt_id if you need to pair them exactly.",
       "datasource": {
         "type": "loki",
         "uid": "loki"
       },
+      "description": "Interleaves claude_code.user_prompt and claude_code.assistant_response by timestamp. Slash commands such as /status never call the model, so they appear as a USER line with no CLAUDE reply. The two events share a prompt_id if you need to pair them exactly.",
       "gridPos": {
         "h": 18,
         "w": 24,
         "x": 0,
         "y": 45
       },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "{service_name=~\"claude-code.*\"} | event_name=~\"user_prompt|assistant_response\" | operator=~\"$operator\" | session_id=~\"$session\" | line_format \"{{ if eq .event_name \\\"user_prompt\\\" }}\u25b6 USER    {{ .prompt }}{{ else }}\u25c0 CLAUDE  {{ .response }}{{ end }}\"",
-          "direction": "forward"
-        }
-      ],
       "options": {
-        "showTime": true,
-        "sortOrder": "Ascending",
-        "wrapLogMessage": true,
+        "dedupStrategy": "none",
         "enableLogDetails": true,
         "prettifyLogMessage": false,
-        "dedupStrategy": "none"
-      }
+        "showTime": true,
+        "sortOrder": "Ascending",
+        "wrapLogMessage": true
+      },
+      "targets": [
+        {
+          "direction": "forward",
+          "expr": "{service_name=~\"claude-code.*\"} | event_name=~\"user_prompt|assistant_response\" | operator=~\"$operator\" | session_id=~\"$session\" | line_format \"{{ if eq .event_name \\\"user_prompt\\\" }}\u25b6 USER    {{ .prompt }}{{ else }}\u25c0 CLAUDE  {{ .response }}{{ end }}\"",
+          "refId": "A"
+        }
+      ],
+      "title": "Conversation (prompts and responses, oldest first)",
+      "type": "logs"
     }
-  ]
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": [
+    "claude-code",
+    "operator",
+    "usage"
+  ],
+  "templating": {
+    "list": [
+      {
+        "allValue": ".*",
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "includeAll": true,
+        "label": "Operator",
+        "multi": true,
+        "name": "operator",
+        "query": "label_values(claude_code_token_usage_tokens_total, operator)",
+        "refresh": 2,
+        "type": "query"
+      },
+      {
+        "allValue": ".*",
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "description": "Cascades from Operator and the dashboard time range. Pick one session to read it end to end.",
+        "includeAll": true,
+        "label": "Session",
+        "multi": true,
+        "name": "session",
+        "query": "label_values(claude_code_session_count_total{operator=~\"$operator\"}, session_id)",
+        "refresh": 2,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "timezone": "browser",
+  "title": "Operator Usage",
+  "uid": "operator-usage",
+  "version": 6
 }
