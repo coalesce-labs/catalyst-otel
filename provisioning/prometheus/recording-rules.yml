@@ -85,13 +85,20 @@ groups:
       # absent). The ticket's/PR-brief's assumption that GLM is identified by
       # `account="glm-coding"` is WRONG on this stack -- `model` is the only
       # reliable discriminator (`glm-5.3[1m]`, `glm-5.2[1m]`, `glm-5.2`, ...).
+      #
+      # OTL-93: also excludes model=~"^qwen.*" -- since ~2026-08-27 the Qwen
+      # relay lanes run through the claude-code SDK harness (model
+      # `qwen3.8-max`; the SDK warns `unrecognized_model` but telemetry
+      # flows), so Qwen rides this same family too (verified live
+      # 2026-08-28: `qwen3.8-max[1m]`, account="qwen-token-plan"). Without
+      # the exclusion Qwen tokens silently inflate the Claude lane.
       - record: ai:tokens:sum
         labels:
           provider: anthropic
         expr: |
           label_replace(
             sum by (model, type, project, branch, linear_key, task_type, catalyst_orchestration, account, phase) (
-              claude_code_token_usage_tokens_total{model!~"^glm.*"}
+              claude_code_token_usage_tokens_total{model!~"^(glm|qwen).*"}
             ),
             "token_type", "$1", "type", "(.*)"
           )
@@ -122,21 +129,29 @@ groups:
         expr: |
           sum by (model, token_type) (codex_turn_token_usage_sum)
 
-      # provider=qwen: NOT YET EMITTING (OpenCode/Qwen lane -- OTL-80 tracks
-      # the qwencloud CLI wiring, key pending). Structural placeholder only:
-      # this expr matches zero series today and evaluates to no rows (a
-      # Prometheus recording rule on an absent metric is inert, not an
-      # error -- unlike a collector exporter, which crash-loops on an unmet
-      # dependency). Update the metric name once OpenCode's actual OTel
-      # exporter is confirmed (unverified today what family/service.name it
-      # would use) -- do not fabricate data before real telemetry lands.
-      # See dashboards/unified-dashboard.json's "Qwen Lane" text panel.
+      # provider=qwen: LIVE since OTL-93 (2026-08-28). The original OTL-81
+      # placeholder read `qwen_token_usage_tokens_total`, anticipating a
+      # dedicated OpenCode/Qwen exporter -- that family never materialized
+      # (still zero `qwen_*`/`opencode_*` series, checked live 2026-08-28).
+      # What actually happened: since ~2026-08-27 the Qwen relay lanes run
+      # through the claude-code SDK harness (model `qwen3.8-max`; the SDK
+      # warns `unrecognized_model` but telemetry flows), so Qwen rides the
+      # SAME claude_code_* family as anthropic/glm, discriminated by `model`
+      # (live: `qwen3.8-max[1m]`, account="qwen-token-plan"). Same shape as
+      # the glm leg above; the anthropic leg excludes ^qwen.* to match.
+      # Token COUNTS are accurate as reported; the $ cost counter for this
+      # lane is Anthropic-rate fiction (Qwen bills in plan credits -- see
+      # the ai-qwen-credits-estimate group below), so there is deliberately
+      # NO provider=qwen leg under ai:cost_usd:sum.
       - record: ai:tokens:sum
         labels:
           provider: qwen
         expr: |
-          sum by (model, token_type, project, branch, linear_key, task_type, account, phase) (
-            qwen_token_usage_tokens_total
+          label_replace(
+            sum by (model, type, project, branch, linear_key, task_type, catalyst_orchestration, account, phase) (
+              claude_code_token_usage_tokens_total{model=~"^qwen.*"}
+            ),
+            "token_type", "$1", "type", "(.*)"
           )
 
   - name: ai-canonical-tool-calls
@@ -179,12 +194,22 @@ groups:
       # OTL-81: excludes model=~"^glm.*" -- see the ai:tokens:sum note above
       # on why `model`, not `account="glm-coding"`, is the correct GLM
       # discriminator on this stack.
+      #
+      # OTL-93: also excludes model=~"^qwen.*" for the same reason GLM is
+      # excluded -- since the 2026-08-27 SDK-harness cutover Qwen sessions
+      # emit claude_code_cost_usage_USD_total priced from Claude Code's own
+      # Anthropic-protocol cost table (measured $40.90 of fictional dollars
+      # in 24h, 2026-08-28), which is NOT a real charge (Qwen bills in plan
+      # credits). Letting it through would contaminate the REAL-dollars
+      # contract this metric name promises. Qwen's trustworthy figure is
+      # the credits estimate (ai-qwen-credits-estimate group below); there
+      # is deliberately no provider=qwen cost leg.
       - record: ai:cost_usd:sum
         labels:
           provider: anthropic
         expr: |
           sum by (model, project, branch, linear_key, task_type, catalyst_orchestration, account, phase) (
-            claude_code_cost_usage_USD_total{model!~"^glm.*"}
+            claude_code_cost_usage_USD_total{model!~"^(glm|qwen).*"}
           )
 
       # provider=glm: RE-RATED, not real, not estimated-at-list-price like
@@ -733,18 +758,16 @@ groups:
   #
   # SOURCE: deliberately layered on ai:tokens:sum{provider="qwen"} (the
   # ai-canonical-tokens group above), NOT on a raw metric name directly.
-  # That provider=qwen leg is itself still an inert OTL-81 structural
-  # placeholder today (matches zero series -- confirmed live 2026-08-25,
-  # no qwen_*/opencode_* series in Prometheus and no
-  # service_name=~"qwen.*|opencode.*" streams in Loki) pointing at a metric
-  # family that is still unverified (OpenCode's actual OTel exporter has
-  # not been confirmed -- Qwen today runs interactive-only via OpenCode,
-  # per CTC-1007). Building on that existing abstraction, instead of a raw
-  # metric name here, means this whole block goes from producing nothing to
-  # producing real numbers the moment OTL-80/CTC-1007's wiring lands and
-  # corrects that ONE upstream expr -- with zero edits needed in this
-  # group. A Prometheus recording rule over an absent series is inert, not
-  # an error, same as every other qwen leg in this file.
+  # That layering paid off exactly as designed: OTL-93 (2026-08-28)
+  # repointed the ONE upstream provider=qwen expr at the claude_code_*
+  # family (the 2026-08-27 SDK-harness cutover routes Qwen lanes through
+  # claude-code with model `qwen3.8-max` -- the anticipated dedicated
+  # qwen_*/opencode_* exporter never materialized), and this whole group
+  # went from producing nothing to producing real numbers with zero edits
+  # here. CAVEAT that came with that cutover: the coefficients below are
+  # still the qwen3.6-plus worked example while the lane now runs
+  # qwen3.8-max, which may price differently per-model -- the estimate is
+  # directional until a real vendor reading (OTL-80) recalibrates it.
   #
   # WINDOW: same max_over_time(...[7d]) convention as the
   # ai-canonical-efficiency group's denominator rules above (both read a
