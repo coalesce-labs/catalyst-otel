@@ -448,3 +448,62 @@ tests:
         exp_samples:
           - labels: 'stub_b{k="p2"}'
             value: 3
+
+  # =======================================================================
+  # Group C (OTL-93): provider classification of the shared claude_code_*
+  # family -- anthropic vs glm vs qwen. Since the 2026-08-27 SDK-harness
+  # cutover Qwen lanes emit claude_code_* with model=~"^qwen.*"; the
+  # anthropic legs must exclude BOTH ^glm.* and ^qwen.*, the qwen tokens
+  # leg must read the family, and the credits estimate must light up from
+  # it (chained through ai:tokens:sum{provider="qwen"}, no self-reference).
+  # =======================================================================
+  - interval: 1m
+    input_series:
+      - series: 'claude_code_token_usage_tokens_total{model="claude-sonnet-5",type="output",project="catalyst-otel",branch="otl-93",linear_key="OTL-93",task_type="implement",account="acct1",phase="implement",session_id="c1"}'
+        values: "0+500x10"
+      - series: 'claude_code_token_usage_tokens_total{model="glm-5.3[1m]",type="output",project="catalyst-otel",branch="otl-93",linear_key="OTL-93",task_type="implement",phase="implement",session_id="g1"}'
+        values: "0+100x10"
+      - series: 'claude_code_token_usage_tokens_total{model="qwen3.8-max[1m]",type="output",project="catalyst-otel",branch="otl-93",linear_key="OTL-93",task_type="implement",account="qwen-token-plan",phase="implement",session_id="q1"}'
+        values: "0+1000x10"
+      - series: 'claude_code_cost_usage_USD_total{model="claude-sonnet-5",project="catalyst-otel",branch="otl-93",linear_key="OTL-93",task_type="implement",account="acct1",phase="implement",session_id="c1"}'
+        values: "0+2x10"
+      - series: 'claude_code_cost_usage_USD_total{model="qwen3.8-max[1m]",project="catalyst-otel",branch="otl-93",linear_key="OTL-93",task_type="implement",account="qwen-token-plan",phase="implement",session_id="q1"}'
+        values: "0+1x10"
+
+    promql_expr_test:
+      # qwen tokens leg reads the claude_code_* family now.
+      - expr: sum(ai:tokens:sum{provider="qwen"})
+        eval_time: 5m
+        exp_samples:
+          - labels: '{}'
+            value: 5000
+      # anthropic tokens leg excludes BOTH glm and qwen models...
+      - expr: sum(ai:tokens:sum{provider="anthropic", model=~"^(glm|qwen).*"})
+        eval_time: 5m
+        exp_samples: []
+      # ...while still counting real Claude sessions.
+      - expr: sum(ai:tokens:sum{provider="anthropic"})
+        eval_time: 5m
+        exp_samples:
+          - labels: '{}'
+            value: 2500
+      # glm leg unchanged by the qwen split.
+      - expr: sum(ai:tokens:sum{provider="glm"})
+        eval_time: 5m
+        exp_samples:
+          - labels: '{}'
+            value: 500
+      # REAL-dollars contract: anthropic cost excludes qwen's fictional
+      # Anthropic-rate dollars ($5 planted) -- only the claude $10 counts.
+      - expr: sum(ai:cost_usd:sum{provider="anthropic"})
+        eval_time: 5m
+        exp_samples:
+          - labels: '{}'
+            value: 10
+      # Credits estimate lights up from the repointed tokens leg:
+      # 5000 output tokens * 1.2 credits/1K = 6.
+      - expr: sum(ai:qwen_credits_estimate:sum)
+        eval_time: 5m
+        exp_samples:
+          - labels: '{}'
+            value: 6
