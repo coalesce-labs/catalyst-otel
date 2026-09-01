@@ -1,0 +1,96 @@
+# =============================================================================
+# Loki config — OTL-96. Mounted over the grafana/loki image's own bundled
+# `/etc/loki/local-config.yaml` (see docker-compose.yml's otel-loki service).
+#
+# Everything above the `limits_config.otlp_config` block is a byte-identical
+# copy of the image's baked-in default (cmd/loki/loki-docker-config.yaml
+# upstream, NOT the non-Docker cmd/loki/loki-local-config.yaml — the two
+# differ: the Docker variant's `common.path_prefix` is `/loki`, matching this
+# stack's `${OTEL_LOKI_DATA:-otel-loki-data}:/loki` volume mount; the
+# non-Docker one is `/tmp/loki` and would silently start Loki with a fresh,
+# unmounted, ephemeral store). Before this file existed, otel-loki ran with
+# ZERO config overrides — no otlp_config was ever set, so account_id/repo/
+# team/project_id could never become Loki index labels no matter what the
+# collector sent (this is the OTL-96 audit finding). This file changes ONLY
+# that: everything else is left exactly as the image default so existing
+# data/behavior is unaffected.
+# =============================================================================
+
+auth_enabled: false
+
+server:
+  http_listen_port: 3100
+
+common:
+  instance_addr: 127.0.0.1
+  path_prefix: /loki
+  storage:
+    filesystem:
+      chunks_directory: /loki/chunks
+      rules_directory: /loki/rules
+  replication_factor: 1
+  ring:
+    kvstore:
+      store: inmemory
+
+schema_config:
+  configs:
+    - from: 2020-10-24
+      store: tsdb
+      object_store: filesystem
+      schema: v13
+      index:
+        prefix: index_
+        period: 24h
+
+ruler:
+  alertmanager_url: http://localhost:9093
+
+# -----------------------------------------------------------------------------
+# limits_config.otlp_config — OTL-96. Promotes the four ADR-0011 low-card
+# tenant/scope dims to real Loki STREAM LABELS for the catalyst-cloud
+# namespace, on top of Loki's own default index-label set (service.name,
+# service.namespace, deployment.environment.name, k8s.*, cloud.region, …ONLY
+# valid for RESOURCE attributes — see the collector-side note below).
+#
+# `ignore_defaults` is left unset (false): we ADD to the default list, we do
+# not replace it — service_name/service_namespace stay indexed exactly as
+# before.
+#
+# WHY THIS ALONE ISN'T ENOUGH: Loki can only promote a RESOURCE attribute to
+# an index_label — a log-record (or scope) attribute can only become
+# structured_metadata or be dropped, never index_label (grafana/loki docs,
+# "Changing the default mapping of OTLP to Loki Format"). account_id/repo/
+# team/project_id arrive from catalyst-cloud as per-request LOG-record
+# attributes (packages/observability/src/logging.ts's createLogger), not
+# resource attributes. The catalyst-otel-private collector overlay's
+# groupbyattrs/catalyst_cloud_labels processor (private/collector-config-
+# private.yaml) does the promotion to resource level BEFORE export, safely
+# (regrouping by value so one Resource can never end up mislabeled with a
+# sibling tenant's account_id). Without that collector-side step, this block
+# has NOTHING to match and is a silent no-op — the two changes are a pair.
+#
+# CARDINALITY RULE (do not extend this list casually): every key here
+# multiplies the Loki index's series count. account_id/repo/project_id are
+# all LOW cardinality — bounded by (tenant count × repo count), which for
+# catalyst-cloud is small (a handful of tenants, each with a handful of
+# repos) and grows slowly. `team` is included for forward-compatibility
+# (OTL-96) but has NO current emitter, so it costs nothing today. NEVER add
+# `ticket`/`trace_id`/`session_id`/`commit_sha`/`user_id`/`ray_id` here —
+# those are per-request/per-entity HIGH cardinality dims that belong in
+# structured metadata (fully queryable via `| trace_id="…"` / `sum by
+# (trace_id)` without ever becoming an index label) — promoting any of them
+# would blow up the index (see docs/data-dictionary-cloud.md §2 in the
+# catalyst-otel-private repo for the full canonical-dimensions cardinality
+# table this rule is drawn from).
+# -----------------------------------------------------------------------------
+limits_config:
+  otlp_config:
+    resource_attributes:
+      attributes_config:
+        - action: index_label
+          attributes:
+            - account_id
+            - repo
+            - team
+            - project_id

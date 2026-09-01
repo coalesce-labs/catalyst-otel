@@ -90,6 +90,12 @@ services:
     command: -config.file=/etc/loki/local-config.yaml
     volumes:
       - "${OTEL_LOKI_DATA:-otel-loki-data}:/loki"
+      # OTL-96: overrides the image's baked-in default config (which this
+      # stack ran with, unmodified, until now — see loki-config.yaml's header
+      # comment) to add limits_config.otlp_config, promoting account_id/repo/
+      # team/project_id to real Loki index labels for catalyst-cloud. Every
+      # other setting is a byte-identical copy of the image default.
+      - "./loki-config.yaml:/etc/loki/local-config.yaml:ro"
     restart: unless-stopped
     logging: *default-logging
     networks:
