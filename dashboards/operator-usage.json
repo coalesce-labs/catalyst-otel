@@ -246,7 +246,7 @@
         },
         "overrides": []
       },
-      "description": "Counts claude_code.user_prompt events. This includes local slash commands such as /status and /effort, which never call the API \u2014 so this can exceed the number of sessions that show tokens or cost."
+      "description": "Counts claude_code.user_prompt events. This includes local slash commands such as /status and /effort, which never call the API — so this can exceed the number of sessions that show tokens or cost."
     },
     {
       "type": "stat",
@@ -324,11 +324,13 @@
       "options": {
         "legend": {
           "displayMode": "table",
-          "placement": "bottom",
+          "placement": "right",
           "calcs": [
             "lastNotNull",
             "max"
-          ]
+          ],
+          "showLegend": true,
+          "width": 360
         }
       },
       "fieldConfig": {
@@ -370,11 +372,13 @@
       "options": {
         "legend": {
           "displayMode": "table",
-          "placement": "bottom",
+          "placement": "right",
           "calcs": [
             "lastNotNull",
             "max"
-          ]
+          ],
+          "showLegend": true,
+          "width": 360
         }
       },
       "fieldConfig": {
@@ -487,8 +491,14 @@
       ],
       "options": {
         "legend": {
-          "displayMode": "list",
-          "placement": "bottom"
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": [
+            "lastNotNull",
+            "max",
+            "sum"
+          ]
         }
       },
       "fieldConfig": {
@@ -710,7 +720,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "{service_name=~\"claude-code.*\"} | event_name=~\"user_prompt|assistant_response\" | operator=~\"$operator\" | session_id=~\"$session\" | line_format \"{{ if eq .event_name \\\"user_prompt\\\" }}\u25b6 USER    {{ .prompt }}{{ else }}\u25c0 CLAUDE  {{ .response }}{{ end }}\"",
+          "expr": "{service_name=~\"claude-code.*\"} | event_name=~\"user_prompt|assistant_response\" | operator=~\"$operator\" | session_id=~\"$session\" | line_format \"{{ if eq .event_name \\\"user_prompt\\\" }}▶ USER    {{ .prompt }}{{ else }}◀ CLAUDE  {{ .response }}{{ end }}\"",
           "direction": "forward"
         }
       ],

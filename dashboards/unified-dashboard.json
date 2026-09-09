@@ -375,7 +375,20 @@
           },
           "unit": "currencyUSD"
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^cloudflare-container$"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "cf-container"
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 7,
@@ -390,7 +403,7 @@
           "displayMode": "table",
           "placement": "right",
           "showLegend": true,
-          "width": 280,
+          "width": 420,
           "calcs": [
             "lastNotNull",
             "max",
@@ -454,7 +467,20 @@
           },
           "unit": "short"
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^cloudflare-container$"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "cf-container"
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 7,
@@ -469,7 +495,7 @@
           "displayMode": "table",
           "placement": "right",
           "showLegend": true,
-          "width": 280,
+          "width": 420,
           "calcs": [
             "lastNotNull",
             "max",
@@ -594,7 +620,7 @@
           "displayMode": "table",
           "placement": "right",
           "showLegend": true,
-          "width": 280,
+          "width": 420,
           "calcs": [
             "lastNotNull",
             "max",
@@ -734,7 +760,7 @@
           "displayMode": "table",
           "placement": "right",
           "showLegend": true,
-          "width": 280,
+          "width": 420,
           "calcs": [
             "lastNotNull",
             "max",
@@ -827,7 +853,7 @@
               "displayMode": "table",
               "placement": "right",
               "showLegend": true,
-              "width": 280,
+              "width": 420,
               "calcs": [
                 "lastNotNull",
                 "max",
@@ -967,7 +993,7 @@
               "displayMode": "table",
               "placement": "right",
               "showLegend": true,
-              "width": 280,
+              "width": 420,
               "calcs": [
                 "lastNotNull",
                 "max",
@@ -1497,7 +1523,7 @@
               "displayMode": "table",
               "placement": "right",
               "showLegend": true,
-              "width": 280,
+              "width": 420,
               "calcs": [
                 "lastNotNull",
                 "max",
@@ -1637,7 +1663,7 @@
               "displayMode": "table",
               "placement": "right",
               "showLegend": true,
-              "width": 280,
+              "width": 420,
               "calcs": [
                 "lastNotNull",
                 "max",
@@ -2229,7 +2255,7 @@
               "displayMode": "table",
               "placement": "right",
               "showLegend": true,
-              "width": 280,
+              "width": 420,
               "calcs": [
                 "lastNotNull",
                 "max",
@@ -2245,7 +2271,7 @@
           },
           "targets": [
             {
-              "expr": "topk(10, sum by (session_id, project, branch, linear_key) (rate(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"}[$__interval])))",
+              "expr": "label_replace(topk(10, sum by (session_id, project, branch, linear_key) (rate(claude_code_token_usage_tokens_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"}[$__interval]))), \"session_id\", \"$1\", \"session_id\", \"^([0-9a-f]{8})-.*\")",
               "interval": "$bucket",
               "legendFormat": "{{session_id}}",
               "refId": "A"
@@ -2628,7 +2654,7 @@
               "displayMode": "table",
               "placement": "right",
               "showLegend": true,
-              "width": 280,
+              "width": 420,
               "calcs": [
                 "lastNotNull",
                 "max"
@@ -2850,7 +2876,7 @@
               "displayMode": "table",
               "placement": "right",
               "showLegend": true,
-              "width": 280,
+              "width": 420,
               "calcs": [
                 "lastNotNull",
                 "max",
@@ -3117,7 +3143,7 @@
               "displayMode": "table",
               "placement": "right",
               "showLegend": true,
-              "width": 280,
+              "width": 420,
               "calcs": [
                 "lastNotNull",
                 "max"
@@ -3204,7 +3230,7 @@
               "displayMode": "table",
               "placement": "right",
               "showLegend": true,
-              "width": 280,
+              "width": 420,
               "calcs": [
                 "lastNotNull",
                 "max"
@@ -3326,7 +3352,7 @@
               "displayMode": "table",
               "placement": "right",
               "showLegend": true,
-              "width": 280,
+              "width": 420,
               "calcs": [
                 "lastNotNull",
                 "max",
@@ -3415,7 +3441,7 @@
               "displayMode": "table",
               "placement": "right",
               "showLegend": true,
-              "width": 280,
+              "width": 420,
               "calcs": [
                 "lastNotNull",
                 "max",
@@ -3498,7 +3524,7 @@
               "displayMode": "table",
               "placement": "right",
               "showLegend": true,
-              "width": 280,
+              "width": 420,
               "calcs": [
                 "lastNotNull",
                 "max",
@@ -3983,7 +4009,7 @@
               "displayMode": "table",
               "placement": "right",
               "showLegend": true,
-              "width": 280,
+              "width": 360,
               "calcs": [
                 "lastNotNull",
                 "max"
@@ -4093,7 +4119,7 @@
               "displayMode": "table",
               "placement": "right",
               "showLegend": true,
-              "width": 280,
+              "width": 420,
               "calcs": [
                 "lastNotNull",
                 "max"
@@ -4207,7 +4233,7 @@
               "displayMode": "table",
               "placement": "right",
               "showLegend": true,
-              "width": 280,
+              "width": 420,
               "calcs": [
                 "lastNotNull",
                 "max"
@@ -4364,7 +4390,7 @@
               "displayMode": "table",
               "placement": "right",
               "showLegend": true,
-              "width": 280,
+              "width": 420,
               "calcs": [
                 "lastNotNull",
                 "max",
@@ -4667,7 +4693,7 @@
           "displayMode": "table",
           "placement": "right",
           "showLegend": true,
-          "width": 280,
+          "width": 420,
           "calcs": [
             "lastNotNull",
             "max",
@@ -4807,7 +4833,7 @@
           "displayMode": "table",
           "placement": "right",
           "showLegend": true,
-          "width": 280,
+          "width": 420,
           "calcs": [
             "lastNotNull",
             "max",
@@ -6453,7 +6479,7 @@
           "displayMode": "table",
           "placement": "right",
           "showLegend": true,
-          "width": 280,
+          "width": 360,
           "calcs": [
             "lastNotNull",
             "max",
@@ -6516,7 +6542,7 @@
           "displayMode": "table",
           "placement": "right",
           "showLegend": true,
-          "width": 280,
+          "width": 360,
           "calcs": [
             "lastNotNull",
             "max",
@@ -7157,7 +7183,20 @@
               },
               "unit": "currencyUSD"
             },
-            "overrides": []
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byRegexp",
+                  "options": "^cloudflare-container$"
+                },
+                "properties": [
+                  {
+                    "id": "displayName",
+                    "value": "cf-container"
+                  }
+                ]
+              }
+            ]
           },
           "gridPos": {
             "h": 7,
@@ -7171,7 +7210,7 @@
               "displayMode": "table",
               "placement": "right",
               "showLegend": true,
-              "width": 280,
+              "width": 420,
               "calcs": [
                 "lastNotNull",
                 "max"
@@ -7234,7 +7273,20 @@
               },
               "unit": "short"
             },
-            "overrides": []
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byRegexp",
+                  "options": "^cloudflare-container$"
+                },
+                "properties": [
+                  {
+                    "id": "displayName",
+                    "value": "cf-container"
+                  }
+                ]
+              }
+            ]
           },
           "gridPos": {
             "h": 7,
@@ -7248,7 +7300,7 @@
               "displayMode": "table",
               "placement": "right",
               "showLegend": true,
-              "width": 280,
+              "width": 420,
               "calcs": [
                 "lastNotNull",
                 "max"
@@ -7371,7 +7423,7 @@
               "displayMode": "table",
               "placement": "right",
               "showLegend": true,
-              "width": 280,
+              "width": 420,
               "calcs": [
                 "lastNotNull",
                 "max"
@@ -7494,7 +7546,7 @@
               "displayMode": "table",
               "placement": "right",
               "showLegend": true,
-              "width": 280,
+              "width": 420,
               "calcs": [
                 "lastNotNull",
                 "max"
