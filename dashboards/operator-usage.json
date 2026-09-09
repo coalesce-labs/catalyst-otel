@@ -310,7 +310,7 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 12,
+        "w": 24,
         "x": 0,
         "y": 7
       },
@@ -330,7 +330,7 @@
             "max"
           ],
           "showLegend": true,
-          "width": 360
+          "width": 420
         }
       },
       "fieldConfig": {
@@ -358,9 +358,9 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 7
+        "w": 24,
+        "x": 0,
+        "y": 15
       },
       "targets": [
         {
@@ -378,7 +378,7 @@
             "max"
           ],
           "showLegend": true,
-          "width": 360
+          "width": 420
         }
       },
       "fieldConfig": {
@@ -408,7 +408,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 15
+        "y": 23
       },
       "targets": [
         {
@@ -447,7 +447,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 15
+        "y": 23
       },
       "targets": [
         {
@@ -478,9 +478,9 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 8,
-        "x": 16,
-        "y": 15
+        "w": 24,
+        "x": 0,
+        "y": 31
       },
       "targets": [
         {
@@ -492,13 +492,14 @@
       "options": {
         "legend": {
           "displayMode": "table",
-          "placement": "bottom",
+          "placement": "right",
           "showLegend": true,
           "calcs": [
             "lastNotNull",
             "max",
             "sum"
-          ]
+          ],
+          "width": 420
         }
       },
       "fieldConfig": {
@@ -519,7 +520,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 23
+        "y": 39
       },
       "collapsed": false,
       "panels": []
@@ -536,7 +537,7 @@
         "h": 11,
         "w": 12,
         "x": 0,
-        "y": 24
+        "y": 40
       },
       "targets": [
         {
@@ -563,7 +564,7 @@
         "h": 11,
         "w": 12,
         "x": 12,
-        "y": 24
+        "y": 40
       },
       "targets": [
         {
@@ -589,7 +590,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 35
+        "y": 51
       },
       "targets": [
         {
@@ -698,7 +699,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 44
+        "y": 60
       },
       "collapsed": false,
       "panels": []
@@ -715,7 +716,7 @@
         "h": 18,
         "w": 24,
         "x": 0,
-        "y": 45
+        "y": 61
       },
       "targets": [
         {

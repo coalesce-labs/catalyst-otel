@@ -557,7 +557,7 @@
       "title": "Token Rate by Type",
       "gridPos": {
         "h": 7,
-        "w": 12,
+        "w": 24,
         "x": 0,
         "y": 6
       },
@@ -618,7 +618,7 @@
             "sum"
           ],
           "showLegend": true,
-          "width": 360
+          "width": 420
         },
         "tooltip": {
           "mode": "multi",
@@ -632,9 +632,9 @@
       "title": "Turn Rate by Model",
       "gridPos": {
         "h": 7,
-        "w": 12,
-        "x": 12,
-        "y": 6
+        "w": 24,
+        "x": 0,
+        "y": 13
       },
       "datasource": {
         "type": "prometheus",
@@ -693,7 +693,7 @@
             "sum"
           ],
           "showLegend": true,
-          "width": 360
+          "width": 420
         },
         "tooltip": {
           "mode": "multi",
@@ -709,7 +709,7 @@
         "h": 7,
         "w": 24,
         "x": 0,
-        "y": 13
+        "y": 20
       },
       "datasource": {
         "type": "prometheus",
@@ -785,7 +785,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 20
+        "y": 27
       },
       "panels": []
     },
@@ -796,9 +796,9 @@
       "description": "codex_turn_e2e_duration_ms — Codex_Desktop / codex-app-server ONLY. Verified 2026-08-24: codex_exec (headless relay) never emits this histogram (turn e2e duration is not exported by the headless CLI). See dashboard-level note.",
       "gridPos": {
         "h": 7,
-        "w": 12,
+        "w": 24,
         "x": 0,
-        "y": 21
+        "y": 28
       },
       "datasource": {
         "type": "prometheus",
@@ -861,7 +861,7 @@
             "max"
           ],
           "showLegend": true,
-          "width": 360
+          "width": 420
         },
         "tooltip": {
           "mode": "multi",
@@ -876,9 +876,9 @@
       "description": "codex_turn_ttft_duration_ms / codex_turn_ttfm_duration_ms — verified 2026-08-24 to be emitted by BOTH codex_exec (headless relay) and Codex_Desktop, unlike Turn Latency (e2e) which is Desktop-only.",
       "gridPos": {
         "h": 7,
-        "w": 12,
-        "x": 12,
-        "y": 21
+        "w": 24,
+        "x": 0,
+        "y": 35
       },
       "datasource": {
         "type": "prometheus",
@@ -951,7 +951,7 @@
             "max"
           ],
           "showLegend": true,
-          "width": 360
+          "width": 420
         },
         "tooltip": {
           "mode": "multi",
@@ -968,7 +968,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 28
+        "y": 42
       },
       "panels": []
     },
@@ -980,7 +980,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 29
+        "y": 43
       },
       "datasource": {
         "type": "prometheus",
@@ -1028,9 +1028,9 @@
       "title": "Tool Success Rate",
       "gridPos": {
         "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 29
+        "w": 24,
+        "x": 0,
+        "y": 51
       },
       "datasource": {
         "type": "prometheus",
@@ -1098,7 +1098,7 @@
             "max"
           ],
           "showLegend": true,
-          "width": 360
+          "width": 420
         },
         "tooltip": {
           "mode": "single",
@@ -1115,7 +1115,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 37
+        "y": 59
       },
       "panels": []
     },
@@ -1127,7 +1127,7 @@
         "h": 10,
         "w": 12,
         "x": 0,
-        "y": 38
+        "y": 60
       },
       "datasource": {
         "type": "loki",
@@ -1159,7 +1159,7 @@
         "h": 10,
         "w": 12,
         "x": 12,
-        "y": 38
+        "y": 60
       },
       "datasource": {
         "type": "loki",
@@ -1192,7 +1192,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 48
+        "y": 70
       },
       "panels": []
     },
@@ -1205,7 +1205,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 49
+        "y": 71
       },
       "datasource": {
         "type": "prometheus",
@@ -1256,7 +1256,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 49
+        "y": 71
       },
       "datasource": {
         "type": "loki",
@@ -1306,7 +1306,7 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 49
+        "y": 71
       },
       "datasource": {
         "type": "loki",
@@ -1357,7 +1357,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 57
+        "y": 79
       },
       "datasource": {
         "type": "loki",
@@ -1406,9 +1406,9 @@
       "description": "codex_exec emits NO codex_turn_token_usage_* metric -- the only token-usage signal for headless relay work is Loki structured metadata on codex.sse_event (input_token_count/output_token_count/cached_token_count/reasoning_token_count/tool_token_count), verified 2026-08-24. unwrap sums those fields per ticket.",
       "gridPos": {
         "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 57
+        "w": 24,
+        "x": 0,
+        "y": 87
       },
       "datasource": {
         "type": "loki",
@@ -1472,7 +1472,7 @@
             "sum"
           ],
           "showLegend": true,
-          "width": 360
+          "width": 420
         },
         "tooltip": {
           "mode": "multi",
@@ -1489,7 +1489,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 65
+        "y": 95
       },
       "datasource": {
         "type": "loki",
@@ -1565,7 +1565,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 73
+        "y": 103
       },
       "panels": []
     },
@@ -1578,7 +1578,7 @@
         "h": 8,
         "w": 6,
         "x": 0,
-        "y": 74
+        "y": 104
       },
       "datasource": {
         "type": "loki",
@@ -1635,7 +1635,7 @@
         "h": 8,
         "w": 18,
         "x": 6,
-        "y": 74
+        "y": 104
       },
       "datasource": {
         "type": "loki",
