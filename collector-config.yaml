@@ -286,6 +286,19 @@ processors:
           - 'IsMatch(instrumentation_scope.name, "connector")'
         statements:
           - delete_key(resource.attributes, "host.name")
+      # OTL-99: opencode rides its per-run id on the resource (opencode.run AND
+      # service.instance.id — the OTLP exporter stamps runID into both);
+      # resource_to_telemetry_conversion would turn each into a churny
+      # per-session label on the derived opencode_llm_* metrics. Drop both so
+      # series identity is (model x provider x host_name x project x branch).
+      # Only opencode is affected (guarded); Tempo keeps the ids because the
+      # traces pipeline processors don't run on metrics.
+      - context: metric
+        conditions:
+          - 'IsMatch(instrumentation_scope.name, "connector") and resource.attributes["service.name"] == "opencode"'
+        statements:
+          - delete_key(resource.attributes, "opencode.run")
+          - delete_key(resource.attributes, "service.instance.id")
 
   # OTL-20: the signal_to_metrics connector stamps a per-run
   # signal_to_metrics.service.instance.id onto its output resource, which
@@ -295,6 +308,26 @@ processors:
     attributes:
       - key: signal_to_metrics.service.instance.id
         action: delete
+
+  # OTL-99: normalize OpenCode AI SDK span attributes into the label names the
+  # derived opencode_llm_* metrics (and dashboards) group by. Gated to
+  # service.name=opencode so no other emitter is touched. host_name copy mirrors
+  # CTL-812: opencode's use_otel_context stamps `hostname` (possible .local
+  # suffix) on the resource; the canonical fleet label is host_name. Runs BEFORE
+  # tail_sampling so the derived metrics (exporter on this pipeline) see the
+  # normalized labels regardless of sampling outcome.
+  transform/opencode_labels:
+    error_mode: ignore
+    trace_statements:
+      - context: span
+        conditions:
+          - 'resource.attributes["service.name"] == "opencode"'
+        statements:
+          - set(attributes["model"], attributes["ai.model.id"]) where attributes["ai.model.id"] != nil
+          - set(attributes["provider"], attributes["ai.model.provider"]) where attributes["ai.model.provider"] != nil
+          - set(attributes["finish_reason"], attributes["ai.response.finishReason"]) where attributes["ai.response.finishReason"] != nil
+          - set(attributes["host_name"], resource.attributes["hostname"]) where resource.attributes["hostname"] != nil
+          - replace_pattern(attributes["host_name"], "\\.local$", "")
 
   # OTL-25: traces tail sampling. Keeps every span that matters — slow ticks
   # (the event-loop-blocking wedge signal) and errors — and probabilistically
@@ -348,6 +381,15 @@ processors:
         type: status_code
         status_code:
           status_codes: [ERROR]
+      # OTL-99: usage accounting must be EXACT. LLM spans carry ai.usage.* token
+      # counts; the probabilistic 20% policy would silently drop 4 of 5 fast
+      # calls (<1s and non-error) and skew every derived token sum. Keep any
+      # trace carrying token attributes at 100% (attribute value >= 0 matches).
+      - name: keep-ai-usage
+        type: numeric_attribute
+        numeric_attribute:
+          key: ai.usage.totalTokens
+          min_value: 0
       - name: keep-slow-ticks
         type: latency
         latency:
@@ -690,6 +732,130 @@ connectors:
   # (verified against missing / empty / non-numeric field values), so a malformed
   # sample can't 5xx the shared logs ingestion path.
   signal_to_metrics:
+    # OTL-99: OpenCode (AI SDK) usage metrics derived from LLM SPANS. OpenCode
+    # exports traces + logs ONLY — no native metrics — so this is its metrics
+    # leg (same derivation-not-storage pattern as the logs section below).
+    # DOUBLE-COUNT GUARD: every LLM call emits a PARENT span (ai.streamText /
+    # ai.generateText) and a CHILD span (…doStream / …doGenerate) carrying
+    # IDENTICAL ai.usage.* values (verified live in Tempo, OTL-99). Every
+    # token/call sum gates on the parent operationId regex so one call counts
+    # exactly once. model/provider/host_name labels are normalized onto the
+    # spans by transform/opencode_labels upstream.
+    spans:
+      - name: opencode_llm_calls_total
+        description: "OpenCode LLM calls by model (parent spans only; one call = one increment)"
+        conditions:
+          - 'resource.attributes["service.name"] == "opencode" and IsMatch(attributes["ai.operationId"], "^ai\\.(streamText|generateText)$")'
+        attributes:
+          - key: model
+            default_value: unknown
+          - key: provider
+            default_value: unknown
+          - key: host_name
+            default_value: unknown
+        sum:
+          value: Int(AdjustedCount())
+          monotonic: true
+      - name: opencode_llm_input_tokens_total
+        description: "OpenCode LLM prompt tokens (incl. cache reads) by model"
+        unit: "1"
+        conditions:
+          - 'resource.attributes["service.name"] == "opencode" and IsMatch(attributes["ai.operationId"], "^ai\\.(streamText|generateText)$") and attributes["ai.usage.inputTokens"] != nil'
+        attributes:
+          - key: model
+            default_value: unknown
+          - key: provider
+            default_value: unknown
+          - key: host_name
+            default_value: unknown
+        sum:
+          value: 'Double(attributes["ai.usage.inputTokens"])'
+          monotonic: true
+      - name: opencode_llm_output_tokens_total
+        description: "OpenCode LLM completion tokens (text + reasoning) by model"
+        unit: "1"
+        conditions:
+          - 'resource.attributes["service.name"] == "opencode" and IsMatch(attributes["ai.operationId"], "^ai\\.(streamText|generateText)$") and attributes["ai.usage.outputTokens"] != nil'
+        attributes:
+          - key: model
+            default_value: unknown
+          - key: provider
+            default_value: unknown
+          - key: host_name
+            default_value: unknown
+        sum:
+          value: 'Double(attributes["ai.usage.outputTokens"])'
+          monotonic: true
+      - name: opencode_llm_cached_input_tokens_total
+        description: "OpenCode LLM prompt tokens served from cache by model (cache-hit accounting)"
+        unit: "1"
+        conditions:
+          - 'resource.attributes["service.name"] == "opencode" and IsMatch(attributes["ai.operationId"], "^ai\\.(streamText|generateText)$") and attributes["ai.usage.cachedInputTokens"] != nil'
+        attributes:
+          - key: model
+            default_value: unknown
+          - key: provider
+            default_value: unknown
+          - key: host_name
+            default_value: unknown
+        sum:
+          value: 'Double(attributes["ai.usage.cachedInputTokens"])'
+          monotonic: true
+      - name: opencode_llm_reasoning_tokens_total
+        description: "OpenCode LLM reasoning/thinking tokens by model"
+        unit: "1"
+        conditions:
+          - 'resource.attributes["service.name"] == "opencode" and IsMatch(attributes["ai.operationId"], "^ai\\.(streamText|generateText)$") and attributes["ai.usage.reasoningTokens"] != nil'
+        attributes:
+          - key: model
+            default_value: unknown
+          - key: provider
+            default_value: unknown
+          - key: host_name
+            default_value: unknown
+        sum:
+          value: 'Double(attributes["ai.usage.reasoningTokens"])'
+          monotonic: true
+      - name: opencode_llm_errors_total
+        description: "OpenCode LLM calls that ended in span ERROR status, by model"
+        conditions:
+          - 'resource.attributes["service.name"] == "opencode" and IsMatch(attributes["ai.operationId"], "^ai\\.(streamText|generateText)$") and status.code == STATUS_CODE_ERROR'
+        attributes:
+          - key: model
+            default_value: unknown
+          - key: provider
+            default_value: unknown
+          - key: host_name
+            default_value: unknown
+        sum:
+          value: Int(AdjustedCount())
+          monotonic: true
+      - name: opencode_llm_duration_seconds
+        description: "OpenCode LLM call wall time (parent span, request prep through final chunk)"
+        unit: "s"
+        conditions:
+          - 'resource.attributes["service.name"] == "opencode" and IsMatch(attributes["ai.operationId"], "^ai\\.(streamText|generateText)$")'
+        attributes:
+          - key: model
+            default_value: unknown
+        histogram:
+          buckets: [0.1, 0.25, 0.5, 1, 2, 5, 10, 30, 60, 120, 300]
+          value: 'Seconds(end_time - start_time)'
+      # TTFT comes from the CHILD doStream/doGenerate span (the parent does not
+      # carry ai.response.msToFirstChunk) — this is the one metric gated on the
+      # child operationId, so it must NOT be summed with the parent-gated
+      # families above.
+      - name: opencode_llm_ttft_seconds
+        description: "OpenCode LLM time-to-first-token (ai.response.msToFirstChunk)"
+        unit: "s"
+        conditions:
+          - 'resource.attributes["service.name"] == "opencode" and IsMatch(attributes["ai.operationId"], "^ai\\.(streamText\\.doStream|generateText\\.doGenerate)$") and attributes["ai.response.msToFirstChunk"] != nil'
+        attributes:
+          - key: model
+            default_value: unknown
+        histogram:
+          buckets: [0.25, 0.5, 1, 2, 5, 10, 20, 30, 60]
+          value: 'Double(attributes["ai.response.msToFirstChunk"]) / 1000'
     logs:
       # --- scheduler autotune-gauge (phase.scheduler.autotune-gauge.<orchestration>) ---
       - name: catalyst_scheduler_load1
@@ -1371,9 +1537,15 @@ service:
       # OTL-56: filter/drop_crate_internals runs BEFORE tail_sampling on purpose
       # — dropping the h2 firehose first means the sampler's decisions are made
       # over real spans instead of library noise, and it does less work.
-      processors: [resource, filter/drop_crate_internals, tail_sampling]
+      # OTL-99: transform/opencode_labels normalizes AI SDK attributes into
+      # model/provider/host_name labels before the derivation connector below
+      # consumes the spans.
+      processors: [resource, transform/opencode_labels, filter/drop_crate_internals, tail_sampling]
       # OTL-54: `debug` REMOVED (see the metrics pipeline above). Span volume
       # here is dominated by codex-app-server emitting Rust h2 HTTP/2 library
       # internals (one span per frame op) — serializing that to stdout as well
       # was pure waste.
-      exporters: [otlp/tempo, otlp_http/honeycomb]
+      # OTL-99: signal_to_metrics is a DERIVATION exporter (spans -> metrics),
+      # not a storage destination — identical to its role on the logs pipeline
+      # (OTL-20). Storage legs stay exactly {otlp/tempo, otlp_http/honeycomb}.
+      exporters: [otlp/tempo, otlp_http/honeycomb, signal_to_metrics]
