@@ -384,12 +384,18 @@ processors:
       # OTL-99: usage accounting must be EXACT. LLM spans carry ai.usage.* token
       # counts; the probabilistic 20% policy would silently drop 4 of 5 fast
       # calls (<1s and non-error) and skew every derived token sum. Keep any
-      # trace carrying token attributes at 100% (attribute value >= 0 matches).
+      # trace containing an AI SDK span at 100%: ai.settings.maxOutputTokens is
+      # present on BOTH the parent (ai.streamText/generateText) and child
+      # (…doStream/…doGenerate) spans of every call, usage or not.
+      # GOTCHA (hit live, 0.154.0): numeric_attribute treats min_value: 0 as
+      # unset and PANICS ("At least one of minValue or maxValue must be set") —
+      # both bounds must be explicitly non-zero.
       - name: keep-ai-usage
         type: numeric_attribute
         numeric_attribute:
-          key: ai.usage.totalTokens
-          min_value: 0
+          key: ai.settings.maxOutputTokens
+          min_value: 1
+          max_value: 100000000
       - name: keep-slow-ticks
         type: latency
         latency:
