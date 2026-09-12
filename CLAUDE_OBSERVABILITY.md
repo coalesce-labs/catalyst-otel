@@ -354,6 +354,42 @@ All metrics are exported with:
 * Service Version: Current Claude Code version
 * Meter Name: `com.anthropic.claude_code`
 
+## OpenCode (GLM/Qwen harness) Telemetry
+
+OpenCode is a second supported harness (GLM/Qwen/subscription providers). Unlike Claude Code it has **no native metrics** — it exports **OTLP traces + logs only**, and the collector derives its Prometheus metrics from the LLM spans (OTL-99).
+
+### Enabling
+
+```bash
+# 1. Enable OpenTelemetry export (opencode.json / ~/.config/opencode/opencode.json)
+{ "experimental": { "openTelemetry": true } }
+
+# 2. Point it at the collector's OTLP/HTTP receiver (OTEL_HOST is set by .envrc)
+export OTEL_EXPORTER_OTLP_ENDPOINT="http://$OTEL_HOST:4318"
+```
+
+`OTEL_RESOURCE_ATTRIBUTES` from the direnv context (`project`, `hostname`, `branch`, `linear.key`, `catalyst.orchestration`) rides on every signal, so OpenCode telemetry slices by project/branch/host like Claude Code. Resource identity: `service.name=opencode`, `opencode.client`, `opencode.run` (per-run id, stripped from derived metrics to avoid series churn).
+
+### What OpenCode emits
+
+* **Traces**: one span per effect step; the LLM calls are `ai.streamText` / `ai.generateText` (parent) with a `…doStream` / `…doGenerate` child. Both carry identical `ai.usage.*` (input/output/cached/reasoning/total tokens), `ai.model.id`, `ai.model.provider`, `ai.response.finishReason`; the child additionally carries `ai.response.msToFirstChunk` (TTFT) and `msToFinish`. Stored in Tempo; `ai.usage.totalTokens` spans are kept at 100% by tail sampling (`keep-ai-usage`) so token accounting is exact.
+* **Logs**: Effect runtime span logs under `service_name="opencode"` in Loki (bodies are `[spanName, attributesJSON]` pairs — no `event_name` convention).
+
+### Derived metrics (collector `signal_to_metrics` spans leg)
+
+| Metric | Type | Labels | Source |
+|---|---|---|---|
+| `opencode_llm_calls_total` | counter | model, provider, host_name | parent spans |
+| `opencode_llm_input_tokens_total` | counter | model, provider, host_name | `ai.usage.inputTokens` |
+| `opencode_llm_output_tokens_total` | counter | model, provider, host_name | `ai.usage.outputTokens` |
+| `opencode_llm_cached_input_tokens_total` | counter | model, provider, host_name | `ai.usage.cachedInputTokens` |
+| `opencode_llm_reasoning_tokens_total` | counter | model, provider, host_name | `ai.usage.reasoningTokens` |
+| `opencode_llm_errors_total` | counter | model, provider, host_name | span status ERROR |
+| `opencode_llm_duration_seconds` | histogram | model | span wall time |
+| `opencode_llm_ttft_seconds` | histogram | model | child `msToFirstChunk` |
+
+All token/call metrics gate on the **parent** `ai.operationId` (`ai.streamText` / `ai.generateText`) because parent + child spans duplicate usage values — summing over both would double-count. TTFT is the one child-gated metric. Grafana dashboard: **OpenCode Usage** (`dashboards/opencode-usage.json`, uid `opencode-usage`). No cost attribute exists in OpenCode spans; cost estimation (model price table) is future work.
+
 ## Security/Privacy Considerations
 
 * Telemetry is opt-in and requires explicit configuration

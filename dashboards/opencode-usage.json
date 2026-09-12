@@ -1,0 +1,770 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": false,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "id": 1,
+      "type": "row",
+      "title": "OpenCode — Usage (derived from ai.* spans, OTL-99)",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "panels": []
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "LLM Calls",
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 1 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum(increase(opencode_llm_calls_total{model=~\"$model\",provider=~\"$provider\",project=~\"$project\",branch=~\"$branch\",host_name=~\"$host_name\"}[$__range])) or vector(0)",
+          "legendFormat": "Calls",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "#5794F2", "value": null }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background_solid",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "textMode": "value_and_name",
+        "reduceOptions": { "calcs": ["lastNotNull"], "values": false, "fields": "" }
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Input Tokens",
+      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 1 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum(increase(opencode_llm_input_tokens_total{model=~\"$model\",provider=~\"$provider\",project=~\"$project\",branch=~\"$branch\",host_name=~\"$host_name\"}[$__range])) or vector(0)",
+          "legendFormat": "Input",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "#73BF69", "value": null }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background_solid",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "textMode": "value_and_name",
+        "reduceOptions": { "calcs": ["lastNotNull"], "values": false, "fields": "" }
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Output Tokens",
+      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 1 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum(increase(opencode_llm_output_tokens_total{model=~\"$model\",provider=~\"$provider\",project=~\"$project\",branch=~\"$branch\",host_name=~\"$host_name\"}[$__range])) or vector(0)",
+          "legendFormat": "Output",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "#FF9830", "value": null }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background_solid",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "textMode": "value_and_name",
+        "reduceOptions": { "calcs": ["lastNotNull"], "values": false, "fields": "" }
+      }
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Cache Hit Rate",
+      "description": "cachedInputTokens / inputTokens. Input tokens INCLUDE cache reads, so this is the share of prompt tokens served from cache.",
+      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 1 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum(increase(opencode_llm_cached_input_tokens_total{model=~\"$model\",provider=~\"$provider\",project=~\"$project\",branch=~\"$branch\",host_name=~\"$host_name\"}[$__range])) / clamp_min(sum(increase(opencode_llm_input_tokens_total{model=~\"$model\",provider=~\"$provider\",project=~\"$project\",branch=~\"$branch\",host_name=~\"$host_name\"}[$__range])), 1)",
+          "legendFormat": "Cache Hit",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 1,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "#73BF69", "value": null },
+              { "color": "#F2CC0C", "value": 0.5 },
+              { "color": "#F2495C", "value": 0.2 }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background_solid",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "textMode": "value_and_name",
+        "reduceOptions": { "calcs": ["lastNotNull"], "values": false, "fields": "" }
+      }
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "LLM Error Rate",
+      "description": "error-status LLM calls / total LLM calls. Zero-usage (no calls in range) shows 0, not an error.",
+      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 1 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "(sum(increase(opencode_llm_errors_total{model=~\"$model\",provider=~\"$provider\",project=~\"$project\",branch=~\"$branch\",host_name=~\"$host_name\"}[$__range])) or vector(0)) / clamp_min((sum(increase(opencode_llm_calls_total{model=~\"$model\",provider=~\"$provider\",project=~\"$project\",branch=~\"$branch\",host_name=~\"$host_name\"}[$__range])) or vector(1)), 1)",
+          "legendFormat": "Errors",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 2,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "#73BF69", "value": null },
+              { "color": "#F2CC0C", "value": 0.02 },
+              { "color": "#F2495C", "value": 0.1 }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background_solid",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "textMode": "value_and_name",
+        "reduceOptions": { "calcs": ["lastNotNull"], "values": false, "fields": "" }
+      }
+    },
+    {
+      "id": 7,
+      "type": "stat",
+      "title": "TTFT p50",
+      "description": "Time to first token, median, over the range (ai.response.msToFirstChunk).",
+      "gridPos": { "h": 4, "w": 4, "x": 20, "y": 1 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.5, sum by (le) (increase(opencode_llm_ttft_seconds_bucket{model=~\"$model\",provider=~\"$provider\"}[$__range]))) or vector(0)",
+          "legendFormat": "TTFT p50",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 1,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "#5794F2", "value": null },
+              { "color": "#F2CC0C", "value": 5 },
+              { "color": "#F2495C", "value": 15 }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background_solid",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "textMode": "value_and_name",
+        "reduceOptions": { "calcs": ["lastNotNull"], "values": false, "fields": "" }
+      }
+    },
+    {
+      "id": 8,
+      "type": "row",
+      "title": "Tokens & Calls",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
+      "panels": []
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Token Rate by Model (input / output, per second)",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 6 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum by (model) (rate(opencode_llm_input_tokens_total{model=~\"$model\",provider=~\"$provider\",project=~\"$project\",branch=~\"$branch\",host_name=~\"$host_name\"}[5m]))",
+          "legendFormat": "{{model}} in",
+          "refId": "A"
+        },
+        {
+          "expr": "sum by (model) (rate(opencode_llm_output_tokens_total{model=~\"$model\",provider=~\"$provider\",project=~\"$project\",branch=~\"$branch\",host_name=~\"$host_name\"}[5m]))",
+          "legendFormat": "{{model}} out",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "stacking": { "mode": "none" }
+          },
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "A-out" },
+            "properties": [
+              { "id": "color", "value": { "fixedColor": "#FF9830", "mode": "fixed" } }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": ["max", "mean", "sum"]
+        },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Tokens by Model (increase over range)",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 6 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum by (model) (increase(opencode_llm_input_tokens_total{model=~\"$model\",provider=~\"$provider\",project=~\"$project\",branch=~\"$branch\",host_name=~\"$host_name\"}[$__range]))",
+          "legendFormat": "{{model}} in",
+          "refId": "A"
+        },
+        {
+          "expr": "sum by (model) (increase(opencode_llm_output_tokens_total{model=~\"$model\",provider=~\"$provider\",project=~\"$project\",branch=~\"$branch\",host_name=~\"$host_name\"}[$__range]))",
+          "legendFormat": "{{model}} out",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 40,
+            "showPoints": "never",
+            "stacking": { "mode": "normal" }
+          },
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": ["max", "mean", "sum"]
+        },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "LLM Calls by Model (increase over range)",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 6 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum by (model) (increase(opencode_llm_calls_total{model=~\"$model\",provider=~\"$provider\",project=~\"$project\",branch=~\"$branch\",host_name=~\"$host_name\"}[$__range]))",
+          "legendFormat": "{{model}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 40,
+            "showPoints": "never",
+            "stacking": { "mode": "normal" }
+          },
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": ["max", "mean", "sum"]
+        },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "Input Tokens by Project (increase over range)",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 14 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum by (project) (increase(opencode_llm_input_tokens_total{model=~\"$model\",provider=~\"$provider\",project=~\"$project\",branch=~\"$branch\",host_name=~\"$host_name\"}[$__range]))",
+          "legendFormat": "{{project}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 40,
+            "showPoints": "never",
+            "stacking": { "mode": "normal" }
+          },
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": ["max", "mean", "sum"]
+        },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "id": 13,
+      "type": "timeseries",
+      "title": "Reasoning Tokens by Model (increase over range)",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 14 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum by (model) (increase(opencode_llm_reasoning_tokens_total{model=~\"$model\",provider=~\"$provider\",project=~\"$project\",branch=~\"$branch\",host_name=~\"$host_name\"}[$__range]))",
+          "legendFormat": "{{model}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 40,
+            "showPoints": "never",
+            "stacking": { "mode": "normal" }
+          },
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": ["max", "mean", "sum"]
+        },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "id": 14,
+      "type": "timeseries",
+      "title": "Cached vs Uncached Input Tokens (increase over range)",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 14 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum by (model) (increase(opencode_llm_cached_input_tokens_total{model=~\"$model\",provider=~\"$provider\",project=~\"$project\",branch=~\"$branch\",host_name=~\"$host_name\"}[$__range]))",
+          "legendFormat": "{{model}} cached",
+          "refId": "A"
+        },
+        {
+          "expr": "clamp_min(sum by (model) (increase(opencode_llm_input_tokens_total{model=~\"$model\",provider=~\"$provider\",project=~\"$project\",branch=~\"$branch\",host_name=~\"$host_name\"}[$__range])) - sum by (model) (increase(opencode_llm_cached_input_tokens_total{model=~\"$model\",provider=~\"$provider\",project=~\"$project\",branch=~\"$branch\",host_name=~\"$host_name\"}[$__range])), 0)",
+          "legendFormat": "{{model}} fresh",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 40,
+            "showPoints": "never",
+            "stacking": { "mode": "normal" }
+          },
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "B-out" },
+            "properties": [
+              { "id": "color", "value": { "fixedColor": "#FF9830", "mode": "fixed" } }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": ["max", "mean", "sum"]
+        },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "id": 15,
+      "type": "row",
+      "title": "Latency",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 22 },
+      "panels": []
+    },
+    {
+      "id": 16,
+      "type": "timeseries",
+      "title": "LLM Call Duration p50 / p95 by Model",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 23 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.5, sum by (le, model) (rate(opencode_llm_duration_seconds_bucket{model=~\"$model\",provider=~\"$provider\",host_name=~\"$host_name\"}[5m])))",
+          "legendFormat": "p50 {{model}}",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, model) (rate(opencode_llm_duration_seconds_bucket{model=~\"$model\",provider=~\"$provider\",host_name=~\"$host_name\"}[5m])))",
+          "legendFormat": "p95 {{model}}",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 0,
+            "showPoints": "never"
+          },
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byRegexp", "options": "p95 .*" },
+            "properties": [
+              { "id": "custom.fillOpacity", "value": 10 },
+              { "id": "custom.lineStyle", "value": { "dash": [10, 10], "fill": "dash" } }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": ["max", "mean", "lastNotNull"]
+        },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "id": 17,
+      "type": "timeseries",
+      "title": "TTFT p50 / p95 by Model",
+      "description": "Time to first token from the child doStream span (ai.response.msToFirstChunk).",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 23 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.5, sum by (le, model) (rate(opencode_llm_ttft_seconds_bucket{model=~\"$model\",provider=~\"$provider\",host_name=~\"$host_name\"}[5m])))",
+          "legendFormat": "p50 {{model}}",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, model) (rate(opencode_llm_ttft_seconds_bucket{model=~\"$model\",provider=~\"$provider\",host_name=~\"$host_name\"}[5m])))",
+          "legendFormat": "p95 {{model}}",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 0,
+            "showPoints": "never"
+          },
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byRegexp", "options": "p95 .*" },
+            "properties": [
+              { "id": "custom.fillOpacity", "value": 10 },
+              { "id": "custom.lineStyle", "value": { "dash": [10, 10], "fill": "dash" } }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": ["max", "mean", "lastNotNull"]
+        },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "id": 18,
+      "type": "row",
+      "title": "Events",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 31 },
+      "panels": []
+    },
+    {
+      "id": 19,
+      "type": "logs",
+      "title": "OpenCode Events (Loki)",
+      "description": "Effect-runtime span logs from service_name=opencode. Bodies are [spanName, attributesJSON] pairs.",
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 32 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "expr": "{service_name=\"opencode\"} | line_format \"{{.scope_name}}\"",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "showTime": true,
+        "showLabels": false,
+        "showCommonLabels": false,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": false,
+        "enableLogDetails": true,
+        "sortOrder": "Descending"
+      }
+    }
+  ],
+  "refresh": "1m",
+  "schemaVersion": 39,
+  "tags": ["otel", "opencode", "usage"],
+  "templating": {
+    "list": [
+      {
+        "name": "model",
+        "type": "query",
+        "label": "Model",
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "query": {
+          "qryType": 1,
+          "query": "label_values(opencode_llm_calls_total, model)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": true,
+        "refresh": 2,
+        "sort": 1,
+        "current": { "text": "All", "value": "$__all" },
+        "options": [],
+        "hide": 0
+      },
+      {
+        "name": "provider",
+        "type": "query",
+        "label": "Provider",
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "query": {
+          "qryType": 1,
+          "query": "label_values(opencode_llm_calls_total, provider)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": true,
+        "refresh": 2,
+        "sort": 1,
+        "current": { "text": "All", "value": "$__all" },
+        "options": [],
+        "hide": 0
+      },
+      {
+        "name": "project",
+        "type": "query",
+        "label": "Project",
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "query": {
+          "qryType": 1,
+          "query": "label_values(opencode_llm_calls_total, project)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": true,
+        "refresh": 2,
+        "sort": 1,
+        "current": { "text": "All", "value": "$__all" },
+        "options": [],
+        "hide": 0
+      },
+      {
+        "name": "branch",
+        "type": "query",
+        "label": "Branch",
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "query": {
+          "qryType": 1,
+          "query": "label_values(opencode_llm_calls_total, branch)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": true,
+        "refresh": 2,
+        "sort": 1,
+        "current": { "text": "All", "value": "$__all" },
+        "options": [],
+        "hide": 0
+      },
+      {
+        "name": "host_name",
+        "type": "query",
+        "label": "Host",
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "query": {
+          "qryType": 1,
+          "query": "label_values(opencode_llm_calls_total, host_name)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": true,
+        "refresh": 2,
+        "sort": 1,
+        "current": { "text": "All", "value": "$__all" },
+        "options": [],
+        "hide": 0
+      }
+    ]
+  },
+  "time": { "from": "now-24h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "OpenCode Usage",
+  "uid": "opencode-usage",
+  "version": 1,
+  "weekStart": ""
+}

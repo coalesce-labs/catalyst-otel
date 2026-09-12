@@ -396,12 +396,15 @@ for sig in logs metrics traces; do
 done
 
 # --- collector: traces exporter allowlist. Must include otlp/tempo and stay a
-#     SUBSET of {otlp/tempo, otlp_http/honeycomb, otlp_http/dash0, debug}.
+#     SUBSET of {otlp/tempo, otlp_http/honeycomb, otlp_http/dash0, debug,
+#     signal_to_metrics}.
 #     OTL-45 (#82) added the vendor legs (honeycomb/dash0) AFTER tail_sampling, so
 #     the per-span bill rides only the sampled stream — they are now allowed.
-#     Loki (otlp_http) is STILL rejected (it cannot ingest traces -> 404s), as is
-#     any other unknown trace leg, AND the case where otlp/tempo is dropped
-#     entirely. The traces pipeline is last in the block. ---
+#     OTL-99 added signal_to_metrics: a DERIVATION exporter (spans -> metrics),
+#     not a storage destination — the same role it already plays on the logs
+#     pipeline (OTL-20). Loki (otlp_http) is STILL rejected (it cannot ingest
+#     traces -> 404s), as is any other unknown trace leg, AND the case where
+#     otlp/tempo is dropped entirely. The traces pipeline is last in the block. ---
 TRACES_EXPORTERS=$(echo "$PIPELINES_BLOCK" | awk '/^    traces:/{f=1} f' | grep -E "^\s+exporters:" | head -1)
 TRACES_IDS=$(echo "$TRACES_EXPORTERS" | sed -E 's/.*\[//; s/\].*//; s/,/ /g')
 BAD_TRACE_EXP=""
@@ -410,14 +413,15 @@ for id in $TRACES_IDS; do
   case "$id" in
     otlp/tempo) HAVE_TEMPO=1 ;;
     otlp_http/honeycomb|otlp_http/dash0) : ;;
+    signal_to_metrics) : ;;
     debug) : ;;
     *) BAD_TRACE_EXP="$BAD_TRACE_EXP $id" ;;
   esac
 done
 if [ -n "$BAD_TRACE_EXP" ]; then
-  fail "traces pipeline exports to a disallowed backend (allowed: otlp/tempo, otlp_http/honeycomb, otlp_http/dash0, debug):$BAD_TRACE_EXP"
+  fail "traces pipeline exports to a disallowed backend (allowed: otlp/tempo, otlp_http/honeycomb, otlp_http/dash0, debug, signal_to_metrics):$BAD_TRACE_EXP"
 elif [ "$HAVE_TEMPO" -eq 1 ]; then
-  pass "traces pipeline exporters are within the allowlist {otlp/tempo, otlp_http/honeycomb, otlp_http/dash0, debug}"
+  pass "traces pipeline exporters are within the allowlist {otlp/tempo, otlp_http/honeycomb, otlp_http/dash0, debug, signal_to_metrics}"
 else
   fail "traces pipeline is missing the otlp/tempo exporter (traces must always reach Tempo)"
 fi
