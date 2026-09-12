@@ -287,50 +287,63 @@
     },
     {
       "id": 10,
-      "type": "barchart",
+      "type": "table",
       "title": "Tokens by Harness × Model (increase over range)",
+      "description": "One row per harness · model, sorted by tokens. Table (not bars) because single-value series across ~15 models with a huge value disparity render unreadably as a bar chart.",
       "gridPos": { "h": 7, "w": 12, "x": 12, "y": 13 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "sum by (model) (increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",type=~\"input|output\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range]))",
-          "legendFormat": "claude · {{model}}",
-          "refId": "A"
+          "expr": "label_replace(sum by (model) (increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",type=~\"input|output\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range])), \"harness\", \"claude\", \"model\", \".*\") or label_replace(sum by (model) (increase(codex_turn_token_usage_sum{token_type=~\"input|output\"}[$__range])), \"harness\", \"codex\", \"model\", \".*\") or label_replace(sum by (model) (increase(opencode_llm_input_tokens_total{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"}[$__range]) + increase(opencode_llm_output_tokens_total{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"}[$__range])), \"harness\", \"opencode\", \"model\", \".*\")",
+          "legendFormat": "__auto",
+          "refId": "A",
+          "instant": true,
+          "range": false,
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": { "Time": true },
+            "indexByName": { "harness": 0, "model": 1 },
+            "renameByName": { "Value": "Tokens (in+out)" }
+          }
         },
         {
-          "expr": "sum by (model) (increase(codex_turn_token_usage_sum{token_type=~\"input|output\"}[$__range]))",
-          "legendFormat": "codex · {{model}}",
-          "refId": "B"
-        },
-        {
-          "expr": "sum by (model) (increase(opencode_llm_input_tokens_total{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"}[$__range]) + increase(opencode_llm_output_tokens_total{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"}[$__range]))",
-          "legendFormat": "opencode · {{model}}",
-          "refId": "C"
+          "id": "sortBy",
+          "options": {
+            "sort": [{ "field": "Tokens (in+out)", "desc": true }]
+          }
         }
       ],
       "fieldConfig": {
         "defaults": {
           "unit": "short",
-          "color": { "mode": "palette-classic" },
+          "decimals": 1,
           "custom": {
-            "fillOpacity": 80,
-            "lineWidth": 1,
-            "axisPlacement": "auto",
-            "stacking": { "mode": "none" }
-          }
+            "align": "auto",
+            "cellOptions": { "type": "auto", "wrapText": false },
+            "inspect": false,
+            "filterable": true
+          },
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "text", "value": null },
+              { "color": "green", "value": 1000000 }
+            ]
+          },
+          "mappings": []
         },
         "overrides": []
       },
       "options": {
-        "orientation": "vertical",
-        "showValue": "auto",
-        "stacking": "off",
-        "groupWidth": 0.7,
-        "barWidth": 0.8,
-        "xTickLabelRotation": 45,
-        "xTickLabelMaxGap": 2,
-        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
-        "tooltip": { "mode": "multi", "sort": "desc" }
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": { "show": false, "reducer": ["sum"], "countRows": false, "fields": "" }
       }
     },
     {
