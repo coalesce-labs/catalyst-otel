@@ -322,14 +322,15 @@
         "overrides": []
       },
       "options": {
-        "orientation": "horizontal",
+        "orientation": "vertical",
         "showValue": "auto",
         "stacking": "off",
         "groupWidth": 0.7,
         "barWidth": 0.8,
+        "xTickLabelRotation": 45,
+        "xTickLabelMaxGap": 2,
         "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
-        "tooltip": { "mode": "multi", "sort": "desc" },
-        "xTickLabelRotation": 0
+        "tooltip": { "mode": "multi", "sort": "desc" }
       }
     },
     {
