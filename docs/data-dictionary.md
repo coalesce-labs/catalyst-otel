@@ -1,8 +1,8 @@
 # Catalyst Observability Data Dictionary
 
-> Single source of truth for the **metrics, logs, and traces** flowing through the catalyst observability stack (OTel Collector → Prometheus + Loki + Tempo → Grafana). Use it to know what each signal means, which dimensions you can trust, and how to correlate across signals.
+> Single source of truth for the **metrics, logs, and traces** flowing through the catalyst observability stack (OTel Collector → Prometheus + Loki + Tempo → Grafana, **and — since 2026-09-15 — ClickHouse/ClickStack in parallel**). Use it to know what each signal means, which dimensions you can trust, and how to correlate across signals.
 >
-> **Last verified:** 2026-06-29 against the live home stack. **Owner:** OTL team. When you add/rename a signal or dimension, update this file (a CI governance check is planned — see [Data quality](#data-quality--desired-envelope)).
+> **Last verified:** **2026-09-18** against the live home stack **and the live trial ClickHouse** (the ClickHouse sections are new this pass; the Prometheus/Loki/Tempo catalogs below still carry their 2026-06-29 verification and are NOT re-verified here — see [ClickHouse](#clickhouse-clickstack-trial--the-parallel-store)). **Owner:** OTL team. When you add/rename a signal or dimension, update this file (a CI governance check is planned — see [Data quality](#data-quality--desired-envelope)).
 >
 > **Managed backends:** all three signals also fan out to **Dash0** and **Honeycomb** (the `otlp_http/dash0` + `otlp_http/honeycomb` exporters) — metrics and logs since 2026-06-07, and **traces** since 2026-07-02 (added *after* `tail_sampling`, so the per-span vendor bill rides only the sampled stream).
 >
@@ -15,6 +15,7 @@
 | Metrics | Prometheus | `prometheus` | `https://otel.rozich.com/api/datasources/proxy/uid/prometheus/api/v1/...` |
 | Logs / events | Loki | `loki` | `.../uid/loki/loki/api/v1/...` |
 | Traces | Tempo | `tempo` | `.../uid/tempo/api/search?q={}` |
+| **All three (parallel)** | **ClickHouse** | `clickstack` | `http://127.0.0.1:18123/` — **loopback-only**, reach it with `ssh -L 18123:127.0.0.1:18123 home`. User is `clickstack_admin`, **not `default`**; credentials in `~/clickstack/.env` on the host. |
 
 - **OTel → Prometheus naming:** dots → underscores; counters get a `_total` suffix (`claude_code.cost.usage` → `claude_code_cost_usage_USD_total`).
 - **Loki labels:** only `service_name` + `service_namespace` are **stream labels** (selectors). Everything else (`host_name`, `event_*`, `catalyst_node_name`, …) is **structured metadata** — filter with `| field="x"`, aggregate with `sum by (field)`, but `/label/<x>/values` returns empty. Don't `| json` a body unless it IS json (the CTL-1330 daemon `.log` lines now ship full-json bodies; most events carry fields as structured metadata, not in the body).
@@ -64,6 +65,10 @@ Full reliability matrix:
 - **`instance` is a red herring** (the collector scrape target, not a producer). **`job`** is constant; use `exported_job`.
 - **Two load/memory views:** `catalyst_scheduler_*` (autotuner) vs `catalyst_host_*` (agent host-sampler) differ by sampler/timing — not interchangeable (OTL-26/27).
 - **Traces are LIVE (2026-06-24):** real `catalyst.execution-core` spans flow (CTL-1330) — `scheduler.tick` root + `scheduler.pass` children, carrying `service.name`, `service.namespace`, short `host.name`, `catalyst.node.name`, `environment`. Caveat: trace↔logs correlation does **not** round-trip yet (three disjoint id spaces — see Traces catalog → Correlation); `filterByTraceID:false` is the interim, OTL-30 ⇄ CTL-1337 the real fix.
+
+- **⛔ Capacity/limit false friends (measured 2026-09-18).** Four keys read like provider quota and are not: `rate_in_per_mtok` / `rate_out_per_mtok` / `rate_cached_per_mtok` are **pricing** rates (literally `"none"` for Qwen); `remaining_slots` is **host-agent fleet concurrency**; `auth.retry_after_unauthorized` is a **boolean** and is `false` in all 3,989 records; and a substring scan additionally matches `refresh_st`**rate**`gy` and `de`**limit**`ed_prefixes`. See [ClickHouse → capacity signals](#capacity-and-limit-signals--what-exists-measured-2026-09-18).
+- **⛔ GLM hides under Anthropic model names.** GLM rides the Anthropic-compatible endpoint, so the **Claude harness** emits its requests and its 429s — under model names like `glm-5.3[1m]`, and some under the sonnet name the z.ai mapping reports. A filter expecting `glm` as a *service* finds nothing and reads as "GLM is quiet". Filter on the **model**, and expect aliases.
+- **⛔ A key-name scan cannot see a value-borne signal.** Scanning `mapKeys()` for limit/quota/rate returns a clean, positive-control-passing negative while missing Anthropic's 429s entirely — because those live in the *values* `status_code='429'` and `error='…rate limit…'`, under key names that match nothing. A negative from a key-name scan licenses nothing about values.
 
 ## Data quality & desired envelope
 Cross-signal correlation is reliable only on **service identity**; **host identity is broken** (details above). Tracked in **OTL-29** (collector-side host canonicalization + dimension governance) and a sibling catalyst (CTL) cleanup ticket (producer-side daemon-`.log` host fix); metric-value divergence in **OTL-26 / OTL-27**.
@@ -351,6 +356,251 @@ Every catalyst span carries OTel-semconv resource attributes, set in daemon code
 Hard rules CONFIRMED on arrival: (1) **BatchSpanProcessor only** — exporter proven zero-cost on the Tier-1 `event_loop_p99_ms` (unchanged post-tracing), so no CTL-790 wedge reintroduced; (2) **AlwaysOn SDK sampler**, all sampling deferred to the collector tail_sampling (100% slow >1s + 100% errors + 20% of the rest); `CATALYST_TRACING_SAMPLE_RATIO` is an emergency head-valve only. Two deviations from the contract, both flagged above: `liveness.refresh` ships as its own ROOT span (async context; tick-parenting = Phase 2), and trace↔logs correlation does not round-trip (three disjoint id spaces → interim `filterByTraceID:false`; real fix OTL-30 ⇄ CTL-1337). The historical synthetic smoketest `otl25-live-smoketest` (telemetrygen 2-span `lets-go`→`okey-dokey-0`, no host.name) was the bring-up baseline (OTL-25 entry 01) and has since aged out of the search window.
 
 Note also that scheduler-health Prometheus metrics (`catalyst.scheduler.tick.duration`, `.pass.duration`, `.event_loop.delay`, `catalyst.liveness.refresh{outcome}`, `catalyst.scheduler.eligible_work`) are derived from the UNSAMPLED Tier-1 LOGS, not from spans — span sampling must never feed RED/health metrics or they undercount by the tail ratio. **Traces EXPLAIN; metrics (from logs) DETECT + LOCALIZE.**
+
+## ClickHouse (ClickStack trial) — the parallel store
+
+> **Status: LIVE, trial (decision date 2026-09-29).** Since 2026-09-15 the collector fans the
+> same telemetry into a self-hosted ClickHouse beside Prometheus/Loki/Tempo, with HyperDX over it.
+> Everything below is **[MEASURED] 2026-09-18** against that instance unless marked otherwise.
+> This is the store the agent-behaviour work (`agent_tool_calls`, verdicts) is built on — those
+> datasets exist **only** here, not in Loki.
+>
+> **⛔ Access is `ssh -L` only.** ClickHouse binds loopback (`127.0.0.1:18123`) and HyperDX is
+> tailnet-only. That is the thing the platform work exists to retire — see
+> `~/catalyst/comms/observability-platform-architecture.md`.
+>
+> **⛔ Never query within ~2 minutes of a collector restart.** End-to-end lag is ~40–70 s (5 s
+> batch + queue + insert + part visibility). A zero here reads exactly like a broken pipeline;
+> the unfiltered positive control will be zero too.
+
+### Tables and views
+
+| Object | Kind | What it is | Notes |
+|---|---|---|---|
+| `otel.otel_logs` | table | Every log/event record. The base table everything else derives from. | 7d volume is large; always bound `Timestamp`. Attributes split across `LogAttributes` and `ResourceAttributes` — see the trap below. |
+| `otel.otel_traces` | table | Every span. **78.8M over 7 days** (measured). | `SpanAttributes` + `ResourceAttributes`. `otel_traces_trace_id_ts` (+ its MV) is the trace-id lookup index. |
+| `otel.otel_metrics_{gauge,sum,histogram,exponential_histogram,summary}` | tables | Metrics by instrument type. | Standard ClickHouse OTel exporter shape. |
+| `otel.claude_api_requests` | **view** | The one deduplicating per-request view. **Every panel and SQL test reads this, never `otel_logs` directly.** | Dedup is a `GROUP BY (request_key, Timestamp)`, deliberately not `LIMIT 1 BY` — the latter blocks predicate pushdown (measured: 2,984 ms → 138 ms for the same answer). |
+| `otel.agent_tool_calls` | **view** | One row per tool call, for transcript/behaviour classification. | ~107K rows/24h, 25 tools. A view, not a copy — it re-derives for historical rows the moment it is replaced. |
+| `otel.agent_phase_verdicts` | table | The opinion side: a judge's score for a phase. | **⚠️ NOT DEPLOYED as of 2026-09-18.** PR #5132 is still **open** (CI red on an unrelated guard timeout), so this table does **not** exist yet. Do not write queries against it. |
+| `otel.eval_resources`, `otel.eval_queries`, `otel.trial_meta` | tables | Trial evaluation harness — resource samples, query benchmark, run metadata. | Benchmark runs hourly at **:23**, 7-day suite at **03:41 UTC**. A collector restart or Grafana recreate kills an in-flight run. |
+
+### ⛔ The trap that has cost time twice: `LogAttributes` vs `ResourceAttributes`
+
+`ticket`, `phase`, `tenant`, `harness`, `container_id` are **ResourceAttributes**. A query
+reading `LogAttributes['phase']` returns **nothing** — silently, as a clean empty result.
+
+Compounding it, **live and Loki-backfilled rows use different names for the same field**: live
+rows keep Claude Code's dotted names (`session.id`, `event.sequence`), backfilled rows carry
+normalised underscores (`session_id`). The views handle both with `multiIf` fallbacks; ad-hoc
+SQL must too.
+
+### `claude_api_requests` — two dimensions that are easy to misuse
+
+| Column | Added | The trap |
+|---|---|---|
+| `phase` | PR #4944 | **Legitimately empty** for interactive and non-relay work — per-day coverage measured 15.2%–72.1%, never 100%. ⛔ Filtering on a phase value **excludes about half of all spend**: 7,550 calls / $1,611.74 in one 24h window had no phase, more than every named phase combined. **A per-phase total is not a spend total** — anything presenting one as the other is wrong by ~2×. Show the unattributed bucket. |
+| `session_kind` | PR #5011 | `relay` / `interactive` / `unknown`. Derived only from what the producer declared. Three values, not two, because Loki-backfilled rows lost `terminal.type` and `catalyst.orchestration` in the round-trip and a two-value split mislabels them. Measured: `non-interactive` and `ghostty` partition perfectly, zero overlap. |
+
+⛔ **This view sees only `claude_code.api_request`** — work routed through the Claude Code
+harness. Qwen and GLM run natively under OpenCode and **do not appear here**. For a
+cross-harness answer use the runner's `ai.call.metered` event instead (below).
+
+### `agent_tool_calls` — join on `session_id`, nothing else
+
+Measured over 53,395 `claude_code.tool_result` rows in 24h, `session_id` is the **only key
+present on 100% of them**. `linear_key` / `phase` / `tenant` / `harness` sit on the resource and
+are present on 83.5%. ⛔ **The missing 16.5% is not loss — it is the interactive population**,
+which legitimately has no ticket or phase. An inner join on `linear_key` silently drops every
+one of them and still looks complete. Filter on `session_kind = 'relay'` and say so.
+
+⛔ `harness` rides on every row on purpose: **token and duration semantics are not comparable
+across harnesses.** Codex reported 1,284M input tokens against Claude's 5.65M over one window —
+different counting, not real usage. Any aggregate must be per-harness until that is reconciled.
+
+### ⚠️ CORRECTION: `attempt` / `nonce` CAN be recovered — [MEASURED] 2026-09-18
+
+The comment merged into `022-agent-tool-calls.sql` says `attempt`/nonce "does NOT exist anywhere
+in the harness stream … it cannot be read back from telemetry. Do not design a join that assumes
+it." **That is true of the tool stream and false of the system as a whole**, and the distinction
+is load-bearing for the verdict writer (CTC-2715) and architecture §5.
+
+- On `tool_result` rows it is genuinely absent: **0 `attempt`, 0 `nonce` out of 86,927**.
+- But the runner's **executor** streams carry both: `claude_exec` **2,457**, `codex_exec` 148,
+  `opencode_exec` 110 — plus `assignment_id` in the form **`tenant-0/CTC-2625/implement/9`**,
+  which encodes tenant / ticket / phase / **attempt** directly.
+- The two streams join: `claude_exec.provider_session_id` → `tool_result['session.id']` matches
+  **781 of 795 session ids (98.2%)**.
+
+```sql
+-- recover tenant/ticket/phase/attempt for a tool-call session
+WITH execs AS (
+  SELECT DISTINCT LogAttributes['provider_session_id'] AS sid,
+         LogAttributes['assignment_id'] AS assignment
+  FROM otel.otel_logs
+  WHERE Timestamp > now() - INTERVAL 7 DAY AND ServiceName = 'claude_exec'
+    AND LogAttributes['provider_session_id'] != '')
+SELECT e.sid, e.assignment, count() AS tool_calls
+FROM otel.otel_logs t INNER JOIN execs e ON t.LogAttributes['session.id'] = e.sid
+WHERE t.Timestamp > now() - INTERVAL 7 DAY AND t.LogAttributes['event.name'] = 'tool_result'
+GROUP BY e.sid, e.assignment ORDER BY tool_calls DESC;
+```
+
+**Independent control — the join was tested for FALSIFICATION, not re-run.** Re-running the
+same query proves nothing, so the check used a field the join never touches: for every joined
+row, does `assignment_id`'s ticket/phase agree with the tool row's **own**
+`ResourceAttributes['linear.key']` and `['phase']`?
+
+| | rows |
+|---|---:|
+| joined rows | 62,144 |
+| ticket **agrees** | 62,144 (100%) |
+| ticket **conflicts** | **0** |
+| phase **agrees** | 62,144 (100%) |
+| phase **conflicts** | **0** |
+| joined tool row with no ticket | 0 |
+
+Zero conflicts on 62,144 rows. The join is **semantically** correct, not merely key-matching.
+(Internally consistent with the 83.5% figure above: `claude_exec` is the *runner's* executor, so
+every joined row is a relay row and legitimately has a ticket — the interactive 16.5% never
+enters this join.)
+
+**⚠️ …which narrows what the join is actually worth.** Because ticket and phase agree 100%, they
+were **already available** on the tool rows. The *only* field `assignment_id` adds is the
+**attempt number** — which is precisely the one the verdict writer needed and the one the
+"cannot be read back" claim was about. Do not reach for this join to get ticket or phase; read
+those off the resource directly.
+
+**Caveat, stated honestly:** only ~32% of `claude_exec` records carry `provider_session_id`
+(795 of 2,461), so coverage is partial at the record level even though the join is near-total at
+the session level. And a *derived* nonce is an **observation, not an attestation** — it does not
+replace the runner supplying it at write time. What changes is that a runner-supplied nonce can
+now be **verified** against telemetry, which the "cannot be read back" framing ruled out.
+
+### `ai.call.metered` — the only cross-harness accounting event
+
+Emitted by `catalyst-runner` (`emitter=catalyst-runner`), so it covers **every** executor
+including OpenCode, which `claude_api_requests` cannot see. Carries `routing_provider`, `model`,
+`account_slot`, `input_tokens`, `output_tokens`, `cached_input_tokens`, `usage_status`,
+`cost_basis`, `price_source`, plus the full relay resource set (`ticket`, `phase`, `repo`,
+`team`, `nonce`, `assignment_id`, `image_tag`, `resource_profile`).
+
+⛔ **It does not reconcile with `claude_api_requests`.** Measured 7d, Qwen reads as **10 calls**
+in one and **34 metered events / 106 records** in the other. There is no single per-provider
+spend answer today — you must know which stream you are asking. Tracked as **CTC-2733**.
+
+### Capacity and limit signals — what exists [MEASURED] 2026-09-18
+
+**Scanned:** all `SpanAttributes` over 78.8M spans and all `LogAttributes`, 7 days, every key
+matching limit/quota/rate/retry/remaining/credit/balance/throttl/429/reset, across all 13
+services. Positive controls passed on both (`http.response.status_code` 4,482,852; `model`
+801,797).
+
+| Signal | Where | Volume | Verdict |
+|---|---|---:|---|
+| Anthropic **429** — *"This request would exceed your account's rate limit"* | `claude-code` / `api_error` / `status_code='429'` | 63 / 7d in ClickHouse (**~105 on Loki** — see backfill gap below) | ✅ **REAL.** Attributable per model **and** per account slot. **54 of 63 are interactive laptop sessions, not fleet runs.** |
+| Codex `account/rateLimits/read` | span, `codex_cli_rs` | 1,982 / 7d | ⚠️ **Polled ~1,100×/day and the response is DISCARDED.** The span carries only RPC plumbing — `rpc.method`, `rpc.request_id`, thread, timing. No remaining, no limit, no reset. |
+| Rate-limit headers (`anthropic-ratelimit-*`, `x-ratelimit-*`, `retry-after`) | — | **0** | ❌ Absent everywhere. |
+| Any provider credit/quota balance | — | **0** | ❌ Absent. **No vendor API exists** for Qwen (Alibaba Model Studio) or GLM (Z.ai) coding-plan balance — console only. Hence CTC-2729's operator-declared model. |
+| Codex / OpenCode / GLM error text mentioning limit, quota, credit | — | **0 in ClickHouse** | ⚠️ **Partly an artefact.** GLM 429s *do* exist (~50, on Loki) and are missing here for the backfill reason above. Codex and OpenCode/Qwen are genuinely zero. Given Qwen rides a finite credit pack, its exhaustion would currently be **invisible**. |
+
+**The shape of what we have:** saturation is measurable (we can see *that* we hit the wall, with
+full attribution); **headroom is not** (we cannot see how close we are before hitting it). 429s
+are a **lagging** signal; `anthropic-ratelimit-remaining-*` would be a **leading** one. Tracked
+as **CTC-2732**.
+
+### ⛔ The backfill dropped every error-class event — [MEASURED] 2026-09-18
+
+**ClickHouse is not a complete copy of Loki for the pre-2026-09-16 window.** The Loki→ClickHouse
+backfill carried the ordinary event stream but **not the error-class events**. Any question
+about failures, rate limits or retries that reaches back before 2026-09-16 will read as a clean,
+plausible zero in ClickHouse and is wrong.
+
+Control — claude-code events either side of the boundary:
+
+| event | before 09-16 | after 09-16 |
+|---|---:|---:|
+| `tool_decision` | 2,287 | 84,749 |
+| `tool_result` | 2,286 | 84,691 |
+| `api_request` | 1,885 | 78,309 |
+| `hook_execution_start` | 1,933 | 19,238 |
+| **`api_error`** | **0** | **83** |
+| **`api_retries_exhausted`** | **0** | **10** |
+| **`hook_registered`** | **0** | **70** |
+
+Ordinary events are present before the boundary (thinner, but present). The error family is
+**exactly zero**, which is not a volume effect.
+
+**Corroborated on an independent instrument.** A Loki cut over the same 7 days (concierge,
+2026-09-18) counts **~105** claude-code 429s against ClickHouse's **63**, and finds **~50 GLM
+429s** — and GLM activity in ClickHouse stops on **09-14**, entirely inside the missing window.
+Two instruments agreeing on where the boundary falls. *(The residuals do not reconcile to the
+row — the two 7-day windows start at different clock times — so treat the boundary as
+established and the exact counts as approximate.)*
+
+**Consequences:**
+- ⛔ **GLM rate-limiting is invisible in ClickHouse and real in Loki.** GLM rides the
+  Anthropic-compatible endpoint, so the Claude harness emits its 429s under model names like
+  `glm-5.3[1m]` — and a filter expecting `glm` as a *service* would miss them even in a complete
+  dataset.
+- For any error/failure question spanning 2026-09-15 or earlier, **query Loki, not ClickHouse.**
+- Backfill completeness needs a positive control per event class, not per row count.
+
+> **⏳ This section has an expiry condition.** The "query Loki, not ClickHouse" rule above is a
+> workaround for a defect, not a property of the system. **When the backfill gap is fixed or
+> declared permanent, delete rule (1) here and say so in one line on CTC-2732** — a stale
+> workaround outlives the bug it worked around and quietly becomes folklore. Owner of the
+> underlying defect: catalyst-otel (this repo). Not yet filed as its own ticket.
+
+
+### GenAI semantic-convention attributes on spans
+
+The collector's `transform/genai_usage` processor (catalyst-otel #206, catalyst-otel-private #20)
+maps each harness's native token fields onto `gen_ai.*`. It is **copy-never-move and every
+statement is nil-guarded**, so it is idempotent and reversible by deleting the processor.
+
+⛔ It had to be wired into **both** the public traces pipeline *and* `traces/clickhouse` —
+HyperDX reads the ClickHouse table directly, so a Tempo-only mapping is invisible to it.
+
+| Attribute | Occurrences (7d) | Services |
+|---|---:|---:|
+| `gen_ai.usage.input_tokens` / `.output_tokens` | 9,384 each | 4 |
+| `gen_ai.usage.cache_read.input_tokens` / `.cache_write.input_tokens` | 9,022 each | 2 |
+| `gen_ai.request.model` | 422 | 3 |
+| `gen_ai.operation.name` / `gen_ai.provider.name` | 375 each | 3 |
+| `gen_ai.usage.cost`, `gen_ai.input.messages`, `gen_ai.output.messages` | 325 each | 1 |
+| `gen_ai.system` | 146 | 3 |
+| `gen_ai.response.finish_reasons` / `.response.id` | 93 each | 2 |
+
+⚠️ By volume these are overwhelmingly **`codex-app-server`** (9,021), not `claude-code` (1). The
+Claude Code tracing beta was only enabled 2026-09-17, so its span history is ~217 spans.
+
+### Claude Code tracing beta — spans, not just logs
+
+**Claude Code emits traces; it is a config gate, not a missing feature.** Requires all three:
+`CLAUDE_CODE_ENHANCED_TELEMETRY_BETA=1` + `OTEL_TRACES_EXPORTER=otlp` + **`OTEL_EXPORTER_OTLP_PROTOCOL`**.
+⛔ An `otlp` exporter with **no protocol set exports nothing, silently.**
+
+Spans carry `gen_ai.system`, `gen_ai.request.model`, `gen_ai.response.id/finish_reasons`
+**natively** — only `gen_ai.usage.*` needed the collector mapping.
+
+| Span | Count (7d) | First seen | Purpose |
+|---|---:|---|---|
+| `claude_code.llm_request` | 56 | 2026-09-17 21:13Z | One LLM call. The span analogue of the `api_request` log event. |
+| `claude_code.tool` | 52 | 2026-09-18 03:02Z | A tool call, with real parent/child structure the log stream cannot express. |
+| `claude_code.tool.execution` | 52 | 2026-09-18 03:02Z | The tool's own work — **separated from human wait time**. |
+| `claude_code.tool.blocked_on_user` | 52 | 2026-09-18 03:02Z | Time waiting on a permission prompt. This is why the split matters: a "slow tool" in the log stream is often a human. |
+| `claude_code.interaction` | 5 | 2026-09-17 21:13Z | One user turn, root of the others. |
+
+⛔ **Ambient traffic cannot prove a harness mapping.** `claude-code` arrives at **0.2 spans/s**
+against Cloudflare's **660/s**. Verifying any claude-code change requires *deliberately
+generating* a span (`claude -p` with the beta env) — waiting for organic traffic will read as
+failure.
+
+A span-sourced variant of `agent_tool_calls` belongs beside the log-sourced one later; the
+current view shape does not preclude it.
+
+---
 
 ## Alerts catalog
 
