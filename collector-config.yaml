@@ -369,6 +369,53 @@ processors:
   # Applied to the ONE traces pipeline, so it drops for Tempo as well as the
   # vendors. That is intentional and keeps the OTL-1 payload-parity invariant
   # intact: these spans have no diagnostic value anywhere.
+  # CTC-2582 — additive GenAI semantic-convention mapping for harness spans.
+  #
+  # WHY: each harness is missing a DIFFERENT half of the OTel GenAI conventions, so
+  # no single query compares them and no GenAI-aware tool (HyperDX's preset LLM
+  # dashboards, and the same class in any vendor) recognises our spans as LLM calls.
+  # Measured 2026-09-17 over 30,135,977 spans in 24h:
+  #   claude-code       gen_ai.system + gen_ai.request.model present; gen_ai.usage.* ABSENT
+  #                     (tokens ride the SAME span as bare input_tokens/output_tokens/...)
+  #   codex-app-server  gen_ai.usage.* present (4 keys); ALL identity attrs absent
+  #   opencode          both present once its exporter gate opens (CTC-2575)
+  # Across all of them: gen_ai.system 0, gen_ai.operation.name 38, gen_ai.request.model 38
+  # (those 38 are Cloudflare AI Gateway's, not a harness's).
+  #
+  # COPY, NEVER MOVE. The bare names are read by live dashboards and by the
+  # signal_to_metrics connectors below. Every statement is additive and guarded on the
+  # destination being nil, so this is idempotent and cannot clobber a harness that later
+  # emits the canonical key itself - on that day the guard stops firing and this block
+  # becomes dead weight, which is the intended end state.
+  #
+  # NOT DONE HERE, deliberately: gen_ai.request.model for codex. A bare `model` exists on
+  # ~761 codex spans/6h against ~7,170 gen_ai.usage.* spans - different populations - and
+  # only 1,090 of 35,496 codex logs carry a TraceId to join on. Inventing it would be
+  # fabrication; it needs an upstream emitter change (CTC-2579).
+  transform/genai_usage:
+    error_mode: ignore
+    trace_statements:
+      - context: span
+        statements:
+          # --- Claude Code: identity already correct; supply the usage half. ---
+          - set(attributes["gen_ai.usage.input_tokens"], Int(attributes["input_tokens"])) where resource.attributes["service.name"] == "claude-code" and attributes["input_tokens"] != nil and attributes["gen_ai.usage.input_tokens"] == nil
+          - set(attributes["gen_ai.usage.output_tokens"], Int(attributes["output_tokens"])) where resource.attributes["service.name"] == "claude-code" and attributes["output_tokens"] != nil and attributes["gen_ai.usage.output_tokens"] == nil
+          - set(attributes["gen_ai.usage.cache_read.input_tokens"], Int(attributes["cache_read_tokens"])) where resource.attributes["service.name"] == "claude-code" and attributes["cache_read_tokens"] != nil and attributes["gen_ai.usage.cache_read.input_tokens"] == nil
+          - set(attributes["gen_ai.usage.cache_write.input_tokens"], Int(attributes["cache_creation_tokens"])) where resource.attributes["service.name"] == "claude-code" and attributes["cache_creation_tokens"] != nil and attributes["gen_ai.usage.cache_write.input_tokens"] == nil
+          # gen_ai.provider.name is the semconv successor to gen_ai.system (the spec renamed
+          # it; Status: Development). Carry BOTH so a consumer on either vintage resolves.
+          # Neither is invented - both derive from what the harness itself declared.
+          - set(attributes["gen_ai.provider.name"], attributes["gen_ai.system"]) where attributes["gen_ai.system"] != nil and attributes["gen_ai.provider.name"] == nil
+          # Only the span the harness itself names as the model call gets an operation name.
+          - set(attributes["gen_ai.operation.name"], "chat") where resource.attributes["service.name"] == "claude-code" and name == "claude_code.llm_request" and attributes["gen_ai.operation.name"] == nil
+
+          # --- Codex: usage already correct; supply only what derives honestly. ---
+          # The provider is a property of the binary, not a guess: codex-app-server is
+          # OpenAI's CLI. request.model is deliberately NOT set - see the header.
+          - set(attributes["gen_ai.system"], "openai") where resource.attributes["service.name"] == "codex-app-server" and attributes["gen_ai.usage.input_tokens"] != nil and attributes["gen_ai.system"] == nil
+          - set(attributes["gen_ai.provider.name"], "openai") where resource.attributes["service.name"] == "codex-app-server" and attributes["gen_ai.usage.input_tokens"] != nil and attributes["gen_ai.provider.name"] == nil
+          - set(attributes["gen_ai.operation.name"], "chat") where resource.attributes["service.name"] == "codex-app-server" and attributes["gen_ai.usage.input_tokens"] != nil and attributes["gen_ai.operation.name"] == nil
+
   filter/drop_crate_internals:
     traces:
       span:
@@ -1546,7 +1593,7 @@ service:
       # OTL-99: transform/opencode_labels normalizes AI SDK attributes into
       # model/provider/host_name labels before the derivation connector below
       # consumes the spans.
-      processors: [resource, transform/opencode_labels, filter/drop_crate_internals, tail_sampling]
+      processors: [resource, transform/opencode_labels, transform/genai_usage, filter/drop_crate_internals, tail_sampling]
       # OTL-54: `debug` REMOVED (see the metrics pipeline above). Span volume
       # here is dominated by codex-app-server emitting Rust h2 HTTP/2 library
       # internals (one span per frame op) — serializing that to stdout as well
