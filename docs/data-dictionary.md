@@ -558,6 +558,17 @@ the handover. Measured in Loki for 2026-08-20→09-16 alone: `tool_decision` 804
 order of operation from the ~8k error recovery, and it needs its own decision. **Behaviour and
 transcript questions over the pre-handover range are still unanswerable from ClickHouse.**
 
+**What the 403s are good for.** The 31 `403 "Request not allowed"` records are the quarantine-arm
+input for **CTC-2684**. Six are attributable to a named Claude slot; the other 25 carry
+`account = unknown` and cannot be assessed per slot, so a bare count of 31 overstates the usable
+population by 5×. Of the six, **every one took exactly a single 403** — no runs anywhere in the
+range — and **five were serving traffic again within 1–6 seconds**, going on to 36–269 successful
+requests in the following half hour. Joining a 403 to the same account's subsequent
+`api_request` events is the cut that distinguishes a transient 403 from a dead credential.
+
+⛔ When you write that join, count **both** `event_name` and `event.name` — recovered rows use the
+underscore form, live rows the dotted one, and reading either alone undercounts badly.
+
 > **⏳ Expiry.** Tracked as **OTL-101**. When the selector is parameterised (or the gap is
 > declared permanent), revisit this section and post one line on CTC-2732 — a stale workaround
 > outlives the bug it worked around and quietly becomes folklore.
