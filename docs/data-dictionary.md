@@ -498,60 +498,69 @@ services. Positive controls passed on both (`http.response.status_code` 4,482,85
 
 | Signal | Where | Volume | Verdict |
 |---|---|---:|---|
-| Anthropic **429** — *"This request would exceed your account's rate limit"* | `claude-code` / `api_error` / `status_code='429'` | 63 / 7d in ClickHouse (**~105 on Loki** — see backfill gap below) | ✅ **REAL.** Attributable per model **and** per account slot. **54 of 63 are interactive laptop sessions, not fleet runs.** |
+| Anthropic **429** — *"This request would exceed your account's rate limit"* | `claude-code` / `api_error` / `status_code='429'` | **7,242** since 2026-07-25 (after the recovery below) | ✅ **REAL.** Attributable per model **and** per account slot. Overwhelmingly interactive laptop sessions rather than fleet runs. |
 | Codex `account/rateLimits/read` | span, `codex_cli_rs` | 1,982 / 7d | ⚠️ **Polled ~1,100×/day and the response is DISCARDED.** The span carries only RPC plumbing — `rpc.method`, `rpc.request_id`, thread, timing. No remaining, no limit, no reset. |
 | Rate-limit headers (`anthropic-ratelimit-*`, `x-ratelimit-*`, `retry-after`) | — | **0** | ❌ Absent everywhere. |
 | Any provider credit/quota balance | — | **0** | ❌ Absent. **No vendor API exists** for Qwen (Alibaba Model Studio) or GLM (Z.ai) coding-plan balance — console only. Hence CTC-2729's operator-declared model. |
-| Codex / OpenCode / GLM error text mentioning limit, quota, credit | — | **0 in ClickHouse** | ⚠️ **Partly an artefact.** GLM 429s *do* exist (~50, on Loki) and are missing here for the backfill reason above. Codex and OpenCode/Qwen are genuinely zero. Given Qwen rides a finite credit pack, its exhaustion would currently be **invisible**. |
+| GLM rate limiting | `claude-code`, under model `glm-5.3[1m]` | **64** since 2026-07-25 | ✅ Recovered 2026-09-18; read as zero before that. |
+| Codex / OpenCode / Qwen error text mentioning limit, quota, credit | — | **0** | ❌ Genuinely absent. Given Qwen rides a finite credit pack, its exhaustion would currently be **invisible**. |
 
 **The shape of what we have:** saturation is measurable (we can see *that* we hit the wall, with
 full attribution); **headroom is not** (we cannot see how close we are before hitting it). 429s
 are a **lagging** signal; `anthropic-ratelimit-remaining-*` would be a **leading** one. Tracked
 as **CTC-2732**.
 
-### ⛔ The backfill dropped every error-class event — [MEASURED] 2026-09-18
+### ⚠️ The pre-2026-09-16 backfill was scoped to `api_request` only — RECOVERED 2026-09-18
 
-**ClickHouse is not a complete copy of Loki for the pre-2026-09-16 window.** The Loki→ClickHouse
-backfill carried the ordinary event stream but **not the error-class events**. Any question
-about failures, rate limits or retries that reaches back before 2026-09-16 will read as a clean,
-plausible zero in ClickHouse and is wrong.
+**What happened.** The Loki→ClickHouse backfill (`apps/clickstack/src/backfill.ts`) carries a
+LogQL **line filter** on line 25:
 
-Control — claude-code events either side of the boundary:
+```ts
+export const LOKI_SELECTOR = '{service_name=~"claude-code.*"} |= `claude_code.api_request`';
+```
 
-| event | before 09-16 | after 09-16 |
-|---|---:|---:|
-| `tool_decision` | 2,287 | 84,749 |
-| `tool_result` | 2,286 | 84,691 |
-| `api_request` | 1,885 | 78,309 |
-| `hook_execution_start` | 1,933 | 19,238 |
-| **`api_error`** | **0** | **83** |
-| **`api_retries_exhausted`** | **0** | **10** |
-| **`hook_registered`** | **0** | **70** |
+So for everything before the 2026-09-15T19:18Z handover it imported `claude_code.api_request`
+and **nothing else**. Not a transfer failure and not a filter bug — it was scoped to one event
+class by design, and its header says so. It reported 0 failed windows because nothing failed.
 
-Ordinary events are present before the boundary (thinner, but present). The error family is
-**exactly zero**, which is not a volume effect.
+⛔ **The reader-facing hazard, which outlives the fix:** `otel.otel_logs` reads as a general log
+table. Nothing in the schema or the table name says a historical range may hold only some event
+classes, so a query over such a range returns a clean, plausible **zero** rather than an error.
 
-**Corroborated on an independent instrument.** A Loki cut over the same 7 days (concierge,
-2026-09-18) counts **~105** claude-code 429s against ClickHouse's **63**, and finds **~50 GLM
-429s** — and GLM activity in ClickHouse stops on **09-14**, entirely inside the missing window.
-Two instruments agreeing on where the boundary falls. *(The residuals do not reconcile to the
-row — the two 7-day windows start at different clock times — so treat the boundary as
-established and the exact counts as approximate.)*
+⚠️ **Do not diagnose this by counting `LogAttributes['event.name']`.** Backfilled rows use the
+underscore spelling `event_name`; live rows use the dotted `event.name`. Counting only the dotted
+form makes the backfill look like it imported almost nothing (1,885 `api_request` rows) when it
+actually imported **69,663**. Count both, always.
 
-**Consequences:**
-- ⛔ **GLM rate-limiting is invisible in ClickHouse and real in Loki.** GLM rides the
-  Anthropic-compatible endpoint, so the Claude harness emits its 429s under model names like
-  `glm-5.3[1m]` — and a filter expecting `glm` as a *service* would miss them even in a complete
-  dataset.
-- For any error/failure question spanning 2026-09-15 or earlier, **query Loki, not ClickHouse.**
-- Backfill completeness needs a positive control per event class, not per row count.
+**Recovered — error classes, [MEASURED] 2026-09-18.** `api_error` and `api_retries_exhausted`
+were re-imported for 2026-07-25 → 2026-09-15T19:18Z (the handover): **5,070 windows, 7,762 rows,
+0 failures.**
 
-> **⏳ This section has an expiry condition.** The "query Loki, not ClickHouse" rule above is a
-> workaround for a defect, not a property of the system. **When the backfill gap is fixed or
-> declared permanent, delete rule (1) here and say so in one line on CTC-2732** — a stale
-> workaround outlives the bug it worked around and quietly becomes folklore. Owner of the
-> underlying defect: catalyst-otel (this repo). Not yet filed as its own ticket.
+Verified per day against Loki rather than against the run's own completion message:
+**51 of 51 days with data match exactly**, ClickHouse total **7,762 = Loki 7,762**. Cross-checked
+on the 429 subset with both instruments' filters matched: ClickHouse **5,294** `api_error` 429s
+for 2026-08-20→09-16 against Loki's raw **5,294**.
 
+| now queryable, 2026-07-25 onward | |
+|---|--:|
+| 429 rate-limit events | **7,242** |
+| …of which on a GLM slot | **64** |
+| 403 "Request not allowed" | 31, across 17 accounts |
+
+⛔ **GLM 429s are recorded under Anthropic model names** — `glm-5.3[1m]`, and some under a
+sonnet name — because GLM rides the Anthropic-compatible endpoint and the Claude harness emits
+them. Before this recovery they read as zero, which was an artefact of the gap, not a fact.
+
+**Still NOT imported, deliberately.** Every other non-`api_request` class remains absent before
+the handover. Measured in Loki for 2026-08-20→09-16 alone: `tool_decision` 804,162 ·
+`tool_result` 803,222 · `hook_execution_start` 495,520 · `assistant_response` 234,576 ·
+`hook_registered` 54,754 · `user_prompt` 28,216. That is ~2.4M rows for four weeks — a different
+order of operation from the ~8k error recovery, and it needs its own decision. **Behaviour and
+transcript questions over the pre-handover range are still unanswerable from ClickHouse.**
+
+> **⏳ Expiry.** Tracked as **OTL-101**. When the selector is parameterised (or the gap is
+> declared permanent), revisit this section and post one line on CTC-2732 — a stale workaround
+> outlives the bug it worked around and quietly becomes folklore.
 
 ### GenAI semantic-convention attributes on spans
 
