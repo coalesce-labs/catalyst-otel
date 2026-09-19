@@ -70,6 +70,54 @@ groups:
   # here because we are not creating a new high-card series, we are grouping
   # existing ones).
   # ---------------------------------------------------------------------
+  # ---------------------------------------------------------------------
+  # CTC-2898 (2026-09-19): THE RENAME SHIM. Two producer renames land at the
+  # runner image pin, not at their PR merge -- CTC-2786 renames the coding
+  # slot resource attribute from `account` to `catalyst.account_slot`, and
+  # CTC-2821 renames the repository from `project` to `vcs.repository.name`.
+  # The collector promotes resource attributes to metric labels with
+  # `resource_to_telemetry_conversion` and the Prometheus exporter sanitizes
+  # dots to underscores, so the LABELS follow: `catalyst_account_slot` and
+  # `vcs_repository_name`.
+  #
+  # POSITIVE CONTROL for that label naming, taken live 2026-09-19 against this
+  # stack's own Prometheus: `claude_code_token_usage_tokens_total` (168 series)
+  # already carries `catalyst_orchestration`, `catalyst_tenant`,
+  # `catalyst_substrate` and `deployment_environment_name` -- promoted from
+  # `catalyst.orchestration`, `catalyst.tenant`, `catalyst.substrate` and
+  # `deployment.environment.name`, stamped by the SAME
+  # OTEL_RESOURCE_ATTRIBUTES block in harness-otel-env.ts. It carries
+  # `account` and `project` and does NOT yet carry `catalyst_account_slot` or
+  # `vcs_repository_name` -- i.e. the rename has not rolled yet, and every
+  # series read by these rules is still on the old spelling TODAY.
+  #
+  # A `sum by (... account ...)` over a metric that no longer carries
+  # `account` does not error. It collapses every series into `account=""` --
+  # the label silently stops grouping and the panel keeps drawing. PromQL has
+  # no coalesce, so the idiom is a nested `label_replace` applied to the raw
+  # selector BEFORE the aggregation:
+  #
+  #   label_replace(<vector>, "account", "$1", "catalyst_account_slot", "(.+)")
+  #
+  # `(.+)` does not match an ABSENT label (whose value is the empty string),
+  # and a non-matching `label_replace` returns the series unchanged -- so this
+  # is exactly "canonical if present, else legacy", evaluated per series. A
+  # pre-rename series keeps its `account`; a post-rename series gets `account`
+  # set from `catalyst_account_slot`; a window holding both is correct because
+  # each series is decided on its own labels. The OUTPUT label set is
+  # unchanged, so every dashboard reading `ai:*{account=...,project=...}`
+  # keeps working across the roll with no dashboard edit.
+  #
+  # Only the rules reading a RAW producer metric are shimmed. Rules built on
+  # the `ai:*` series those produce (the efficiency and accumulator
+  # combinators) inherit the normalised labels and are deliberately left
+  # alone.
+  #
+  # Retirement: drop the `label_replace` wrapper for a dimension once the
+  # retention window has rolled past the DEPLOY date of its producer fix, the
+  # condition recorded per alias in catalyst-cloud's
+  # packages/observability/src/telemetry-aliases.ts.
+  # ---------------------------------------------------------------------
   - name: ai-canonical-tokens
     interval: 1m
     rules:
@@ -98,7 +146,13 @@ groups:
         expr: |
           label_replace(
             sum by (model, type, project, branch, linear_key, task_type, catalyst_orchestration, account, phase) (
-              claude_code_token_usage_tokens_total{model!~"^(glm|qwen).*"}
+              label_replace(
+                label_replace(
+                  claude_code_token_usage_tokens_total{model!~"^(glm|qwen).*"},
+                  "account", "$1", "catalyst_account_slot", "(.+)"
+                ),
+                "project", "$1", "vcs_repository_name", "(.+)"
+              )
             ),
             "token_type", "$1", "type", "(.*)"
           )
@@ -114,7 +168,13 @@ groups:
         expr: |
           label_replace(
             sum by (model, type, project, branch, linear_key, task_type, catalyst_orchestration, account, phase) (
-              claude_code_token_usage_tokens_total{model=~"^glm.*"}
+              label_replace(
+                label_replace(
+                  claude_code_token_usage_tokens_total{model=~"^glm.*"},
+                  "account", "$1", "catalyst_account_slot", "(.+)"
+                ),
+                "project", "$1", "vcs_repository_name", "(.+)"
+              )
             ),
             "token_type", "$1", "type", "(.*)"
           )
@@ -149,7 +209,13 @@ groups:
         expr: |
           label_replace(
             sum by (model, type, project, branch, linear_key, task_type, catalyst_orchestration, account, phase) (
-              claude_code_token_usage_tokens_total{model=~"^qwen.*"}
+              label_replace(
+                label_replace(
+                  claude_code_token_usage_tokens_total{model=~"^qwen.*"},
+                  "account", "$1", "catalyst_account_slot", "(.+)"
+                ),
+                "project", "$1", "vcs_repository_name", "(.+)"
+              )
             ),
             "token_type", "$1", "type", "(.*)"
           )
@@ -164,7 +230,13 @@ groups:
           provider: anthropic
         expr: |
           sum by (tool_name, success, project, branch, linear_key, task_type, catalyst_orchestration, account, phase) (
-            claude_code_tool_result_total
+            label_replace(
+              label_replace(
+                claude_code_tool_result_total,
+                "account", "$1", "catalyst_account_slot", "(.+)"
+              ),
+              "project", "$1", "vcs_repository_name", "(.+)"
+            )
           )
 
       # provider=openai: native codex_exec metric -- full ticket dims. `tool`
@@ -175,7 +247,13 @@ groups:
         expr: |
           label_replace(
             sum by (tool, success, model, project, branch, linear_key, task_type, host_name, account, phase) (
-              codex_tool_call_total
+              label_replace(
+                label_replace(
+                  codex_tool_call_total,
+                  "account", "$1", "catalyst_account_slot", "(.+)"
+                ),
+                "project", "$1", "vcs_repository_name", "(.+)"
+              )
             ),
             "tool_name", "$1", "tool", "(.*)"
           )
@@ -209,7 +287,13 @@ groups:
           provider: anthropic
         expr: |
           sum by (model, project, branch, linear_key, task_type, catalyst_orchestration, account, phase) (
-            claude_code_cost_usage_USD_total{model!~"^(glm|qwen).*"}
+            label_replace(
+              label_replace(
+                claude_code_cost_usage_USD_total{model!~"^(glm|qwen).*"},
+                "account", "$1", "catalyst_account_slot", "(.+)"
+              ),
+              "project", "$1", "vcs_repository_name", "(.+)"
+            )
           )
 
       # provider=glm: RE-RATED, not real, not estimated-at-list-price like
@@ -237,11 +321,17 @@ groups:
           provider: glm
         expr: |
           sum by (model, project, branch, linear_key, task_type, catalyst_orchestration, account, phase) (
-            (claude_code_token_usage_tokens_total{model=~"^glm.*", type=~"input|cacheCreation"} * 1.40 / 1e6)
-            or
-            (claude_code_token_usage_tokens_total{model=~"^glm.*", type="cacheRead"} * 0.26 / 1e6)
-            or
-            (claude_code_token_usage_tokens_total{model=~"^glm.*", type="output"} * 4.40 / 1e6)
+            label_replace(
+              label_replace(
+                (claude_code_token_usage_tokens_total{model=~"^glm.*", type=~"input|cacheCreation"} * 1.40 / 1e6)
+                or
+                (claude_code_token_usage_tokens_total{model=~"^glm.*", type="cacheRead"} * 0.26 / 1e6)
+                or
+                (claude_code_token_usage_tokens_total{model=~"^glm.*", type="output"} * 4.40 / 1e6),
+                "account", "$1", "catalyst_account_slot", "(.+)"
+              ),
+              "project", "$1", "vcs_repository_name", "(.+)"
+            )
           )
 
   # ---------------------------------------------------------------------
@@ -351,7 +441,12 @@ groups:
     rules:
       - record: ai:phase_completions:sum
         expr: |
-          sum by (phase, provider, model, outcome, account) (ai_phase_completion_total)
+          sum by (phase, provider, model, outcome, account) (
+            label_replace(
+              ai_phase_completion_total,
+              "account", "$1", "catalyst_account_slot", "(.+)"
+            )
+          )
 
   # ---------------------------------------------------------------------
   # OTL-82 recording-rules round / OTL-83 (Ryan-directed, 2026-08-25): a
@@ -595,30 +690,42 @@ groups:
       - record: ai:tokens_accum_delta:sum
         expr: |
           sum by (host_name, hostname, model, type, project, branch, linear_key, task_type, account, phase) (
-            clamp_min(
-              max_over_time(claude_code_token_usage_tokens_total{job="otel-collector"}[20m])
-              - max_over_time(claude_code_token_usage_tokens_total{job="otel-collector"}[20m] offset 1m)
-              , 0
-            )
-            or
-            (
-              max_over_time(claude_code_token_usage_tokens_total{job="otel-collector"}[20m])
-              unless max_over_time(claude_code_token_usage_tokens_total{job="otel-collector"}[20m] offset 1m)
+            label_replace(
+              label_replace(
+                clamp_min(
+                  max_over_time(claude_code_token_usage_tokens_total{job="otel-collector"}[20m])
+                  - max_over_time(claude_code_token_usage_tokens_total{job="otel-collector"}[20m] offset 1m)
+                  , 0
+                )
+                or
+                (
+                  max_over_time(claude_code_token_usage_tokens_total{job="otel-collector"}[20m])
+                  unless max_over_time(claude_code_token_usage_tokens_total{job="otel-collector"}[20m] offset 1m)
+                ),
+                "account", "$1", "catalyst_account_slot", "(.+)"
+              ),
+              "project", "$1", "vcs_repository_name", "(.+)"
             )
           )
 
       - record: ai:cost_usd_accum_delta:sum
         expr: |
           sum by (host_name, hostname, model, project, branch, linear_key, task_type, account, phase) (
-            clamp_min(
-              max_over_time(claude_code_cost_usage_USD_total{job="otel-collector"}[20m])
-              - max_over_time(claude_code_cost_usage_USD_total{job="otel-collector"}[20m] offset 1m)
-              , 0
-            )
-            or
-            (
-              max_over_time(claude_code_cost_usage_USD_total{job="otel-collector"}[20m])
-              unless max_over_time(claude_code_cost_usage_USD_total{job="otel-collector"}[20m] offset 1m)
+            label_replace(
+              label_replace(
+                clamp_min(
+                  max_over_time(claude_code_cost_usage_USD_total{job="otel-collector"}[20m])
+                  - max_over_time(claude_code_cost_usage_USD_total{job="otel-collector"}[20m] offset 1m)
+                  , 0
+                )
+                or
+                (
+                  max_over_time(claude_code_cost_usage_USD_total{job="otel-collector"}[20m])
+                  unless max_over_time(claude_code_cost_usage_USD_total{job="otel-collector"}[20m] offset 1m)
+                ),
+                "account", "$1", "catalyst_account_slot", "(.+)"
+              ),
+              "project", "$1", "vcs_repository_name", "(.+)"
             )
           )
 
@@ -635,30 +742,42 @@ groups:
       - record: ai:tokens_accum_delta_20m:sum
         expr: |
           sum by (host_name, hostname, model, type, project, branch, linear_key, task_type, account, phase) (
-            clamp_min(
-              max_over_time(claude_code_token_usage_tokens_total{job="otel-collector"}[20m])
-              - max_over_time(claude_code_token_usage_tokens_total{job="otel-collector"}[20m] offset 20m)
-              , 0
-            )
-            or
-            (
-              max_over_time(claude_code_token_usage_tokens_total{job="otel-collector"}[20m])
-              unless max_over_time(claude_code_token_usage_tokens_total{job="otel-collector"}[20m] offset 20m)
+            label_replace(
+              label_replace(
+                clamp_min(
+                  max_over_time(claude_code_token_usage_tokens_total{job="otel-collector"}[20m])
+                  - max_over_time(claude_code_token_usage_tokens_total{job="otel-collector"}[20m] offset 20m)
+                  , 0
+                )
+                or
+                (
+                  max_over_time(claude_code_token_usage_tokens_total{job="otel-collector"}[20m])
+                  unless max_over_time(claude_code_token_usage_tokens_total{job="otel-collector"}[20m] offset 20m)
+                ),
+                "account", "$1", "catalyst_account_slot", "(.+)"
+              ),
+              "project", "$1", "vcs_repository_name", "(.+)"
             )
           )
 
       - record: ai:cost_usd_accum_delta_20m:sum
         expr: |
           sum by (host_name, hostname, model, project, branch, linear_key, task_type, account, phase) (
-            clamp_min(
-              max_over_time(claude_code_cost_usage_USD_total{job="otel-collector"}[20m])
-              - max_over_time(claude_code_cost_usage_USD_total{job="otel-collector"}[20m] offset 20m)
-              , 0
-            )
-            or
-            (
-              max_over_time(claude_code_cost_usage_USD_total{job="otel-collector"}[20m])
-              unless max_over_time(claude_code_cost_usage_USD_total{job="otel-collector"}[20m] offset 20m)
+            label_replace(
+              label_replace(
+                clamp_min(
+                  max_over_time(claude_code_cost_usage_USD_total{job="otel-collector"}[20m])
+                  - max_over_time(claude_code_cost_usage_USD_total{job="otel-collector"}[20m] offset 20m)
+                  , 0
+                )
+                or
+                (
+                  max_over_time(claude_code_cost_usage_USD_total{job="otel-collector"}[20m])
+                  unless max_over_time(claude_code_cost_usage_USD_total{job="otel-collector"}[20m] offset 20m)
+                ),
+                "account", "$1", "catalyst_account_slot", "(.+)"
+              ),
+              "project", "$1", "vcs_repository_name", "(.+)"
             )
           )
 

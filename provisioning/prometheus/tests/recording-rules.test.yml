@@ -507,3 +507,64 @@ tests:
         exp_samples:
           - labels: '{}'
             value: 6
+
+  # =======================================================================
+  # CTC-2898: the rename window. CTC-2786 renames the coding slot at the
+  # producer (`account` -> `catalyst.account_slot` -> Prometheus label
+  # `catalyst_account_slot`) and CTC-2821 renames the repository (`project`
+  # -> `vcs.repository.name` -> `vcs_repository_name`); both reach production
+  # only when the runner image pin rolls. Three series here, all in ONE
+  # window, which is the case the shim exists for:
+  #   preRoll  -- the spellings every live series carries today
+  #   postRoll -- the spellings it will carry an hour after the pin rolls
+  #   neither  -- the NEGATIVE CONTROL: a series carrying no slot and no
+  #               repository under either spelling must still read empty, so
+  #               a non-empty answer above is a real read, not a default the
+  #               shim invented.
+  # =======================================================================
+  - interval: 1m
+    input_series:
+      - series: 'claude_code_token_usage_tokens_total{job="otel-collector",host_name="cloudflare-container",model="claude-sonnet-5",type="output",project="catalyst-cloud",branch="CTC-2898",linear_key="CTC-2898",task_type="relay",catalyst_orchestration="relay",account="claude-465ad266-abcd",phase="implement",session_id="preRoll"}'
+        values: "0+60x10"
+      - series: 'claude_code_token_usage_tokens_total{job="otel-collector",host_name="cloudflare-container",model="claude-sonnet-5",type="output",vcs_repository_name="catalyst-cloud",branch="CTC-2898",linear_key="CTC-2898",task_type="relay",catalyst_orchestration="relay",catalyst_account_slot="claude-77aa-beef",phase="validate",session_id="postRoll"}'
+        values: "0+30x10"
+      - series: 'claude_code_token_usage_tokens_total{job="otel-collector",host_name="cloudflare-container",model="claude-sonnet-5",type="output",branch="CTC-2898",linear_key="CTC-2898",task_type="relay",catalyst_orchestration="relay",phase="research",session_id="neither"}'
+        values: "0+10x10"
+
+    promql_expr_test:
+      # PRE-rename window: the legacy spellings still group, exactly as before
+      # this change -- the shim is additive, never a rewrite of what works.
+      - expr: ai:tokens:sum{phase="implement"}
+        eval_time: 3m
+        exp_samples:
+          - labels: 'ai:tokens:sum{provider="anthropic",model="claude-sonnet-5",type="output",token_type="output",project="catalyst-cloud",branch="CTC-2898",linear_key="CTC-2898",task_type="relay",catalyst_orchestration="relay",account="claude-465ad266-abcd",phase="implement"}'
+            value: 180
+
+      # POST-rename window: the canonical labels are read INTO the same
+      # `account` / `project` output labels, so every dashboard query keeps
+      # working across the roll with no dashboard edit.
+      - expr: ai:tokens:sum{phase="validate"}
+        eval_time: 3m
+        exp_samples:
+          - labels: 'ai:tokens:sum{provider="anthropic",model="claude-sonnet-5",type="output",token_type="output",project="catalyst-cloud",branch="CTC-2898",linear_key="CTC-2898",task_type="relay",catalyst_orchestration="relay",account="claude-77aa-beef",phase="validate"}'
+            value: 90
+
+      # NEGATIVE CONTROL: neither spelling present -> both labels empty. The
+      # shim adds a label only where a canonical one really carried a value.
+      - expr: ai:tokens:sum{phase="research"}
+        eval_time: 3m
+        exp_samples:
+          - labels: 'ai:tokens:sum{provider="anthropic",model="claude-sonnet-5",type="output",token_type="output",branch="CTC-2898",linear_key="CTC-2898",task_type="relay",catalyst_orchestration="relay",phase="research"}'
+            value: 30
+
+      # THE MIXED WINDOW, which is the whole point: one query over rows
+      # written either side of the roll returns a non-empty account for both,
+      # so a by-account panel keeps its series instead of collapsing into one
+      # unlabelled bar the hour the pin lands.
+      - expr: count by (account) (ai:tokens:sum{linear_key="CTC-2898",account!=""})
+        eval_time: 3m
+        exp_samples:
+          - labels: '{account="claude-465ad266-abcd"}'
+            value: 1
+          - labels: '{account="claude-77aa-beef"}'
+            value: 1
