@@ -488,6 +488,73 @@ processors:
     send_batch_max_size: 1000
     timeout: 5s
 
+  # CTC-2793: the ingest-lane stamp for this receiver. Every record that
+  # arrives on `otlp` (:4317/:4318, unauthenticated, tailnet/LAN only) is
+  # stamped catalyst.scope=unattributed and
+  # catalyst.attribution.source=tailnet-unauthenticated, whatever it claims.
+  # The lane is decided by the port a record arrived on, never by its payload:
+  # an unauthenticated receiver cannot vouch for anyone, so a sender claiming
+  # catalyst.scope=platform here is stored as unattributed. The claim is kept,
+  # not destroyed, in catalyst.attribution.claimed.* (written only when the
+  # claim differs from the stamp, so re-stamping is a no-op).
+  #
+  # account_id is left as the sender set it (today's behaviour; nothing that
+  # reads it changes), with one exception: the sentinel `platform` means
+  # "owned by the platform" and is honoured only on the authenticated platform
+  # lane, so here it is moved to catalyst.attribution.claimed.account_id.
+  #
+  # This stamp runs LAST before batch/loki (logs) or last (traces, metrics), so
+  # no later processor can rewrite what it set. error_mode: propagate, unlike
+  # the fail-open transforms above: a stamp that silently failed would store a
+  # record that looks stamped by nobody, so the batch is refused instead and
+  # the refusal shows in otelcol_processor_* metrics.
+  #
+  # The private overlay stamps its own receivers the same way; the design is
+  # catalyst-cloud's CTC-2793 plan. Because the prometheus exporter converts
+  # resource attributes to labels, every metric from this pipeline gains the
+  # constant labels catalyst_scope and catalyst_attribution_source.
+  transform/stamp_legacy_tailnet:
+    error_mode: propagate
+    log_statements:
+      - context: resource
+        statements: &stamp_legacy_tailnet_resource
+          - set(resource.attributes["catalyst.attribution.claimed.scope"], resource.attributes["catalyst.scope"]) where resource.attributes["catalyst.scope"] != nil and resource.attributes["catalyst.scope"] != "unattributed"
+          - set(resource.attributes["catalyst.attribution.claimed.source"], resource.attributes["catalyst.attribution.source"]) where resource.attributes["catalyst.attribution.source"] != nil and resource.attributes["catalyst.attribution.source"] != "tailnet-unauthenticated"
+          - set(resource.attributes["catalyst.attribution.claimed.account_id"], resource.attributes["account_id"]) where resource.attributes["account_id"] == "platform"
+          - delete_key(resource.attributes, "account_id") where resource.attributes["account_id"] == "platform"
+          - set(resource.attributes["catalyst.scope"], "unattributed")
+          - set(resource.attributes["catalyst.attribution.source"], "tailnet-unauthenticated")
+      - context: log
+        statements:
+          - set(log.attributes["catalyst.attribution.claimed.scope"], log.attributes["catalyst.scope"]) where log.attributes["catalyst.scope"] != nil and log.attributes["catalyst.scope"] != "unattributed"
+          - set(log.attributes["catalyst.scope"], "unattributed") where log.attributes["catalyst.scope"] != nil
+          - set(log.attributes["catalyst.attribution.claimed.source"], log.attributes["catalyst.attribution.source"]) where log.attributes["catalyst.attribution.source"] != nil and log.attributes["catalyst.attribution.source"] != "tailnet-unauthenticated"
+          - set(log.attributes["catalyst.attribution.source"], "tailnet-unauthenticated") where log.attributes["catalyst.attribution.source"] != nil
+          - set(log.attributes["catalyst.attribution.claimed.account_id"], log.attributes["account_id"]) where log.attributes["account_id"] == "platform"
+          - delete_key(log.attributes, "account_id") where log.attributes["account_id"] == "platform"
+    trace_statements:
+      - context: resource
+        statements: *stamp_legacy_tailnet_resource
+      - context: span
+        statements:
+          - set(span.attributes["catalyst.attribution.claimed.scope"], span.attributes["catalyst.scope"]) where span.attributes["catalyst.scope"] != nil and span.attributes["catalyst.scope"] != "unattributed"
+          - set(span.attributes["catalyst.scope"], "unattributed") where span.attributes["catalyst.scope"] != nil
+          - set(span.attributes["catalyst.attribution.claimed.source"], span.attributes["catalyst.attribution.source"]) where span.attributes["catalyst.attribution.source"] != nil and span.attributes["catalyst.attribution.source"] != "tailnet-unauthenticated"
+          - set(span.attributes["catalyst.attribution.source"], "tailnet-unauthenticated") where span.attributes["catalyst.attribution.source"] != nil
+          - set(span.attributes["catalyst.attribution.claimed.account_id"], span.attributes["account_id"]) where span.attributes["account_id"] == "platform"
+          - delete_key(span.attributes, "account_id") where span.attributes["account_id"] == "platform"
+    metric_statements:
+      - context: resource
+        statements: *stamp_legacy_tailnet_resource
+      - context: datapoint
+        statements:
+          - set(datapoint.attributes["catalyst.attribution.claimed.scope"], datapoint.attributes["catalyst.scope"]) where datapoint.attributes["catalyst.scope"] != nil and datapoint.attributes["catalyst.scope"] != "unattributed"
+          - set(datapoint.attributes["catalyst.scope"], "unattributed") where datapoint.attributes["catalyst.scope"] != nil
+          - set(datapoint.attributes["catalyst.attribution.claimed.source"], datapoint.attributes["catalyst.attribution.source"]) where datapoint.attributes["catalyst.attribution.source"] != nil and datapoint.attributes["catalyst.attribution.source"] != "tailnet-unauthenticated"
+          - set(datapoint.attributes["catalyst.attribution.source"], "tailnet-unauthenticated") where datapoint.attributes["catalyst.attribution.source"] != nil
+          - set(datapoint.attributes["catalyst.attribution.claimed.account_id"], datapoint.attributes["account_id"]) where datapoint.attributes["account_id"] == "platform"
+          - delete_key(datapoint.attributes, "account_id") where datapoint.attributes["account_id"] == "platform"
+
 exporters:
   prometheus:
     endpoint: "0.0.0.0:8889"
@@ -1536,7 +1603,8 @@ service:
       # deltatocumulative converts the count connector's Delta sums to Cumulative;
       # resource/strip_connector_iid drops the connector's per-run instance id.
       receivers: [otlp, count, signal_to_metrics]
-      processors: [deltatocumulative, transform/connector_metric_fixup, resource, resource/strip_connector_iid]
+      # CTC-2793: transform/stamp_legacy_tailnet is LAST (see its definition).
+      processors: [deltatocumulative, transform/connector_metric_fixup, resource, resource/strip_connector_iid, transform/stamp_legacy_tailnet]
       # To fan metrics out to another vendor as well, append the SAME exporter
       # id here, e.g.:
       #
@@ -1560,7 +1628,8 @@ service:
       # shape, and every exporter/connector on this pipeline benefits from the
       # size bound. Without it a single receive went to Loki whole and was
       # refused for exceeding the 4 MiB gRPC limit; see the processor's comment.
-      processors: [resource, transform/logs, transform/metrics_normalize, transform/scheduler_health_promote, transform/updater_promote, batch/loki]
+      # CTC-2793: transform/stamp_legacy_tailnet is last before batch/loki.
+      processors: [resource, transform/logs, transform/metrics_normalize, transform/scheduler_health_promote, transform/updater_promote, transform/stamp_legacy_tailnet, batch/loki]
       # otlp_http = Loki (OTL-8 rename). To turn on a vendor fan-out:
       # (1) uncomment the matching exporter block above if not already, (2) set
       # the env vars in docker-compose.yml, and (3) add its exporter id to the
@@ -1593,7 +1662,8 @@ service:
       # OTL-99: transform/opencode_labels normalizes AI SDK attributes into
       # model/provider/host_name labels before the derivation connector below
       # consumes the spans.
-      processors: [resource, transform/opencode_labels, transform/genai_usage, filter/drop_crate_internals, tail_sampling]
+      # CTC-2793: transform/stamp_legacy_tailnet is LAST, after tail_sampling.
+      processors: [resource, transform/opencode_labels, transform/genai_usage, filter/drop_crate_internals, tail_sampling, transform/stamp_legacy_tailnet]
       # OTL-54: `debug` REMOVED (see the metrics pipeline above). Span volume
       # here is dominated by codex-app-server emitting Rust h2 HTTP/2 library
       # internals (one span per frame op) — serializing that to stdout as well
