@@ -15,7 +15,7 @@
 | Metrics | Prometheus | `prometheus` | `https://otel.rozich.com/api/datasources/proxy/uid/prometheus/api/v1/...` |
 | Logs / events | Loki | `loki` | `.../uid/loki/loki/api/v1/...` |
 | Traces | Tempo | `tempo` | `.../uid/tempo/api/search?q={}` |
-| **All three (parallel)** | **ClickHouse** | `clickstack` | `http://127.0.0.1:18123/` — **loopback-only**, reach it with `ssh -L 18123:127.0.0.1:18123 home`. User is `clickstack_admin`, **not `default`**; credentials in `~/clickstack/.env` on the host. |
+| **All three (parallel)** | **ClickHouse** | `clickstack` | **Agents and humans:** `http://100.65.193.30:18123/` over the tailnet as the read-only **`agent_reader`** — credential name, probe and who may hold it are in catalyst-cloud's `.agents/rules/cloud-credentials.md` → "ClickHouse". ⛔ Not `:8123` (an unrelated service on that host). Admin work stays on the host via `ssh -L 18123:127.0.0.1:18123 home` as `clickstack_admin` — no other user answers a tailnet connection. |
 
 - **OTel → Prometheus naming:** dots → underscores; counters get a `_total` suffix (`claude_code.cost.usage` → `claude_code_cost_usage_USD_total`).
 - **Loki labels:** only `service_name` + `service_namespace` are **stream labels** (selectors). Everything else (`host_name`, `event_*`, `catalyst_node_name`, …) is **structured metadata** — filter with `| field="x"`, aggregate with `sum by (field)`, but `/label/<x>/values` returns empty. Don't `| json` a body unless it IS json (the CTL-1330 daemon `.log` lines now ship full-json bodies; most events carry fields as structured metadata, not in the body).
@@ -365,9 +365,17 @@ Note also that scheduler-health Prometheus metrics (`catalyst.scheduler.tick.dur
 > This is the store the agent-behaviour work (`agent_tool_calls`, verdicts) is built on — those
 > datasets exist **only** here, not in Loki.
 >
-> **⛔ Access is `ssh -L` only.** ClickHouse binds loopback (`127.0.0.1:18123`) and HyperDX is
-> tailnet-only. That is the thing the platform work exists to retire — see
-> `~/catalyst/comms/observability-platform-architecture.md`.
+> **Access (2026-09-19).** Read over the tailnet as `agent_reader` (`100.65.193.30:18123`,
+> `readonly=2`, capped at 2 GiB / 300 s / 100,000 rows, and an oversized result **throws** rather
+> than truncating). Routing and probe: catalyst-cloud `.agents/rules/cloud-credentials.md` →
+> "ClickHouse". Interim — the HTTPS analytics API retires direct access.
+>
+> **Who reads and who writes.** Reading is a platform-operator capability: Catalyst's own agents
+> read **every** tenant's telemetry, on purpose, to diagnose and size the platform. Customer
+> tenants' containers **write only**, through the authenticated ingest gateway with a per-tenant
+> write-only token that stamps `account_id` (CTC-2304); they never hold the read credential. Net:
+> customer containers write only; Catalyst platform containers write the same way and also read;
+> nothing else reads.
 >
 > **⛔ Never query within ~2 minutes of a collector restart.** End-to-end lag is ~40–70 s (5 s
 > batch + queue + insert + part visibility). A zero here reads exactly like a broken pipeline;
