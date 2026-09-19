@@ -14,6 +14,34 @@ processors:
         value: "production"
         action: insert
 
+  # CTC-2902 — TRANSITIONAL alias: re-stamp the retired `project` resource
+  # attribute from `vcs.repository.name` when a producer sends only the new
+  # spelling. CTC-2821 renamed the catalyst-cloud runner's key (both always held
+  # a repository short name, never a registry project id), but every downstream
+  # reader of `project` — transform/logs below (Loki + ClickHouse
+  # LogAttributes), the ClickHouse views, and the Grafana panels and `$project`
+  # variable reading claude_code_* / codex_* series (the prometheus exporter
+  # promotes resource attributes to labels) — still reads the old name. It runs
+  # FIRST in the logs and metrics pipelines so every later processor, connector
+  # and exporter sees it. The where clause never overwrites an existing
+  # `project`, so pre-rename producers (the laptop relay still sends `project`)
+  # pass through untouched. error_mode: ignore so a stamp failure never drops a
+  # record.
+  # RETIRE when the oldest retained row / sample is newer than the runner image
+  # roll that carried CTC-2821 AND every reader has moved to
+  # `vcs.repository.name` — delete this processor and its pipeline entries here
+  # and in catalyst-otel-private together.
+  transform/vcs_repository_alias:
+    error_mode: ignore
+    log_statements:
+      - context: resource
+        statements:
+          - set(attributes["project"], attributes["vcs.repository.name"]) where attributes["project"] == nil and attributes["vcs.repository.name"] != nil
+    metric_statements:
+      - context: resource
+        statements:
+          - set(attributes["project"], attributes["vcs.repository.name"]) where attributes["project"] == nil and attributes["vcs.repository.name"] != nil
+
   # Copy resource attributes to log record attributes so they appear
   # as Loki structured metadata. Resource attributes from
   # OTEL_RESOURCE_ATTRIBUTES are not automatically promoted by Loki's
@@ -1536,7 +1564,8 @@ service:
       # deltatocumulative converts the count connector's Delta sums to Cumulative;
       # resource/strip_connector_iid drops the connector's per-run instance id.
       receivers: [otlp, count, signal_to_metrics]
-      processors: [deltatocumulative, transform/connector_metric_fixup, resource, resource/strip_connector_iid]
+      # CTC-2902: transform/vcs_repository_alias FIRST — see its definition.
+      processors: [transform/vcs_repository_alias, deltatocumulative, transform/connector_metric_fixup, resource, resource/strip_connector_iid]
       # To fan metrics out to another vendor as well, append the SAME exporter
       # id here, e.g.:
       #
@@ -1560,7 +1589,9 @@ service:
       # shape, and every exporter/connector on this pipeline benefits from the
       # size bound. Without it a single receive went to Loki whole and was
       # refused for exceeding the 4 MiB gRPC limit; see the processor's comment.
-      processors: [resource, transform/logs, transform/metrics_normalize, transform/scheduler_health_promote, transform/updater_promote, batch/loki]
+      # CTC-2902: transform/vcs_repository_alias FIRST, before transform/logs
+      # copies `project` onto the record — see its definition.
+      processors: [transform/vcs_repository_alias, resource, transform/logs, transform/metrics_normalize, transform/scheduler_health_promote, transform/updater_promote, batch/loki]
       # otlp_http = Loki (OTL-8 rename). To turn on a vendor fan-out:
       # (1) uncomment the matching exporter block above if not already, (2) set
       # the env vars in docker-compose.yml, and (3) add its exporter id to the
