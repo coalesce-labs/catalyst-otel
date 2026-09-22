@@ -1,0 +1,345 @@
+# Catalyst detectors (CTC-2945, CTC-3003, CTC-3004), filed 2026-09-22.
+#
+# Why this file exists: on 2026-09-22 a wedged execution service (13:16Z) and a
+# repository sync that had failed every pass since 2026-09-17 were both found by
+# a person reading a product page. Every older rule in this directory reads
+# telemetry from the retired mini daemon and sets noDataState: OK, so all of
+# them read healthy throughout (CTC-2514).
+#
+# Rules for this group, and why they differ from the older files:
+#   - Every query reads the box's ClickHouse (datasource clickhouse-trial) and
+#     ALWAYS returns rows on a healthy system. Thresholds live in the Grafana
+#     math expression (refId FIRE), never in the SQL, so zero rows can only mean
+#     the pipeline or ClickHouse is broken.
+#   - noDataState and execErrState are Alerting: a dead signal pages.
+#   - Each rule was replayed through Grafana's /api/v1/eval at a known-good and
+#     a known-bad time before it was armed. The replay times are on the tickets.
+#   - Descriptions say what to do first, not only what is wrong.
+#
+# Routing: no receiver named, so the root policy sends to catalyst-pager
+# (email and push via the mirror's /api/v1/alerts/notify, CTC-2952).
+# Grafana reads this directory at startup only: restart otel-grafana to load.
+apiVersion: 1
+groups:
+- orgId: 1
+  name: catalyst-detectors
+  folder: Catalyst Alerts
+  interval: 1m
+  rules:
+  - uid: ctc2945_execution_silent
+    title: Execution service silent while its host agent is up
+    condition: FIRE
+    for: 2m
+    labels:
+      team: catalyst
+      severity: critical
+      catalyst_alert_class: silence
+      ticket: CTC-2945
+    annotations:
+      summary: '{{ $labels.host }}: no execution capacity beat for {{ $values.BEAT.Value }}s, while its host agent wrote {{ $values.AGENT.Value }}s ago'
+      description: 'The box and its host agent are up, but the execution service has stopped. Nothing will launch on this host. On 2026-09-22 this was an unresolved_attempt wedge (an attempt ended execution_controller_failed with resources retained) and it went unseen for 4h21m. Do: on the host, read the host-agent journal for attempt_terminal / worker_retired and reservations stuck in releasing, then clear the wedge per the dedicated-host runbook. The runner-host seat owns recovery. Do not trust ''host agent alive'': it counts replica sidecar rows.'
+    data:
+    - refId: A
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: clickhouse-trial
+      model:
+        refId: A
+        datasource:
+          type: grafana-clickhouse-datasource
+          uid: clickhouse-trial
+        editorType: sql
+        format: 1
+        queryType: table
+        rawSql: SELECT ResourceAttributes['host.name'] AS host, toFloat64(dateDiff('second', maxIf(Timestamp, Body = 'catalyst.host.execution.capacity'), now())) AS beat_age_s FROM otel.otel_logs WHERE ServiceName = 'catalyst-cloud.host-agent' AND Timestamp > now() - INTERVAL 7 DAY AND Timestamp <= now() AND ResourceAttributes['host.name'] NOT LIKE 'local-%' GROUP BY host
+    - refId: B
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: clickhouse-trial
+      model:
+        refId: B
+        datasource:
+          type: grafana-clickhouse-datasource
+          uid: clickhouse-trial
+        editorType: sql
+        format: 1
+        queryType: table
+        rawSql: SELECT ResourceAttributes['host.name'] AS host, toFloat64(dateDiff('second', max(Timestamp), now())) AS agent_age_s FROM otel.otel_logs WHERE ServiceName = 'catalyst-cloud.host-agent' AND Timestamp > now() - INTERVAL 7 DAY AND Timestamp <= now() AND ResourceAttributes['host.name'] NOT LIKE 'local-%' GROUP BY host
+    - refId: BEAT
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: __expr__
+      model:
+        refId: BEAT
+        type: math
+        expression: $A
+        datasource:
+          type: __expr__
+          uid: __expr__
+    - refId: AGENT
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: __expr__
+      model:
+        refId: AGENT
+        type: math
+        expression: $B
+        datasource:
+          type: __expr__
+          uid: __expr__
+    - refId: FIRE
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: __expr__
+      model:
+        refId: FIRE
+        type: math
+        expression: ($A > 600) && ($B < 300)
+        datasource:
+          type: __expr__
+          uid: __expr__
+    noDataState: Alerting
+    execErrState: Alerting
+  - uid: ctc2945_host_agent_silent
+    title: Host agent silent for 10 minutes
+    condition: FIRE
+    for: 2m
+    labels:
+      team: catalyst
+      severity: critical
+      catalyst_alert_class: silence
+      ticket: CTC-2945
+    annotations:
+      summary: '{{ $labels.host }}: no host-agent telemetry for {{ $values.AGENT.Value }}s'
+      description: 'The host agent on this host has written nothing for over 10 minutes. The host roster is every non-local host seen in the last 7 days. If every host fires together, the telemetry path (collector, tunnel, ClickHouse) is the suspect, not the hosts. Do: check the host over the tailnet (ssh, power, disk). If it was decommissioned on purpose, silence this host until it leaves the 7-day roster.'
+    data:
+    - refId: A
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: clickhouse-trial
+      model:
+        refId: A
+        datasource:
+          type: grafana-clickhouse-datasource
+          uid: clickhouse-trial
+        editorType: sql
+        format: 1
+        queryType: table
+        rawSql: SELECT ResourceAttributes['host.name'] AS host, toFloat64(dateDiff('second', max(Timestamp), now())) AS agent_age_s FROM otel.otel_logs WHERE ServiceName = 'catalyst-cloud.host-agent' AND Timestamp > now() - INTERVAL 7 DAY AND Timestamp <= now() AND ResourceAttributes['host.name'] NOT LIKE 'local-%' GROUP BY host
+    - refId: AGENT
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: __expr__
+      model:
+        refId: AGENT
+        type: math
+        expression: $A
+        datasource:
+          type: __expr__
+          uid: __expr__
+    - refId: FIRE
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: __expr__
+      model:
+        refId: FIRE
+        type: math
+        expression: $A > 600
+        datasource:
+          type: __expr__
+          uid: __expr__
+    noDataState: Alerting
+    execErrState: Alerting
+  - uid: ctc3003_ready_work_stranded
+    title: 'Ready work stranded: every acquire refused for capability, no phase running'
+    condition: FIRE
+    for: 5m
+    labels:
+      team: catalyst
+      severity: critical
+      ticket: CTC-3003
+    annotations:
+      summary: '{{ $values.REFUSALS.Value }} acquire refusals in 30 min, all capability_mismatch, and 0 phases started'
+      description: 'Hosts are asking for work and the queue has work, but every ready row needs a phase no live worker declares, so nothing runs. The waiting phases are listed in the Worker''s ''acquire offered nothing'' lines (row format: TICKET#rank phase capability_mismatch). Do: move the stuck tickets to the fleet-portability steward seat. The structural fix is CTC-3010 (every phase runs in any runner container).'
+    data:
+    - refId: A
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: clickhouse-trial
+      model:
+        refId: A
+        datasource:
+          type: grafana-clickhouse-datasource
+          uid: clickhouse-trial
+        editorType: sql
+        format: 1
+        queryType: table
+        rawSql: SELECT toFloat64(countIf(Body LIKE '%acquire offered nothing%')) AS refusals FROM otel.otel_logs WHERE ServiceName = 'catalyst-cloud' AND Timestamp > now() - INTERVAL 30 MINUTE AND Timestamp <= now()
+    - refId: B
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: clickhouse-trial
+      model:
+        refId: B
+        datasource:
+          type: grafana-clickhouse-datasource
+          uid: clickhouse-trial
+        editorType: sql
+        format: 1
+        queryType: table
+        rawSql: SELECT toFloat64(countIf(Body LIKE '%acquire offered nothing%' AND Body LIKE '%capability_mismatch%')) AS cap_mismatch FROM otel.otel_logs WHERE ServiceName = 'catalyst-cloud' AND Timestamp > now() - INTERVAL 30 MINUTE AND Timestamp <= now()
+    - refId: C
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: clickhouse-trial
+      model:
+        refId: C
+        datasource:
+          type: grafana-clickhouse-datasource
+          uid: clickhouse-trial
+        editorType: sql
+        format: 1
+        queryType: table
+        rawSql: SELECT toFloat64(count()) AS phase_rows FROM otel.otel_logs WHERE ServiceName IN ('claude_exec', 'opencode_exec') AND Timestamp > now() - INTERVAL 30 MINUTE AND Timestamp <= now()
+    - refId: REFUSALS
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: __expr__
+      model:
+        refId: REFUSALS
+        type: math
+        expression: $A
+        datasource:
+          type: __expr__
+          uid: __expr__
+    - refId: FIRE
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: __expr__
+      model:
+        refId: FIRE
+        type: math
+        expression: ($A >= 10) && ($B == $A) && ($C == 0)
+        datasource:
+          type: __expr__
+          uid: __expr__
+    noDataState: Alerting
+    execErrState: Alerting
+  - uid: ctc3004_repo_sync_failing
+    title: A repository's sync fails the same way in 90% of passes for 2 hours
+    condition: FIRE
+    for: 0s
+    labels:
+      team: catalyst
+      severity: warning
+      ticket: CTC-3004
+    annotations:
+      summary: '{{ $labels.acct }} {{ $labels.project }}: ''{{ $labels.err }}'' in {{ $values.SHARE.Value }} of passes over 2h'
+      description: 'This repository''s GitHub sync leg has failed with the same error in at least 90% of reconcile passes (at least 6 passes) for 2 hours. Transient Durable Object resets and dropped connections never reach 90%. Do: ''no GitHub App installation for org X'' means the App was uninstalled on X: reinstall it there or unlink the repository (CTC-3006). For any other error, read lastGithubError on the operator mirror route (GET /admin/mirror?tenant=...).'
+    data:
+    - refId: A
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: clickhouse-trial
+      model:
+        refId: A
+        datasource:
+          type: grafana-clickhouse-datasource
+          uid: clickhouse-trial
+        editorType: sql
+        format: 1
+        queryType: table
+        rawSql: SELECT acct, project, err, toFloat64(if(passes >= 6, hits / passes, 0)) AS share FROM (SELECT acct, project, err, count() AS hits, any(total) AS passes FROM (SELECT JSONExtractString(Body, 'account') AS acct, count() OVER (PARTITION BY JSONExtractString(Body, 'account')) AS total, arrayJoin(arrayMap(p -> (JSONExtractString(p, 'project'), replaceRegexpAll(JSONExtractString(p, 'github', 'error'), '[0-9a-f]{7,}|#[0-9]+|[0-9]{3}$', 'N')), arrayFilter(p -> JSONExtractString(p, 'github', 'error') != '', JSONExtractArrayRaw(Body, 'projects')))) AS pe, pe.1 AS project, pe.2 AS err FROM otel.otel_logs WHERE ServiceName = 'catalyst-cloud' AND Timestamp > now() - INTERVAL 2 HOUR AND Timestamp <= now() AND Body LIKE '{"msg":"reconcile"%') GROUP BY acct, project, err UNION ALL SELECT JSONExtractString(Body, 'account') AS acct, '(none)' AS project, '(none)' AS err, 0 AS hits, count() AS passes FROM otel.otel_logs WHERE ServiceName = 'catalyst-cloud' AND Timestamp > now() - INTERVAL 2 HOUR AND Timestamp <= now() AND Body LIKE '{"msg":"reconcile"%' GROUP BY acct)
+    - refId: SHARE
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: __expr__
+      model:
+        refId: SHARE
+        type: math
+        expression: $A
+        datasource:
+          type: __expr__
+          uid: __expr__
+    - refId: FIRE
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: __expr__
+      model:
+        refId: FIRE
+        type: math
+        expression: $A >= 0.9
+        datasource:
+          type: __expr__
+          uid: __expr__
+    noDataState: Alerting
+    execErrState: Alerting
+  - uid: ctc3004_reconcile_not_running
+    title: A tenant's sync reconcile has not run for 90 minutes
+    condition: FIRE
+    for: 0s
+    labels:
+      team: catalyst
+      severity: critical
+      ticket: CTC-3004
+    annotations:
+      summary: '{{ $labels.acct }}: last reconcile record {{ $values.AGE.Value }}s ago'
+      description: 'The mirror''s scheduled reconcile has written nothing for this tenant for 90 minutes (the slowest tenant runs every 45). Linear and GitHub state in the mirror is no longer being repaired. Do: check the mirror Worker''s alarm pass for this tenant''s Durable Object (alarm-pass and reconcile log lines), and GET /admin/mirror?tenant=... for the last run time and error.'
+    data:
+    - refId: A
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: clickhouse-trial
+      model:
+        refId: A
+        datasource:
+          type: grafana-clickhouse-datasource
+          uid: clickhouse-trial
+        editorType: sql
+        format: 1
+        queryType: table
+        rawSql: SELECT JSONExtractString(Body, 'account') AS acct, toFloat64(dateDiff('second', max(Timestamp), now())) AS reconcile_age_s FROM otel.otel_logs WHERE ServiceName = 'catalyst-cloud' AND Timestamp > now() - INTERVAL 1 DAY AND Timestamp <= now() AND Body LIKE '{"msg":"reconcile"%' GROUP BY acct
+    - refId: AGE
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: __expr__
+      model:
+        refId: AGE
+        type: math
+        expression: $A
+        datasource:
+          type: __expr__
+          uid: __expr__
+    - refId: FIRE
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: __expr__
+      model:
+        refId: FIRE
+        type: math
+        expression: $A > 5400
+        datasource:
+          type: __expr__
+          uid: __expr__
+    noDataState: Alerting
+    execErrState: Alerting
+
