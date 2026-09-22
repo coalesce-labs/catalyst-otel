@@ -1,0 +1,18 @@
+# Catalyst status page (CTC-3005) on `mini`. Bound to the tailnet address only: no LAN, no public DNS.
+# Deploy: copy this directory to ~/catalyst-status on mini, write .env from env.example, then
+#   docker compose up -d
+services:
+  gatus:
+    image: twinproduction/gatus@sha256:ef87c00b0bfd4fcd57bf86f704f5c773747bf8bee0c67a3934eb3f11795b40c9
+    container_name: catalyst-status
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      GATUS_CONFIG_PATH: /config/config.yaml
+    volumes:
+      - ./config.yaml:/config/config.yaml:ro
+      - catalyst-status-data:/data
+    ports:
+      - "100.90.80.62:8094:8080"
+volumes:
+  catalyst-status-data:
