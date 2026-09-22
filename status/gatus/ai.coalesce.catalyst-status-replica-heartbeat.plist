@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Reports the laptop replica writer's freshness to the status page every 60 s (CTC-3005).
+     Read-only: it never starts or stops the writer. Token comes from ~/.config/catalyst-cloud/status-push.env (mode 600).
+     Install: cp to ~/Library/LaunchAgents/ and `launchctl bootstrap gui/$(id -u) <path>`. -->
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>ai.coalesce.catalyst-status-replica-heartbeat</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/sh</string>
+    <string>-c</string>
+    <string>set -a; . "$HOME/.config/catalyst-cloud/status-push.env"; set +a; exec /bin/sh "$HOME/.config/catalyst-cloud/push-replica-heartbeat.sh"</string>
+  </array>
+  <key>StartInterval</key><integer>60</integer>
+  <key>RunAtLoad</key><true/>
+  <key>StandardOutPath</key><string>/tmp/catalyst-status-replica-heartbeat.log</string>
+  <key>StandardErrorPath</key><string>/tmp/catalyst-status-replica-heartbeat.log</string>
+</dict>
+</plist>
