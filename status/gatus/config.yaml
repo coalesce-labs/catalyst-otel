@@ -1,0 +1,242 @@
+# Catalyst status page (CTC-3005). Runs on `mini`, apart from everything it watches:
+# not the phase host (hetzner-3072373), not the ClickHouse box (clickstack-hel1), not the
+# mirror Worker (Cloudflare), not `home` (Grafana, Loki, the older gatus-catalyst).
+#
+# How to read it:
+#   - Every check says what to do first in its alert description.
+#   - ClickHouse checks return one row, {"v": <Int32>}. A roster that comes back empty returns -1,
+#     so "no data" can never read as healthy.
+#   - The ClickHouse group depends on ClickHouse. If "ClickHouse answers" or "ingest is current" is
+#     red, fix that first: the fleet and sync checks below it cannot be trusted until it is green.
+#
+# Alerts go two ways on purpose: email straight to Resend over SMTP (does not depend on the mirror,
+# which is one of the things watched here) and the mirror's /api/v1/alerts/notify for push
+# (best-effort). Gatus sends once on trigger and once on resolve; it does not repeat.
+#
+# Secrets come from the environment (see env.example); none are in this file.
+
+storage:
+  type: sqlite
+  path: /data/data.db
+
+ui:
+  title: Catalyst status
+  header: Catalyst status
+  default-sort-by: group
+
+web:
+  port: 8080
+
+metrics: true
+
+alerting:
+  email:
+    from: "Catalyst status <notifications@notifications.catalystcloud.dev>"
+    username: "resend"
+    password: "${RESEND_API_KEY}"
+    host: "smtp.resend.com"
+    port: 587
+    to: "alerts@coalescelabs.ai"
+    default-alert:
+      enabled: true
+      failure-threshold: 3
+      success-threshold: 2
+      send-on-resolved: true
+  custom:
+    url: "https://staging.catalystcloud.dev/api/v1/alerts/notify"
+    method: "POST"
+    headers:
+      Content-Type: "application/json"
+      X-Catalyst-Alert-Secret: "${CATALYST_ALERT_WEBHOOK_SECRET}"
+    body: |
+      {"title": "Status: [ENDPOINT_GROUP] / [ENDPOINT_NAME] [ALERT_TRIGGERED_OR_RESOLVED]", "body": "[ALERT_DESCRIPTION]", "severity": "critical", "source": "gatus-mini", "url": "http://mini:8094"}
+    placeholders:
+      ALERT_TRIGGERED_OR_RESOLVED:
+        TRIGGERED: "is DOWN"
+        RESOLVED: "recovered"
+    default-alert:
+      enabled: true
+      failure-threshold: 3
+      success-threshold: 2
+      send-on-resolved: true
+
+x-clickhouse: &clickhouse
+  url: "http://100.76.35.19:18123/?default_format=JSONEachRow"
+  method: POST
+  interval: 2m
+  headers:
+    X-ClickHouse-User: "agent_reader"
+    X-ClickHouse-Key: "${CLICKHOUSE_AGENT_READER_PASSWORD}"
+
+endpoints:
+  # ── telemetry: the path every fleet and sync check below depends on ─────────────────────────────
+  - name: ClickHouse answers
+    group: 1 telemetry
+    url: "http://100.76.35.19:18123/ping"
+    interval: 1m
+    conditions:
+      - "[STATUS] == 200"
+    alerts:
+      - type: email
+        description: "ClickHouse on clickstack-hel1 does not answer /ping over the tailnet. Every fleet and sync check on this page is blind until it does. Check the box (ssh clickstack-hel1, docker ps, clickstack-clickhouse). The ClickHouse owner seat is infra-data-clickstack."
+      - type: custom
+        description: "ClickHouse on clickstack-hel1 does not answer /ping over the tailnet. Every fleet and sync check on this page is blind until it does. Check the box (ssh clickstack-hel1, docker ps, clickstack-clickhouse)."
+
+  - name: Ingest is current
+    group: 1 telemetry
+    <<: *clickhouse
+    interval: 1m
+    body: "SELECT toInt32(dateDiff('second', max(Timestamp), now())) AS v FROM otel.otel_logs WHERE Timestamp > now() - INTERVAL 1 HOUR"
+    conditions:
+      - "[STATUS] == 200"
+      - "[BODY].v < 300"
+    alerts:
+      - type: email
+        description: "No telemetry has landed in ClickHouse for over 5 minutes. Suspect the shared path (otel-collector tunnel, the box collector), not the hosts. Fleet and sync checks here read stale data until this is green."
+      - type: custom
+        description: "No telemetry has landed in ClickHouse for over 5 minutes. Suspect the shared path (otel-collector tunnel, the box collector), not the hosts."
+
+  - name: Collector edge
+    group: 1 telemetry
+    url: "https://otel-collector.catalystcloud.dev/v1/traces"
+    interval: 2m
+    headers:
+      CF-Access-Client-Id: "${CF_ACCESS_CLIENT_ID}"
+      CF-Access-Client-Secret: "${CF_ACCESS_CLIENT_SECRET}"
+    conditions:
+      # 405: past Cloudflare Access and at a collector that wants POST. 403 means Access refused the
+      # service token; 5xx or a timeout means the tunnel or collector is down.
+      - "[STATUS] == 405"
+    alerts:
+      - type: email
+        description: "The OTLP collector behind otel-collector.catalystcloud.dev is not answering as expected (want 405 past Access). Check the Cloudflare tunnel and the collector container on clickstack-hel1."
+
+  # ── fleet: is work actually running ─────────────────────────────────────────────────────────────
+  - name: Execution service up on every host
+    group: 2 fleet
+    <<: *clickhouse
+    body: "SELECT toInt32(if(count() = 0, -1, toInt64(countIf(beat_age > 600 AND agent_age < 300)))) AS v FROM (SELECT ResourceAttributes['host.name'] AS h, dateDiff('second', maxIf(Timestamp, Body = 'catalyst.host.execution.capacity'), now()) AS beat_age, dateDiff('second', max(Timestamp), now()) AS agent_age FROM otel.otel_logs WHERE ServiceName = 'catalyst-cloud.host-agent' AND Timestamp > now() - INTERVAL 7 DAY AND ResourceAttributes['host.name'] NOT LIKE 'local-%' GROUP BY h)"
+    conditions:
+      - "[STATUS] == 200"
+      - "[BODY].v == 0"
+    alerts:
+      - type: email
+        failure-threshold: 2
+        description: "A host agent is writing but its execution service has sent no capacity beat for 10 minutes, so nothing launches there (2026-09-22: an unresolved_attempt wedge, 4h21m unseen). Grafana rule ctc2945_execution_silent names the host. Read the host-agent journal for attempt_terminal and reservations stuck releasing. The runner-host seat owns recovery."
+      - type: custom
+        failure-threshold: 2
+        description: "A host agent is writing but its execution service has sent no capacity beat for 10 minutes, so nothing launches there. Grafana rule ctc2945_execution_silent names the host."
+
+  - name: Every host agent reporting
+    group: 2 fleet
+    <<: *clickhouse
+    body: "SELECT toInt32(if(count() = 0, -1, toInt64(countIf(agent_age > 600)))) AS v FROM (SELECT ResourceAttributes['host.name'] AS h, dateDiff('second', max(Timestamp), now()) AS agent_age FROM otel.otel_logs WHERE ServiceName = 'catalyst-cloud.host-agent' AND Timestamp > now() - INTERVAL 7 DAY AND ResourceAttributes['host.name'] NOT LIKE 'local-%' GROUP BY h)"
+    conditions:
+      - "[STATUS] == 200"
+      - "[BODY].v == 0"
+    alerts:
+      - type: email
+        failure-threshold: 2
+        description: "A host seen in the last 7 days has sent no host-agent telemetry for 10 minutes (-1 means no host is reporting at all). If Ingest is current is also red, it is the pipeline. Otherwise check the host: Phase host SSH below, power, disk."
+
+  - name: Phase host SSH (hetzner-3072373)
+    group: 2 fleet
+    url: "tcp://65.109.113.245:22"
+    interval: 1m
+    conditions:
+      - "[CONNECTED] == true"
+    alerts:
+      - type: email
+        description: "hetzner-3072373 does not accept TCP on port 22 from mini. The box itself is unreachable or down: check Hetzner Robot (power, rescue), independent of any telemetry."
+      - type: custom
+        description: "hetzner-3072373 does not accept TCP on port 22 from mini. The box itself is unreachable or down."
+
+  - name: Ready work can run
+    group: 2 fleet
+    <<: *clickhouse
+    body: "SELECT toInt32(refusals >= 10 AND mismatch = refusals AND phases = 0) AS v FROM (SELECT countIf(ServiceName = 'catalyst-cloud' AND Body LIKE '%acquire offered nothing%') AS refusals, countIf(ServiceName = 'catalyst-cloud' AND Body LIKE '%acquire offered nothing%' AND Body LIKE '%capability_mismatch%') AS mismatch, countIf(ServiceName IN ('claude_exec', 'opencode_exec')) AS phases FROM otel.otel_logs WHERE Timestamp > now() - INTERVAL 30 MINUTE AND ServiceName IN ('catalyst-cloud', 'claude_exec', 'opencode_exec'))"
+    conditions:
+      - "[STATUS] == 200"
+      - "[BODY].v == 0"
+    alerts:
+      - type: email
+        failure-threshold: 2
+        description: "For 30 minutes every acquire was refused because no live worker declares the phase the ready work needs, and no phase started. The waiting phases are in the Worker lines acquire offered nothing. Move the stuck tickets to a steward seat that can run them; the structural fix is CTC-3010."
+
+  # ── sync: is the mirror current ─────────────────────────────────────────────────────────────────
+  - name: Mirror answers
+    group: 3 sync
+    url: "https://staging.catalystcloud.dev/api/v1/freshness"
+    interval: 1m
+    headers:
+      Authorization: "Bearer ${CATALYST_STATUS_READ_KEY}"
+    conditions:
+      - "[STATUS] == 200"
+    alerts:
+      - type: email
+        description: "The mirror Worker at staging.catalystcloud.dev does not answer /api/v1/freshness with 200. Check the Cloudflare Worker (recent deploys, Workers status). 401 or 403 means the status page read key was revoked."
+
+  - name: Sync verdict not down
+    group: 3 sync
+    url: "https://staging.catalystcloud.dev/api/v1/freshness"
+    interval: 2m
+    headers:
+      Authorization: "Bearer ${CATALYST_STATUS_READ_KEY}"
+    conditions:
+      - "[STATUS] == 200"
+      - "[BODY].status.severity != down"
+    alerts:
+      - type: email
+        description: "The mirror's own sync verdict for tenant-0 is down. Open Sync health for the source and repository, and see the repository and reconcile checks below for the cause."
+
+  - name: No repository failing every pass
+    group: 3 sync
+    <<: *clickhouse
+    interval: 5m
+    body: "SELECT toInt32(countIf(passes >= 6 AND hits / passes >= 0.9)) AS v FROM (SELECT acct, project, err, count() AS hits, any(total) AS passes FROM (SELECT JSONExtractString(Body, 'account') AS acct, count() OVER (PARTITION BY JSONExtractString(Body, 'account')) AS total, arrayJoin(arrayMap(p -> (JSONExtractString(p, 'project'), replaceRegexpAll(JSONExtractString(p, 'github', 'error'), '[0-9a-f]{7,}|#[0-9]+|[0-9]{3}$', 'N')), arrayFilter(p -> JSONExtractString(p, 'github', 'error') != '', JSONExtractArrayRaw(Body, 'projects')))) AS pe, pe.1 AS project, pe.2 AS err FROM otel.otel_logs WHERE ServiceName = 'catalyst-cloud' AND Timestamp > now() - INTERVAL 2 HOUR AND Body LIKE '{\"msg\":\"reconcile\"%') GROUP BY acct, project, err)"
+    conditions:
+      - "[STATUS] == 200"
+      - "[BODY].v == 0"
+    alerts:
+      - type: email
+        failure-threshold: 1
+        description: "At least one repository has failed sync with the same error in 90 percent of passes for 2 hours. Grafana rule ctc3004_repo_sync_failing names the repository and error. No GitHub App installation for org X means reinstall the App on X or unlink the repository (CTC-3006)."
+
+  - name: Reconcile running for every tenant
+    group: 3 sync
+    <<: *clickhouse
+    interval: 5m
+    body: "SELECT toInt32(if(count() = 0, -1, toInt64(countIf(age > 5400)))) AS v FROM (SELECT JSONExtractString(Body, 'account') AS acct, dateDiff('second', max(Timestamp), now()) AS age FROM otel.otel_logs WHERE ServiceName = 'catalyst-cloud' AND Timestamp > now() - INTERVAL 1 DAY AND Body LIKE '{\"msg\":\"reconcile\"%' GROUP BY acct)"
+    conditions:
+      - "[STATUS] == 200"
+      - "[BODY].v == 0"
+    alerts:
+      - type: email
+        failure-threshold: 1
+        description: "A tenant's scheduled reconcile has written nothing for 90 minutes (the slowest runs every 45), or no tenant has reconciled in a day (-1). Check the mirror Worker's alarm pass and GET /admin/mirror for the last run and error."
+
+  # ── alerting: the other alert path ──────────────────────────────────────────────────────────────
+  - name: Grafana alerting host (home)
+    group: 4 alerting
+    url: "http://100.65.193.30:13000/api/health"
+    interval: 1m
+    conditions:
+      - "[STATUS] == 200"
+      - "[BODY].database == ok"
+    alerts:
+      - type: email
+        description: "Grafana on home is down, so none of the catalyst-detectors rules are evaluating. This page and its email are the only alerting until it is back. Check the otel-grafana container on home."
+      - type: custom
+        description: "Grafana on home is down, so none of the catalyst-detectors rules are evaluating. Check the otel-grafana container on home."
+
+# Pushed heartbeats, for things this host cannot reach.
+external-endpoints:
+  - name: laptop writer
+    group: 5 replica
+    token: "${REPLICA_PUSH_TOKEN}"
+    heartbeat:
+      interval: 5m
+    alerts:
+      - type: email
+        failure-threshold: 1
+        description: "The Linear replica writer on Ryan's laptop is not fresh, or its heartbeat stopped arriving. Agents on that laptop fall back to the shared Linear API quota. The verified restart procedure is on CTC-3008; Ryan confirms before it runs."
