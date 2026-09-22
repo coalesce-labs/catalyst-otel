@@ -6,7 +6,7 @@
 >
 > **Managed backends:** all three signals also fan out to **Dash0** and **Honeycomb** (the `otlp_http/dash0` + `otlp_http/honeycomb` exporters) — metrics and logs since 2026-06-07, and **traces** since 2026-07-02 (added *after* `tail_sampling`, so the per-span vendor bill rides only the sampled stream).
 >
-> **Catalyst Cloud:** telemetry from the Cloudflare side (Workers + AI Gateway, `service.namespace=catalyst-cloud`) is catalogued separately in the overlay repo's `docs/data-dictionary-cloud.md`. This file covers the self-hosted (`service.namespace=catalyst`) fleet.
+> **ClickHouse is not in this file.** The ClickStack store on the box `clickstack-hel1` (every log, span and metric since 2026-09-15, and the only store with `agent_tool_calls` and `claude_api_requests`) is catalogued in catalyst-cloud's `docs/data-dictionary-cloud.md` → "The ClickHouse store". The ClickHouse on `home` (`100.65.193.30`) stopped receiving data on 2026-09-19; never query it. The ClickHouse draft once planned for this file (branch `otl-data-dictionary-clickhouse`) was folded into that one (CTC-3036).
 
 ## How to query
 
