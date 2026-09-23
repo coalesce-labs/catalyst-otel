@@ -60,11 +60,15 @@ alerting:
       success-threshold: 2
       send-on-resolved: true
 
+# ClickHouse is read through its public Access hostname, not the tailnet (CTC-3063). The read
+# service token passes Access; agent_reader is the ClickHouse login behind it.
 x-clickhouse: &clickhouse
-  url: "http://100.76.35.19:18123/?default_format=JSONEachRow"
+  url: "https://clickstack-read.catalystcloud.dev/?default_format=JSONEachRow"
   method: POST
   interval: 2m
   headers:
+    CF-Access-Client-Id: "${CLICKSTACK_READ_ACCESS_CLIENT_ID}"
+    CF-Access-Client-Secret: "${CLICKSTACK_READ_ACCESS_CLIENT_SECRET}"
     X-ClickHouse-User: "agent_reader"
     X-ClickHouse-Key: "${CLICKHOUSE_AGENT_READER_PASSWORD}"
 
@@ -72,15 +76,18 @@ endpoints:
   # ── telemetry: the path every fleet and sync check below depends on ─────────────────────────────
   - name: ClickHouse answers
     group: 1 telemetry
-    url: "http://100.76.35.19:18123/ping"
+    url: "https://clickstack-read.catalystcloud.dev/ping"
     interval: 1m
+    headers:
+      CF-Access-Client-Id: "${CLICKSTACK_READ_ACCESS_CLIENT_ID}"
+      CF-Access-Client-Secret: "${CLICKSTACK_READ_ACCESS_CLIENT_SECRET}"
     conditions:
       - "[STATUS] == 200"
     alerts:
       - type: email
-        description: "ClickHouse on clickstack-hel1 does not answer /ping over the tailnet. Every fleet and sync check on this page is blind until it does. Check the box (ssh clickstack-hel1, docker ps, clickstack-clickhouse). The ClickHouse owner seat is infra-data-clickstack."
+        description: "ClickHouse on clickstack-hel1 does not answer /ping through clickstack-read.catalystcloud.dev. Every fleet and sync check on this page is blind until it does. A 403 means the read Access token was refused; anything else, check the box (docker ps, clickstack-clickhouse) and its tunnel. The ClickHouse owner seat is infra-data-clickstack."
       - type: custom
-        description: "ClickHouse on clickstack-hel1 does not answer /ping over the tailnet. Every fleet and sync check on this page is blind until it does. Check the box (ssh clickstack-hel1, docker ps, clickstack-clickhouse)."
+        description: "ClickHouse on clickstack-hel1 does not answer /ping through clickstack-read.catalystcloud.dev. Every fleet and sync check on this page is blind until it does. A 403 means the read Access token was refused; anything else, check the box and its tunnel."
 
   - name: Ingest is current
     group: 1 telemetry
@@ -218,8 +225,11 @@ endpoints:
   # ── alerting: the other alert path ──────────────────────────────────────────────────────────────
   - name: Grafana alerting host (home)
     group: 4 alerting
-    url: "http://100.65.193.30:13000/api/health"
+    url: "https://otel.rozich.com/api/health"
     interval: 1m
+    headers:
+      CF-Access-Client-Id: "${CF_ACCESS_CLIENT_ID}"
+      CF-Access-Client-Secret: "${CF_ACCESS_CLIENT_SECRET}"
     conditions:
       - "[STATUS] == 200"
       - "[BODY].database == ok"
