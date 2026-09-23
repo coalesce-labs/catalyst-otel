@@ -49,7 +49,7 @@ alerting:
       Content-Type: "application/json"
       X-Catalyst-Alert-Secret: "${CATALYST_ALERT_WEBHOOK_SECRET}"
     body: |
-      {"title": "Status: [ENDPOINT_GROUP] / [ENDPOINT_NAME] [ALERT_TRIGGERED_OR_RESOLVED]", "body": "[ALERT_DESCRIPTION]", "severity": "critical", "source": "gatus-mini", "url": "http://mini:8094"}
+      {"title": "Status: [ENDPOINT_GROUP] / [ENDPOINT_NAME] [ALERT_TRIGGERED_OR_RESOLVED]", "body": "[ALERT_DESCRIPTION]", "severity": "critical", "source": "gatus-mini", "url": "https://ops-status.catalystcloud.dev"}
     placeholders:
       ALERT_TRIGGERED_OR_RESOLVED:
         TRIGGERED: "is DOWN"
