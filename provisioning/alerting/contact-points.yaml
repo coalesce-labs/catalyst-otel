@@ -23,3 +23,9 @@ contactPoints:
         settings:
           url: ${CATALYST_ALERT_WEBHOOK_URL}
           httpMethod: POST
+          # CTC-2952. The endpoint is gated on its OWN shared secret, compared in
+          # constant time — deliberately NOT the Catalyst admin bearer, because this
+          # file is plaintext on a host several people can read. Rotating the pager
+          # secret therefore costs exactly this one line and nothing else.
+          headers:
+            X-Catalyst-Alert-Secret: ${CATALYST_ALERT_WEBHOOK_SECRET}
