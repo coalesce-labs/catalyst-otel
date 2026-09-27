@@ -116,7 +116,7 @@ groups:
       ticket: CTC-2945
     annotations:
       summary: '{{ $labels.host }}: no host-agent telemetry for {{ $values.AGENT.Value }}s'
-      description: 'The host agent on this host has written nothing for over 10 minutes. The host roster is every non-local host seen in the last 7 days. If every host fires together, the telemetry path (collector, tunnel, ClickHouse) is the suspect, not the hosts. Do: check the host over the tailnet (ssh, power, disk). If it was decommissioned on purpose, silence this host until it leaves the 7-day roster.'
+      description: 'The host agent on this host has written nothing for over 10 minutes. The host roster is every fleet host (host.name LIKE hetzner-%) seen in the last 7 days; laptops and workstations never count, because they are not required to send telemetry. If every host fires together, the telemetry path (collector, tunnel, ClickHouse) is the suspect, not the hosts. Do: check the host over the tailnet (ssh, power, disk). If it was decommissioned on purpose, silence this host until it leaves the 7-day roster.'
     data:
     - refId: A
       relativeTimeRange:
@@ -131,7 +131,7 @@ groups:
         editorType: sql
         format: 1
         queryType: table
-        rawSql: SELECT ResourceAttributes['host.name'] AS host, toFloat64(dateDiff('second', max(Timestamp), now())) AS agent_age_s FROM otel.otel_logs WHERE ServiceName = 'catalyst-cloud.host-agent' AND Timestamp > now() - INTERVAL 7 DAY AND Timestamp <= now() AND ResourceAttributes['host.name'] NOT LIKE 'local-%' GROUP BY host
+        rawSql: SELECT ResourceAttributes['host.name'] AS host, toFloat64(dateDiff('second', max(Timestamp), now())) AS agent_age_s FROM otel.otel_logs WHERE ServiceName = 'catalyst-cloud.host-agent' AND Timestamp > now() - INTERVAL 7 DAY AND Timestamp <= now() AND ResourceAttributes['host.name'] LIKE 'hetzner-%' GROUP BY host
     - refId: AGENT
       relativeTimeRange:
         from: 600
