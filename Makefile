@@ -1,5 +1,5 @@
 # Claude Code Observability Stack
-.PHONY: help up down logs restart clean validate-config pull deploy dashboard-validate prometheus-test
+.PHONY: help up down logs restart clean validate-config pull deploy dashboard-validate prometheus-test alert-rules-validate
 
 help: ## Show this help message
 	@echo "Claude Code Observability Stack"
@@ -115,6 +115,11 @@ dashboard-validate: ## Validate dashboard JSON files + Prometheus rules (OTL-89)
 	@bash scripts/validate-dashboard.sh
 	@echo "🔎 Running Prometheus rulefmt gate + promtool tests (scripts/validate-prometheus-rules.sh)..."
 	@bash scripts/validate-prometheus-rules.sh
+	@echo "🔎 Running Grafana alert rule gate (scripts/validate-alert-rules.py)..."
+	@python3 scripts/validate-alert-rules.py
+
+alert-rules-validate: ## Alert rules read only live datasources; LIVE=<grafana url> also diffs the running Grafana (CTC-5029)
+	@python3 scripts/validate-alert-rules.py $(if $(LIVE),--live $(LIVE))
 
 prometheus-test: ## Run promtool unit tests for the recording rules (OTL-87/OTL-89)
 	@promtool test rules provisioning/prometheus/tests/*.test.yml

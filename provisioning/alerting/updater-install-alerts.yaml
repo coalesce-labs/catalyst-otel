@@ -238,6 +238,68 @@ groups:
                     type: gt
                     params: [0]
 
+      # CTC-5029: OTL-38 (8930844, 2026-06-27) removed the rule below from this file,
+      # but Grafana never deletes a rule whose file entry disappears, so it stayed
+      # live. It is restored here exactly as Grafana still runs it, so git matches
+      # live. Retiring it, with the other rules that read the retired mini
+      # orchestrator, is CTC-2514's job: add a deleteRules entry for its uid then.
+      # 5) Updater liveness (BEST-EFFORT). Fires when an updater that WAS emitting
+      #    heartbeats stops (increase==0 while the series is still within the 15m
+      #    metric_expiration). A never-adopted updater = noData = OK. Gatus is the
+      #    real silence detector; this catches a recently-died daemon for a window.
+      #    service_name filter is MANDATORY (node.heartbeat collides w/ execution-core).
+      - uid: catalyst_updater_liveness_silent
+        title: Updater heartbeat stopped (best-effort)
+        condition: C
+        for: 10m
+        noDataState: OK
+        execErrState: OK
+        labels:
+          team: catalyst
+          signal: updater_liveness
+          severity: warning
+        annotations:
+          summary: 'catalyst.updater heartbeat stopped on a host that was reporting'
+          description: >
+            A host that was emitting node.updater.heartbeat has gone silent for 10m
+            (best-effort — within the 15m metric window). The updater daemon may be
+            dead. Confirm against the Gatus updater tile (the source of truth for
+            silence) and the catalyst.updater Loki stream.
+          __dashboardUid__: catalyst-fleet-updater
+          __panelId__: '6'
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: prometheus
+            model:
+              datasource: { type: prometheus, uid: prometheus }
+              editorMode: code
+              instant: true
+              range: false
+              refId: A
+              expr: sum by (host_name) (increase(catalyst_event_total{event_entity="node",event_action="heartbeat",service_name="catalyst.updater"}[10m]))
+          - refId: B
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              expression: A
+              reducer: last
+              datasource: { type: __expr__, uid: __expr__ }
+          - refId: C
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              refId: C
+              expression: B
+              datasource: { type: __expr__, uid: __expr__ }
+              conditions:
+                - evaluator:
+                    type: lt
+                    params: [1]
+
       # Updater liveness (silence detection) is intentionally NOT a Grafana rule.
       # A Prometheus increase(...) == 0 absence check can't fire reliably here: the
       # prometheus exporter expires stale series after metric_expiration: 15m, which
