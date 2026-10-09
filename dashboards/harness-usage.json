@@ -1,0 +1,707 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": false,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "id": 1,
+      "type": "row",
+      "title": "① Tokens & Calls — all harnesses (OTL-100)",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "panels": []
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Total Tokens (in + out)",
+      "description": "Input+output tokens across Claude Code (native OTLP), Codex (native histogram sum), and OpenCode (derived from ai.* spans). Excludes cache reads and reasoning so harnesses sum without double-counting.",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 1 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "(sum(increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",type=~\"input|output\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range])) or vector(0)) + (sum(increase(codex_turn_token_usage_sum{token_type=~\"input|output\"}[$__range])) or vector(0)) + ((sum(increase(opencode_llm_input_tokens_total{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"}[$__range])) or vector(0)) + (sum(increase(opencode_llm_output_tokens_total{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"}[$__range])) or vector(0)))",
+          "legendFormat": "tokens",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 1,
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "#5794F2", "value": null }] },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background_solid",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "textMode": "value_and_name",
+        "reduceOptions": { "calcs": ["lastNotNull"], "values": false, "fields": "" }
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "LLM Calls / Turns",
+      "description": "Claude API requests + Codex conversation turns + OpenCode LLM calls. Semantics differ slightly per harness (request vs turn vs call) — see per-harness dashboards for exact definitions.",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 1 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "(sum(increase(claude_code_api_request_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range])) or vector(0)) + (sum(increase(codex_conversation_turn_count_total[$__range])) or vector(0)) + (sum(increase(opencode_llm_calls_total{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"}[$__range])) or vector(0))",
+          "legendFormat": "calls",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "#73BF69", "value": null }] },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background_solid",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "textMode": "value_and_name",
+        "reduceOptions": { "calcs": ["lastNotNull"], "values": false, "fields": "" }
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Cache Hit Rate",
+      "description": "Cache-read share of input tokens across the harnesses that report it: claude type=cacheRead, codex token_type=cached_input, opencode cachedInputTokens. Denominator clamped to 1 so zero usage reads 0%, not an error.",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 1 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "((sum(increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",type=\"cacheRead\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range])) or vector(0)) + (sum(increase(codex_turn_token_usage_sum{token_type=\"cached_input\"}[$__range])) or vector(0)) + (sum(increase(opencode_llm_cached_input_tokens_total{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"}[$__range])) or vector(0))) / clamp_min(((sum(increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",type=\"input\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range])) or vector(0)) + (sum(increase(codex_turn_token_usage_sum{token_type=\"input\"}[$__range])) or vector(0)) + (sum(increase(opencode_llm_input_tokens_total{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"}[$__range])) or vector(0))), 1)",
+          "legendFormat": "cache hit",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 1,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "#F2495C", "value": null },
+              { "color": "#F2CC0C", "value": 0.5 },
+              { "color": "#73BF69", "value": 0.75 }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background_solid",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "textMode": "value_and_name",
+        "reduceOptions": { "calcs": ["lastNotNull"], "values": false, "fields": "" }
+      }
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Spend (measured: Claude only)",
+      "description": "Only Claude Code exports a measured cost counter (claude_code_cost_usage_USD_total). Codex (ChatGPT subscription) and OpenCode (GLM/Qwen token-plan) emit no cost telemetry — never read this as fleet spend.",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 1 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum(increase(claude_code_cost_usage_USD_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range])) or vector(0)",
+          "legendFormat": "USD",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 2,
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "#FF9830", "value": null }] },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background_solid",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "textMode": "value_and_name",
+        "reduceOptions": { "calcs": ["lastNotNull"], "values": false, "fields": "" }
+      }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Token Rate by Harness (in + out, per second)",
+      "description": "claude = native claude_code_token_usage (input|output) · codex = codex_turn_token_usage_sum (input|output) · opencode = opencode_llm_{input,output}_tokens_total.",
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 5 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum(rate(claude_code_token_usage_tokens_total{job=\"otel-collector\",type=~\"input|output\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[5m]))",
+          "legendFormat": "claude",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(codex_turn_token_usage_sum{token_type=~\"input|output\"}[5m]))",
+          "legendFormat": "codex",
+          "refId": "B"
+        },
+        {
+          "expr": "sum(rate(opencode_llm_input_tokens_total{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"}[5m])) + sum(rate(opencode_llm_output_tokens_total{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"}[5m]))",
+          "legendFormat": "opencode",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10, "showPoints": "never", "stacking": { "mode": "none" } },
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "showLegend": true, "calcs": ["max", "mean", "sum"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "LLM Calls / Turns by Harness (increase over range)",
+      "description": "Per-harness interaction counts. Codex emits no project/branch/host attribution labels, so its series are fleet-wide by design.",
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 5 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum(increase(claude_code_api_request_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range]))",
+          "legendFormat": "claude",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(increase(codex_conversation_turn_count_total[$__range]))",
+          "legendFormat": "codex",
+          "refId": "B"
+        },
+        {
+          "expr": "sum(increase(opencode_llm_calls_total{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"}[$__range]))",
+          "legendFormat": "opencode",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10, "showPoints": "never", "stacking": { "mode": "none" } },
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "showLegend": true, "calcs": ["max", "mean", "sum"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "id": 8,
+      "type": "row",
+      "title": "② Models & Providers",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 12 },
+      "panels": []
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Tokens by Model × Harness (increase over range)",
+      "description": "Legends are prefixed with the harness so identical model names across harnesses stay distinct.",
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 13 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum by (model) (increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",type=~\"input|output\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range]))",
+          "legendFormat": "claude · {{model}}",
+          "refId": "A"
+        },
+        {
+          "expr": "sum by (model) (increase(codex_turn_token_usage_sum{token_type=~\"input|output\"}[$__range]))",
+          "legendFormat": "codex · {{model}}",
+          "refId": "B"
+        },
+        {
+          "expr": "sum by (model) (increase(opencode_llm_input_tokens_total{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"}[$__range]) + increase(opencode_llm_output_tokens_total{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"}[$__range]))",
+          "legendFormat": "opencode · {{model}}",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 0, "showPoints": "never", "stacking": { "mode": "none" } },
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "showLegend": true, "calcs": ["max", "mean", "sum"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "id": 10,
+      "type": "table",
+      "title": "Tokens by Harness × Model (increase over range)",
+      "description": "One row per harness · model, sorted by tokens. Table (not bars) because single-value series across ~15 models with a huge value disparity render unreadably as a bar chart.",
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 13 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "label_replace(sum by (model) (increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",type=~\"input|output\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range])), \"harness\", \"claude\", \"model\", \".*\") or label_replace(sum by (model) (increase(codex_turn_token_usage_sum{token_type=~\"input|output\"}[$__range])), \"harness\", \"codex\", \"model\", \".*\") or label_replace(sum by (model) (increase(opencode_llm_input_tokens_total{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"}[$__range]) + increase(opencode_llm_output_tokens_total{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"}[$__range])), \"harness\", \"opencode\", \"model\", \".*\")",
+          "legendFormat": "__auto",
+          "refId": "A",
+          "instant": true,
+          "range": false,
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": { "Time": true },
+            "indexByName": { "harness": 0, "model": 1 },
+            "renameByName": { "Value": "Tokens (in+out)" }
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "sort": [{ "field": "Tokens (in+out)", "desc": true }]
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 1,
+          "custom": {
+            "align": "auto",
+            "cellOptions": { "type": "auto", "wrapText": false },
+            "inspect": false,
+            "filterable": true
+          },
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "text", "value": null },
+              { "color": "green", "value": 1000000 }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": { "show": false, "reducer": ["sum"], "countRows": false, "fields": "" }
+      }
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Token Type Mix — all harnesses (increase over range)",
+      "description": "Normalized token types summed across harnesses: input · cache read (claude cacheRead / codex cached_input / opencode cachedInputTokens) · output · reasoning (codex reasoning_output / opencode reasoningTokens; claude folds reasoning into output).",
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 20 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "(sum(increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",type=\"input\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range])) or vector(0)) + (sum(increase(codex_turn_token_usage_sum{token_type=\"input\"}[$__range])) or vector(0)) + (sum(increase(opencode_llm_input_tokens_total{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"}[$__range])) or vector(0))",
+          "legendFormat": "input",
+          "refId": "A"
+        },
+        {
+          "expr": "(sum(increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",type=\"cacheRead\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range])) or vector(0)) + (sum(increase(codex_turn_token_usage_sum{token_type=\"cached_input\"}[$__range])) or vector(0)) + (sum(increase(opencode_llm_cached_input_tokens_total{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"}[$__range])) or vector(0))",
+          "legendFormat": "cache read",
+          "refId": "B"
+        },
+        {
+          "expr": "(sum(increase(claude_code_token_usage_tokens_total{job=\"otel-collector\",type=\"output\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range])) or vector(0)) + (sum(increase(codex_turn_token_usage_sum{token_type=\"output\"}[$__range])) or vector(0)) + (sum(increase(opencode_llm_output_tokens_total{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"}[$__range])) or vector(0))",
+          "legendFormat": "output",
+          "refId": "C"
+        },
+        {
+          "expr": "(sum(increase(codex_turn_token_usage_sum{token_type=\"reasoning_output\"}[$__range])) or vector(0)) + (sum(increase(opencode_llm_reasoning_tokens_total{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"}[$__range])) or vector(0))",
+          "legendFormat": "reasoning",
+          "refId": "D"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 40, "showPoints": "never", "stacking": { "mode": "normal" } },
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "showLegend": true, "calcs": ["max", "mean", "sum"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "Reasoning Tokens by Harness (increase over range)",
+      "description": "Only codex (reasoning_output) and opencode (reasoningTokens) report reasoning separately; claude folds reasoning into output tokens.",
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 20 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum(increase(codex_turn_token_usage_sum{token_type=\"reasoning_output\"}[$__range]))",
+          "legendFormat": "codex",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(increase(opencode_llm_reasoning_tokens_total{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"}[$__range]))",
+          "legendFormat": "opencode",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 40, "showPoints": "never", "stacking": { "mode": "normal" } },
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "showLegend": true, "calcs": ["max", "mean", "sum"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "id": 13,
+      "type": "row",
+      "title": "③ Spend — measured: Claude only",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 27 },
+      "panels": []
+    },
+    {
+      "id": 14,
+      "type": "timeseries",
+      "title": "Spend by Model (Claude, USD)",
+      "description": "claude_code_cost_usage_USD_total is the only measured cost signal in the fleet. Codex and OpenCode run on subscriptions/token-plans that emit no cost telemetry — do not infer fleet cost from this row.",
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 28 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum by (model) (increase(claude_code_cost_usage_USD_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range]))",
+          "legendFormat": "{{model}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 40, "showPoints": "never", "stacking": { "mode": "normal" } },
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "showLegend": true, "calcs": ["max", "mean", "sum"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "id": 15,
+      "type": "timeseries",
+      "title": "Spend by Host (Claude, USD)",
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 28 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum by (hostname) (increase(claude_code_cost_usage_USD_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range]))",
+          "legendFormat": "{{hostname}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 40, "showPoints": "never", "stacking": { "mode": "normal" } },
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "showLegend": true, "calcs": ["max", "mean", "sum"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "id": 16,
+      "type": "row",
+      "title": "④ Latency & Reliability",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 35 },
+      "panels": []
+    },
+    {
+      "id": 17,
+      "type": "timeseries",
+      "title": "LLM Call Latency p95 by Harness",
+      "description": "claude = api_request_duration_seconds · codex = turn_e2e_duration_ms (÷1000) · opencode = llm_duration_seconds. Different call shapes (request vs turn vs span) — treat cross-harness gaps as directional, not exact.",
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 36 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(claude_code_api_request_duration_seconds_bucket{job=\"otel-collector\"}[5m])))",
+          "legendFormat": "claude",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(codex_turn_e2e_duration_ms_milliseconds_bucket[5m]))) / 1000",
+          "legendFormat": "codex",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(opencode_llm_duration_seconds_bucket{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"}[5m])))",
+          "legendFormat": "opencode",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 0, "showPoints": "never" },
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "showLegend": true, "calcs": ["max", "mean", "lastNotNull"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "id": 18,
+      "type": "timeseries",
+      "title": "TTFT p95 (codex · opencode)",
+      "description": "Time-to-first-token. codex = turn_ttft_duration_ms (÷1000), opencode = ai.response.msToFirstChunk. Claude Code emits no TTFT metric.",
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 36 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(codex_turn_ttft_duration_ms_milliseconds_bucket[5m]))) / 1000",
+          "legendFormat": "codex",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(opencode_llm_ttft_seconds_bucket{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"}[5m])))",
+          "legendFormat": "opencode",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 0, "showPoints": "never" },
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "showLegend": true, "calcs": ["max", "mean", "lastNotNull"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "id": 19,
+      "type": "stat",
+      "title": "Error Rate by Harness",
+      "description": "claude = api_error / api_request · opencode = span-ERROR LLM calls / total calls. Codex emits no API-error counter (tool failures only) — its absence here is a coverage gap, not a zero.",
+      "gridPos": { "h": 4, "w": 24, "x": 0, "y": 43 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum(increase(claude_code_api_error_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range])) / clamp_min(sum(increase(claude_code_api_request_total{job=\"otel-collector\",project=~\"$project\",branch=~\"$branch\",hostname=~\"$hostname\"}[$__range])), 1)",
+          "legendFormat": "claude",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(increase(opencode_llm_errors_total{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"}[$__range])) / clamp_min(sum(increase(opencode_llm_calls_total{project=~\"$project\",branch=~\"$branch\",host_name=~\"$hostname\"}[$__range])), 1)",
+          "legendFormat": "opencode",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 2,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "#73BF69", "value": null },
+              { "color": "#F2CC0C", "value": 0.02 },
+              { "color": "#F2495C", "value": 0.1 }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background_solid",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "horizontal",
+        "textMode": "value_and_name",
+        "reduceOptions": { "calcs": ["lastNotNull"], "values": false, "fields": "" }
+      }
+    },
+    {
+      "id": 20,
+      "type": "row",
+      "title": "⑤ Events",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 47 },
+      "panels": []
+    },
+    {
+      "id": 21,
+      "type": "logs",
+      "title": "Harness Events (Loki)",
+      "description": "claude-code event stream, codex event stream (service_name=~codex.*), and opencode Effect span logs, interleaved.",
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 48 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "expr": "{service_name=~\"claude-code.*|codex.*|opencode\"}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "options": {
+        "showTime": true,
+        "showLabels": true,
+        "showCommonLabels": false,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": false,
+        "enableLogDetails": true,
+        "sortOrder": "Descending"
+      }
+    }
+  ],
+  "refresh": "1m",
+  "schemaVersion": 39,
+  "tags": ["otel", "usage", "claude", "codex", "opencode", "harness"],
+  "templating": {
+    "list": [
+      {
+        "name": "project",
+        "type": "query",
+        "label": "Project",
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "query": {
+          "qryType": 1,
+          "query": "label_values(claude_code_token_usage_tokens_total, project)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": true,
+        "refresh": 2,
+        "sort": 1,
+        "current": { "text": "All", "value": "$__all" },
+        "options": [],
+        "hide": 0
+      },
+      {
+        "name": "branch",
+        "type": "query",
+        "label": "Branch",
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "query": {
+          "qryType": 1,
+          "query": "label_values(claude_code_token_usage_tokens_total, branch)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": true,
+        "refresh": 2,
+        "sort": 1,
+        "current": { "text": "All", "value": "$__all" },
+        "options": [],
+        "hide": 0
+      },
+      {
+        "name": "hostname",
+        "type": "query",
+        "label": "Host",
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "query": {
+          "qryType": 1,
+          "query": "label_values(claude_code_token_usage_tokens_total, hostname)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": true,
+        "refresh": 2,
+        "sort": 1,
+        "current": { "text": "All", "value": "$__all" },
+        "options": [],
+        "hide": 0
+      }
+    ]
+  },
+  "time": { "from": "now-24h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Harness Usage — Claude · Codex · OpenCode",
+  "uid": "harness-usage",
+  "version": 1,
+  "weekStart": ""
+}
