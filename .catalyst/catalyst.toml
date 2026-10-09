@@ -1,0 +1,20 @@
+#:schema https://staging.catalystcloud.dev/schemas/catalyst.schema.json
+
+[project]
+linear_team = "OTL"
+
+# No package install. The verify steps are the offline parts of make dashboard-validate; the promtool rule tests are left out.
+[environment]
+toolchains = [{ name = "node", version = "22" }]
+system_packages = [{ name = "jq" }, { name = "yq" }, { name = "python3" }]
+
+[environment.container]
+git = { submodules = false, lfs = false }
+
+[[environment.verify]]
+name = "dashboards"
+run = ["sh", "-lc", "bash scripts/validate-dashboard.sh"]
+
+[[environment.verify]]
+name = "alert-rules"
+run = ["sh", "-lc", "python3 scripts/validate-alert-rules.py"]
