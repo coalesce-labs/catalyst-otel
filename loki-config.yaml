@@ -94,9 +94,9 @@ limits_config:
   # CTC-5602: cloud forwarding exceeded Loki's 4 MB/s default during peaks.
   ingestion_rate_mb: 16
   ingestion_burst_size_mb: 32
-  # One OTLP record carried 161111 B of structured metadata; the default
-  # 64KB limit caused a permanent HTTP 400 and dropped its batch.
-  max_structured_metadata_size: 256KB
+  # Cloud-forwarded OTLP records carried 161111 B and 406465 B of structured
+  # metadata; lower limits caused permanent HTTP 400 and dropped each batch.
+  max_structured_metadata_size: 1MB
   otlp_config:
     resource_attributes:
       attributes_config:
