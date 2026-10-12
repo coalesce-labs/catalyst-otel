@@ -45,6 +45,13 @@ schema_config:
 ruler:
   alertmanager_url: http://localhost:9093
 
+# CTC-5602: accept delayed personal-OS batches that arrived 67 minutes late.
+# Loki accepts timestamps up to half max_chunk_age behind the stream's newest
+# entry, so 4h gives a two-hour window. The home host has ample memory for
+# the longer active chunk lifetime.
+ingester:
+  max_chunk_age: 4h
+
 # -----------------------------------------------------------------------------
 # limits_config.otlp_config — OTL-96. Promotes the four ADR-0011 low-card
 # tenant/scope dims to real Loki STREAM LABELS for the catalyst-cloud
