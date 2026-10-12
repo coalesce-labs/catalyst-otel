@@ -24,6 +24,8 @@ distributor:
         # (the collector reaches us at otel-tempo:4317 over the docker network).
         grpc:
           endpoint: 0.0.0.0:4317
+          # CTC-5602: cloud forwarding hit the default 4 MiB OTLP message cap.
+          max_recv_msg_size_mib: 16
         http:
           endpoint: 0.0.0.0:4318
 
