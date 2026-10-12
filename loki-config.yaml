@@ -11,9 +11,8 @@
 # unmounted, ephemeral store). Before this file existed, otel-loki ran with
 # ZERO config overrides — no otlp_config was ever set, so account_id/repo/
 # team/project_id could never become Loki index labels no matter what the
-# collector sent (this is the OTL-96 audit finding). This file changes ONLY
-# that: everything else is left exactly as the image default so existing
-# data/behavior is unaffected.
+# collector sent (this is the OTL-96 audit finding). CTC-5602 also raises
+# ingestion and structured-metadata limits for measured cloud-forwarded peaks.
 # =============================================================================
 
 auth_enabled: false
@@ -45,6 +44,13 @@ schema_config:
 
 ruler:
   alertmanager_url: http://localhost:9093
+
+# CTC-5602: accept delayed personal-OS batches that arrived 67 minutes late.
+# Loki accepts timestamps up to half max_chunk_age behind the stream's newest
+# entry, so 4h gives a two-hour window. The home host has ample memory for
+# the longer active chunk lifetime.
+ingester:
+  max_chunk_age: 4h
 
 # -----------------------------------------------------------------------------
 # limits_config.otlp_config — OTL-96. Promotes the four ADR-0011 low-card
@@ -85,6 +91,12 @@ ruler:
 # table this rule is drawn from).
 # -----------------------------------------------------------------------------
 limits_config:
+  # CTC-5602: cloud forwarding exceeded Loki's 4 MB/s default during peaks.
+  ingestion_rate_mb: 16
+  ingestion_burst_size_mb: 32
+  # Cloud-forwarded OTLP records carried 161111 B and 406465 B of structured
+  # metadata; lower limits caused permanent HTTP 400 and dropped each batch.
+  max_structured_metadata_size: 1MB
   otlp_config:
     resource_attributes:
       attributes_config:
