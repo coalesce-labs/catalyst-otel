@@ -32,6 +32,13 @@ apiVersion: 1
 #
 # noDataState/execErrState = OK on every rule: a quiet / idle fleet (no reads
 # attempted, no installs, poller paused) returns empty/noData and MUST NOT fire.
+# EXCEPTION (CTC-5149): the per-host liveness rules (uid prefix catalyst_host_ —
+# disk, memory) set noDataState=NoData. Those rules read a gauge that exists only
+# while the host keeps reporting, so an empty result means the host or its
+# telemetry path is gone — the exact state the rule exists to catch. The old disk
+# rule read a metric with zero series for 30 days and mapped no data to OK, so it
+# sat dead and healthy-looking the whole time; scripts/validate-alert-rules.py
+# now fails any catalyst_host_* rule that maps no data to OK.
 # COUNT-BASED CAVEAT: the Loki count rules clear when the bad lines STOP, which
 # cannot by itself distinguish "recovered" from "fleet went idle / stopped
 # attempting" — a resolve means "no longer actively failing", not "confirmed
@@ -670,14 +677,22 @@ groups:
 
       # 11) ★ WARNING — a node's disk >90%. When disk fills, per-ticket git
       #     worktree creation fails and the scheduler can't dispatch new work on
-      #     that node (hard, node-local blocker). Use host_disk_used_pct (real fs
-      #     pressure), NOT the APFS-inflated worktree logical-bytes gauge.
-      #     Prometheus gauge, per host_name.
+      #     that node (hard, node-local blocker). Reads system_filesystem_usage_bytes
+      #     — the hostmetrics filesystem gauge every Hetzner box reports (CTC-5149
+      #     proved the metric live 2026-10-06: series for all five boxes, disk use
+      #     3%–9% on the CI boxes, 36% on 3072373). The previous expression read
+      #     catalyst_host_disk_used_pct, which has had ZERO series for 30 days, so
+      #     this rule could never fire — do not repoint it at a producer metric
+      #     without series proof recorded here. Root filesystem only (mountpoint="/",
+      #     state used vs free|reserved): the volume worktrees and runner _diag land on.
+      #     noDataState=NoData (deliberate exception to the file-wide OK): a vanished
+      #     metric means the host or its telemetry path is gone — the exact state this
+      #     rule must notice, never a healthy OK.
       - uid: catalyst_host_disk_exhaustion
         title: Host disk > 90% (worktree/dispatch block risk)
         condition: C
         for: 10m
-        noDataState: OK
+        noDataState: NoData
         execErrState: OK
         labels:
           team: catalyst
@@ -686,10 +701,10 @@ groups:
         annotations:
           summary: 'A node''s disk is over 90% full — worktree creation / dispatch at risk'
           description: >
-            catalyst_host_disk_used_pct exceeded 90% on a node for 10m. When disk fills,
-            per-ticket git worktree creation fails and the scheduler cannot dispatch new
-            work on that node. Use host_disk_used_pct (real fs pressure), NOT the
-            APFS-inflated worktree logical-bytes gauge. macOS disk = /System/Volumes/Data.
+            Root-filesystem used% exceeded 90% on a node for 10m
+            (system_filesystem_usage_bytes, mountpoint="/", used over used+free+reserved).
+            When disk fills, per-ticket git worktree creation fails and the scheduler
+            cannot dispatch new work on that node. macOS disk = /System/Volumes/Data.
         data:
           - refId: A
             relativeTimeRange: { from: 600, to: 0 }
@@ -700,7 +715,12 @@ groups:
               instant: true
               range: false
               refId: A
-              expr: max by (host_name) (catalyst_host_disk_used_pct)
+              expr: |
+                100 * (
+                  sum by (host_name) (system_filesystem_usage_bytes{job="otel-collector", mountpoint="/", state="used"})
+                  /
+                  sum by (host_name) (system_filesystem_usage_bytes{job="otel-collector", mountpoint="/", state=~"used|free|reserved"})
+                )
           - refId: B
             relativeTimeRange: { from: 600, to: 0 }
             datasourceUid: __expr__
@@ -722,6 +742,74 @@ groups:
                 - evaluator:
                     type: gt
                     params: [90]
+
+      # 11b) ★ WARNING — a node's memory available <5%. When memory exhausts, the
+      #      kernel OOM-killer starts taking out runners and phase containers and
+      #      everything still running on the node thrashes (hard, node-local
+      #      blocker). Reads system_memory_usage_bytes — the hostmetrics memory
+      #      gauge (`system.memory.usage` over OTLP) the same five Hetzner boxes
+      #      report (CTC-5149; no memory-pressure rule existed anywhere before
+      #      this one). available% = free+cached+buffered over those states plus
+      #      used: on Linux the hostmetrics "used" state is Total minus exactly
+      #      those, so the ratio is available/(available+used) without trusting
+      #      the sum over every state to equal MemTotal. Missing states (a kernel
+      #      with no buffered, say) drop out of both sides and `free` alone keeps
+      #      the series alive. Fires after 10m sustained, per the ticket scenario.
+      #      noDataState=NoData for the same reason as the disk rule above.
+      - uid: catalyst_host_memory_pressure
+        title: Host memory available < 5% (OOM / thrash risk)
+        condition: C
+        for: 10m
+        noDataState: NoData
+        execErrState: OK
+        labels:
+          team: catalyst
+          signal: host_memory_pressure
+          severity: warning
+        annotations:
+          summary: 'A node''s available memory is under 5% — OOM kills and runner thrash imminent'
+          description: >
+            Available memory on a node has held under 5% for 10m
+            (system_memory_usage_bytes: free+cached+buffered over used+free+cached+buffered).
+            The kernel OOM-killer starts taking out runners and phase containers;
+            check what is consuming the box before dispatching more work to it.
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: prometheus
+            model:
+              datasource: { type: prometheus, uid: prometheus }
+              editorMode: code
+              instant: true
+              range: false
+              refId: A
+              expr: |
+                100 * (
+                  sum by (host_name) (system_memory_usage_bytes{job="otel-collector", state=~"free|cached|buffered"})
+                  /
+                  sum by (host_name) (system_memory_usage_bytes{job="otel-collector", state=~"used|free|cached|buffered"})
+                )
+          - refId: B
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              expression: A
+              reducer: last
+              datasource: { type: __expr__, uid: __expr__ }
+          - refId: C
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              refId: C
+              expression: B
+              datasource: { type: __expr__, uid: __expr__ }
+              conditions:
+                - evaluator:
+                    type: lt
+                    params: [5]
 
       # 12) WARNING — the recovery board-scan's OWN fleet-health check reports >0
       #     failed invariants (dispatchLiveness / strandedNode / blockedTree / ...)
