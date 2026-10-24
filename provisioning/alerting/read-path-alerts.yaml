@@ -754,7 +754,11 @@ groups:
       #      those, so the ratio is available/(available+used) without trusting
       #      the sum over every state to equal MemTotal. Missing states (a kernel
       #      with no buffered, say) drop out of both sides and `free` alone keeps
-      #      the series alive. Fires after 10m sustained, per the ticket scenario.
+      #      the series alive. macOS hosts report only free, inactive and used;
+      #      inactive is reclaimable there, so it counts as available. Without it
+      #      a Mac reads 1-2% available and the rule fires at once (measured
+      #      2026-10-24). Linux hostmetrics has no inactive state, so the Linux
+      #      ratio is unchanged. Fires after 10m sustained, per the ticket scenario.
       #      noDataState=NoData for the same reason as the disk rule above.
       - uid: catalyst_host_memory_pressure
         title: Host memory available < 5% (OOM / thrash risk)
@@ -770,7 +774,8 @@ groups:
           summary: 'A node''s available memory is under 5% — OOM kills and runner thrash imminent'
           description: >
             Available memory on a node has held under 5% for 10m
-            (system_memory_usage_bytes: free+cached+buffered over used+free+cached+buffered).
+            (system_memory_usage_bytes: free+cached+buffered+inactive over those plus used;
+            macOS reports only free, inactive and used).
             The kernel OOM-killer starts taking out runners and phase containers;
             check what is consuming the box before dispatching more work to it.
         data:
@@ -785,9 +790,9 @@ groups:
               refId: A
               expr: |
                 100 * (
-                  sum by (host_name) (system_memory_usage_bytes{job="otel-collector", state=~"free|cached|buffered"})
+                  sum by (host_name) (system_memory_usage_bytes{job="otel-collector", state=~"free|cached|buffered|inactive"})
                   /
-                  sum by (host_name) (system_memory_usage_bytes{job="otel-collector", state=~"used|free|cached|buffered"})
+                  sum by (host_name) (system_memory_usage_bytes{job="otel-collector", state=~"used|free|cached|buffered|inactive"})
                 )
           - refId: B
             relativeTimeRange: { from: 600, to: 0 }
