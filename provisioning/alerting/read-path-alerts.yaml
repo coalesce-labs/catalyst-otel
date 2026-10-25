@@ -35,7 +35,9 @@ apiVersion: 1
 # EXCEPTION (CTC-5149): the per-host liveness rules (uid prefix catalyst_host_ —
 # disk, memory) set noDataState=NoData. Those rules read a gauge that exists only
 # while the host keeps reporting, so an empty result means the host or its
-# telemetry path is gone — the exact state the rule exists to catch. The old disk
+# telemetry path is gone — the exact state the rule exists to catch. These rules
+# are grouped by host_name, so NoData means every host stopped reporting; one
+# silent host only drops its own series and does not page here. The old disk
 # rule read a metric with zero series for 30 days and mapped no data to OK, so it
 # sat dead and healthy-looking the whole time; scripts/validate-alert-rules.py
 # now fails any catalyst_host_* rule that maps no data to OK.
@@ -704,7 +706,8 @@ groups:
             Root-filesystem used% exceeded 90% on a node for 10m
             (system_filesystem_usage_bytes, mountpoint="/", used over used+free+reserved).
             When disk fills, per-ticket git worktree creation fails and the scheduler
-            cannot dispatch new work on that node. macOS disk = /System/Volumes/Data.
+            cannot dispatch new work on that node. On macOS, "/" reports the shared APFS
+            container, so it reads the same as /System/Volumes/Data.
         data:
           - refId: A
             relativeTimeRange: { from: 600, to: 0 }

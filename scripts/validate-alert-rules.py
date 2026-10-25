@@ -81,13 +81,16 @@ def promql_metric_names(expr):
     """The metric identifiers a PromQL expression reads, deduped and sorted. Conservative by design:
     a word wrongly kept only adds one cheap count query, a word wrongly dropped could hide a dead
     metric — so the denylist is exact functions/keywords only, label lists after by/on/ignoring/
-    without/group_* are stripped wholesale, strings and Grafana template vars are removed first, and
-    anything in a call position or before a label matcher is not a metric."""
+    without/group_* are stripped wholesale, strings and Grafana template vars are removed first,
+    label-matcher blocks `{...}` are stripped like range selectors (so a label name never reaches
+    the tokenizer, and a metric before a comparison such as `foo == 0` is kept), and anything in a
+    call position is not a metric."""
     text = re.sub(r'"(?:[^"\\]|\\.)*"', '""', str(expr))
     text = re.sub(r"'(?:[^'\\]|\\.)*'", "''", text)
     text = re.sub(r"\$\{\w+[^}]*\}", "", text)
     text = re.sub(r"\$\w+", "", text)
     text = re.sub(r"\[[^\]]*\]", "[]", text)
+    text = re.sub(r"\{[^}]*\}", "{}", text)
     text = re.sub(r"\boffset\s+[\d.]+[smhdwy]+\b", "offset", text)
     text = re.sub(r"\b(by|without|on|ignoring|group_left|group_right)\s*\([^)]*\)", r"\1()", text)
     names = set()
@@ -96,7 +99,7 @@ def promql_metric_names(expr):
         if token in PROMQL_NON_METRIC_TOKENS:
             continue
         after = text[match.end():].lstrip()
-        if after.startswith("(") or re.match(r"(=~|!~|!=|=)", after):
+        if after.startswith("("):
             continue
         names.add(token)
     return sorted(names)
@@ -272,6 +275,15 @@ def check_static():
             ok(f"positive control: the no-data gate passes {host_rule['uid']} as committed (NoData)")
         else:
             fail(f"POSITIVE CONTROL FAILED: the no-data gate rejects committed rule {host_rule['uid']}")
+
+    # Metric extraction control: a metric on the left of a comparison and a metric with a spaced
+    # label matcher must both be found, and the matcher's label name must not be.
+    comparison_expr = 'ctc5149_left == 0 and ctc5149_right{job = "x"} != 1'
+    found = promql_metric_names(comparison_expr)
+    if found == ["ctc5149_left", "ctc5149_right"]:
+        ok("metric extraction keeps a metric before == / != and drops matcher label names")
+    else:
+        fail(f"metric extraction on {comparison_expr!r} found {found}, expected ctc5149_left and ctc5149_right")
     return rules
 
 
