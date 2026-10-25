@@ -23,67 +23,6 @@ groups:
     folder: Catalyst Alerts
     interval: 1m
     rules:
-      - uid: catalyst_fleet_stuck_at_floor
-        title: Fleet stuck at autotune floor (eligible work > 0, effective == 1)
-        condition: C
-        for: 10m
-        noDataState: OK
-        execErrState: OK
-        labels:
-          team: catalyst
-          signal: fleet_stuck_at_floor
-          severity: warning
-        annotations:
-          summary: 'Scheduler eligible work > 0 but effective parallelism is at the floor (1)'
-          description: >
-            catalyst_scheduler_eligible_work > 0 while
-            catalyst_scheduler_max_parallel_effective == 1 for 10m.
-            The fleet is not dispatching available work — autotune may have
-            floor-clamped due to load/memory pressure, or the scheduler is
-            wedged. Check 'Effective vs Target Slots' (panel 2, the floor clamp)
-            and 'Eligible Work Waiting' (panel 5, the queue) on the Fleet Ops
-            dashboard.
-            Threshold: floor = 1 (hardcoded; edit rule if fleet min changes).
-          __dashboardUid__: catalyst-fleet-ops
-          # Panel 2 = 'Effective vs Target Slots', the timeseries carrying
-          # catalyst_scheduler_max_parallel_effective — the metric whose floor
-          # clamp IS this alert. Deliberately not panel 1: that id is the
-          # queryless 'Queue / Capacity' ROW header, so Grafana's "View panel"
-          # action would open a panel with no data (caught in review on #142).
-          __panelId__: '2'
-        data:
-          - refId: A
-            relativeTimeRange: { from: 600, to: 0 }
-            datasourceUid: prometheus
-            model:
-              datasource: { type: prometheus, uid: prometheus }
-              editorMode: code
-              instant: true
-              range: false
-              refId: A
-              expr: catalyst_scheduler_eligible_work > 0 and catalyst_scheduler_max_parallel_effective == 1
-          - refId: B
-            relativeTimeRange: { from: 600, to: 0 }
-            datasourceUid: __expr__
-            model:
-              type: reduce
-              refId: B
-              expression: A
-              reducer: last
-              datasource: { type: __expr__, uid: __expr__ }
-          - refId: C
-            relativeTimeRange: { from: 600, to: 0 }
-            datasourceUid: __expr__
-            model:
-              type: threshold
-              refId: C
-              expression: B
-              datasource: { type: __expr__, uid: __expr__ }
-              conditions:
-                - evaluator:
-                    type: gt
-                    params: [0]
-
       - uid: catalyst_fleet_reap_leak
         title: Reap leak — requested persistently exceeds complete
         condition: C
@@ -210,3 +149,10 @@ groups:
                 - evaluator:
                     type: gt
                     params: [0]
+
+# CTC-7104: retired. These rules read metrics with no series since Aug/Sep 2026 that no current
+# code emits, so they could never fire. Grafana keeps a provisioned rule whose file entry is
+# removed, so each uid is listed here and deleted on the next otel-grafana restart.
+deleteRules:
+  - orgId: 1
+    uid: catalyst_fleet_stuck_at_floor

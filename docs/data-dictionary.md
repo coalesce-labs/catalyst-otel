@@ -640,21 +640,9 @@ current view shape does not preclude it.
 |---|---|---|---|---|
 | Catalyst needs_human_pileup raised | catalyst-survivability · alert-rules.yaml | Loki `catalyst.alert` `needs_human_pileup`/`raised` (20m), net of cleared | critical | Backlog of tickets needing a human is piling up |
 | Catalyst system_down raised | catalyst-survivability · alert-rules.yaml | Loki `system_down`/`raised` alert events (20m), net of cleared | critical | A whole subsystem reported itself down |
-| Scheduler tick p99 > 3s (deadline breach) | catalyst-scheduler-health · scheduler-health-rules.yaml | `histogram_quantile(0.99, catalyst_scheduler_tick_duration_seconds_bucket)` | warning | Synchronous scheduler-loop wedge (CTL-790/OTL-31) |
-| Scheduler recovery-pass p99 > 3s | catalyst-scheduler-health · scheduler-health-rules.yaml | `..._pass_duration_seconds_bucket{pass="recovery-pass"}` | warning | Recovery pass (LLM reasoning) eating the tick |
-| Scheduler phantom-sweep p99 > 5s | catalyst-scheduler-health · scheduler-health-rules.yaml | `..._pass_duration_seconds_bucket{pass="phantom-sweep"}` | warning | Phantom-sweep regression |
-| Scheduler reclaim p99 > 1s (regression guard) | catalyst-scheduler-health · scheduler-health-rules.yaml | `..._pass_duration_seconds_bucket{pass="reclaim"}` | warning | Reclaim-pass regression (CTL-1331 lap-split) |
-| Scheduler liveness-refresh timeouts | catalyst-scheduler-health · scheduler-health-rules.yaml | `rate(catalyst_liveness_refresh_total{liveness_outcome="timeout"})` | critical | The async `claude agents` liveness refresh is timing out → new-work admission held (the wedge symptom) |
-| Recovery escalations burst (>5/h) | catalyst-tier-b · tier-b-alerts.yaml | `increase(catalyst_event_total{event_entity="ticket",event_action="escalated"}[1h])` | warning | Recovery escalating many tickets to humans |
-| Scheduler slot starvation (work waiting, 0 free slots) | catalyst-tier-b · tier-b-alerts.yaml | `max by(host_name)(catalyst_scheduler_eligible_work)>0 and on(host_name) max by(host_name)(catalyst_scheduler_free_slots)==0` | warning | Work ready but no slots — per-host throughput stall |
 | Claude Code API error rate elevated (>0.2/s) | catalyst-tier-b · tier-b-alerts.yaml | `rate(claude_code_api_error_total) > 0.2` | warning | Anthropic API errors elevated |
-| Updater refresh had failed checkouts | catalyst-updater · updater-install-alerts.yaml | `increase(catalyst_updater_refresh_failed_total[15m])` | warning | Plugin-pull updater hitting checkout failures (built; lights when CTL-1376 ships dev-node telemetry) |
-| Updater refresh p95 slow (>30s) | catalyst-updater · updater-install-alerts.yaml | `histogram_quantile(0.95, catalyst_updater_refresh_duration_seconds_bucket)` | warning | Slow plugin refresh |
 | Plugin checkout drift detected | catalyst-updater · updater-install-alerts.yaml | Loki `plugin.checkout.drift` (30m) | warning | A node fell behind origin/main (LIVE off worker brokers) |
 | Updater pull lag (consecutive failures) | catalyst-updater · updater-install-alerts.yaml | Loki `plugin.checkout.lag` (30m) | warning | Consecutive pull failures on a node |
-| Install run failed | catalyst-install · updater-install-alerts.yaml | `increase(catalyst_install_total{outcome="failed"}[1h])` | warning | A `catalyst install`/uninstall/reinstall failed (CTL-1369) |
-| Install run rolled back | catalyst-install · updater-install-alerts.yaml | `increase(catalyst_install_total{outcome="rolled_back"}[1h])` | warning | An install rolled back |
-| Install phase p95 slow (>120s, gated) | catalyst-install · updater-install-alerts.yaml | `histogram_quantile(0.95, catalyst_install_duration_seconds_bucket)` | warning | A slow install phase |
 
 ### Recommended — NOT YET IMPLEMENTED (audit gaps, 2026-06-29)
 

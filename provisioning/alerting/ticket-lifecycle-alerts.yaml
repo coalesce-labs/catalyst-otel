@@ -28,15 +28,9 @@ apiVersion: 1
 #      otherwise). UNVERIFIED against a live fire (the latch has never raised —
 #      correct); selector confirmed against fleet-freeze-alert.mjs emit shape.
 #
-#   2. board_work_aging — Prometheus. Healthy baseline is eligible_work==0 (work
-#      dispatches promptly). Fires when eligible_work>0 AND free_slots>0 hold for
-#      2h continuously = there is work AND idle capacity to run it, but it isn't
-#      moving. `for:2h` filters bursts; warning severity (not a pager).
-#      CALIBRATION NOTE: at ship time eligible_work has been parked at ~2 with
-#      free capacity for ~18h (post-freeze residue). This rule WILL fire on that
-#      state — which is the intent: either those tickets are genuinely stalled
-#      (investigate what they are) or they're a benign blocked class and the
-#      threshold gets tuned after one observation cycle. Do not silence blindly.
+#   2. board_work_aging read catalyst_scheduler_eligible_work and _free_slots, which
+#      stopped on 2026-08-25 with the orchestrator; it was retired in CTC-7104.
+
 groups:
   - orgId: 1
     name: catalyst-board-stuck
@@ -103,57 +97,9 @@ groups:
                     type: gt
                     params: [0]
 
-      - uid: catalyst_board_work_aging
-        title: Catalyst board work AGING (eligible work + idle capacity, sustained)
-        condition: C
-        for: 2h
-        noDataState: OK
-        execErrState: OK
-        labels:
-          team: catalyst
-          signal: board_work_aging
-          severity: warning
-        annotations:
-          summary: 'Eligible work has sat undispatched with free capacity for 2h (board aging — stuck, not quiet)'
-          description: >
-            catalyst_scheduler_eligible_work>0 AND catalyst_scheduler_free_slots>0
-            held continuously for 2h — there is work waiting AND idle worker slots
-            to run it, but it is not dispatching. Healthy baseline is eligible==0
-            (work clears promptly), so this separates a genuinely STUCK board from
-            a merely QUIET one. Check the Ticket Lifecycle dashboard's Board Health
-            row. If admission is frozen the board_frozen_admission (critical) rule
-            fires too; this warning also catches softer non-dispatch stalls.
-          __dashboardUid__: catalyst-ticket-lifecycle
-          __panelId__: '6'
-        data:
-          - refId: A
-            relativeTimeRange: { from: 600, to: 0 }
-            datasourceUid: prometheus
-            model:
-              datasource: { type: prometheus, uid: prometheus }
-              editorMode: code
-              instant: true
-              range: false
-              refId: A
-              expr: (sum(catalyst_scheduler_eligible_work) > 0) and (sum(catalyst_scheduler_free_slots) > 0)
-          - refId: B
-            relativeTimeRange: { from: 600, to: 0 }
-            datasourceUid: __expr__
-            model:
-              type: reduce
-              refId: B
-              expression: A
-              reducer: last
-              datasource: { type: __expr__, uid: __expr__ }
-          - refId: C
-            relativeTimeRange: { from: 600, to: 0 }
-            datasourceUid: __expr__
-            model:
-              type: threshold
-              refId: C
-              expression: B
-              datasource: { type: __expr__, uid: __expr__ }
-              conditions:
-                - evaluator:
-                    type: gt
-                    params: [0]
+# CTC-7104: retired. These rules read metrics with no series since Aug/Sep 2026 that no current
+# code emits, so they could never fire. Grafana keeps a provisioned rule whose file entry is
+# removed, so each uid is listed here and deleted on the next otel-grafana restart.
+deleteRules:
+  - orgId: 1
+    uid: catalyst_board_work_aging

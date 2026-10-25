@@ -374,73 +374,6 @@ groups:
                     params: [2]
 
   # =====================================================================
-  # Fleet freshness — nodes running stale code (updater not keeping them fresh).
-  # =====================================================================
-  - orgId: 1
-    name: catalyst-fleet-freshness
-    folder: Catalyst Alerts
-    interval: 1m
-    rules:
-      # 6) ★ WARNING — node >20 commits behind origin/main. Live GAUGE (instant
-      #    read, NOT a count window): the fleet 7-day peak is 1 commit behind, so
-      #    gt 20 is a ~20x margin. for: 15m rides out a deploy/merge-train spike
-      #    (pulled back by the next updater poll). Prometheus.
-      - uid: catalyst_node_stale_commits_behind
-        title: Node running stale code (>20 commits behind main)
-        condition: C
-        for: 15m
-        noDataState: OK
-        execErrState: OK
-        labels:
-          team: catalyst-readpath
-          signal: node_stale_commits_behind
-          severity: warning
-        annotations:
-          summary: 'A node is >20 commits behind origin/main for 15m — the updater is not keeping it fresh'
-          description: >
-            max by (host_name) (catalyst_vcs_commits_behind) exceeded 20 for a host,
-            sustained 15m. The node is running STALE plugin/agent code: the updater is
-            supposed to keep every node within ~1 commit of origin/main (live baseline:
-            0, 7-day fleet peak: 1), so >20 means the updater has failed to pull across
-            many merges and this node's work is suspect. Check that node's
-            catalyst.updater liveness, its git remote / auth / disk, and the last
-            successful plugin.checkout.updated event.
-          __dashboardUid__: catalyst-fleet-hosts
-          __panelId__: '82'
-        data:
-          - refId: A
-            relativeTimeRange: { from: 600, to: 0 }
-            datasourceUid: prometheus
-            model:
-              datasource: { type: prometheus, uid: prometheus }
-              editorMode: code
-              instant: true
-              range: false
-              refId: A
-              expr: max by (host_name) (catalyst_vcs_commits_behind)
-          - refId: B
-            relativeTimeRange: { from: 600, to: 0 }
-            datasourceUid: __expr__
-            model:
-              type: reduce
-              refId: B
-              expression: A
-              reducer: last
-              datasource: { type: __expr__, uid: __expr__ }
-          - refId: C
-            relativeTimeRange: { from: 600, to: 0 }
-            datasourceUid: __expr__
-            model:
-              type: threshold
-              refId: C
-              expression: B
-              datasource: { type: __expr__, uid: __expr__ }
-              conditions:
-                - evaluator:
-                    type: gt
-                    params: [20]
-
-  # =====================================================================
   # Workflow blockers (critic pass) — Loki event signals where a ticket can't
   # advance. Rare events => gt 0 over 30m (pile-up rule for cleanup-failed).
   # =====================================================================
@@ -619,64 +552,6 @@ groups:
     folder: Catalyst Alerts
     interval: 1m
     rules:
-      # 10) ★ CRITICAL — the shared Anthropic account 5h rate-limit window near
-      #     exhaustion. At 100% EVERY agent's LLM call fails fleet-wide until reset
-      #     — the ROOT cause behind any 429 burst the api-error alert sees as a
-      #     downstream symptom. Prometheus gauge. CAVEAT: the CTL-787 poller is
-      #     currently idle, so the gauge expires (15m) and reads NoData/OK today
-      #     (won't false-fire); it lights up the moment the poller resumes.
-      - uid: catalyst_account_ratelimit_saturated
-        title: Account 5h rate-limit window near exhaustion (LLM halt)
-        condition: C
-        for: 5m
-        noDataState: OK
-        execErrState: OK
-        labels:
-          team: catalyst
-          signal: account_ratelimit_saturated
-          severity: critical
-        annotations:
-          summary: 'Anthropic account 5h rate-limit window > 95% — all LLM calls about to halt fleet-wide'
-          description: >
-            The shared account 5-hour rate-limit window is over 95% consumed. At 100%
-            every agent's LLM call fails until the window resets — a fleet-wide work
-            stoppage and the ROOT cause behind any 429 burst on the api-error alert.
-            NOTE the gauge expires 15m after the CTL-787 poller stops sampling, so this
-            reads NoData/OK (won't false-fire) while the poller is idle. Companion 7d
-            window = catalyst_account_ratelimit_seven_day_pct.
-        data:
-          - refId: A
-            relativeTimeRange: { from: 600, to: 0 }
-            datasourceUid: prometheus
-            model:
-              datasource: { type: prometheus, uid: prometheus }
-              editorMode: code
-              instant: true
-              range: false
-              refId: A
-              expr: max(catalyst_account_ratelimit_five_hour_pct)
-          - refId: B
-            relativeTimeRange: { from: 600, to: 0 }
-            datasourceUid: __expr__
-            model:
-              type: reduce
-              refId: B
-              expression: A
-              reducer: last
-              datasource: { type: __expr__, uid: __expr__ }
-          - refId: C
-            relativeTimeRange: { from: 600, to: 0 }
-            datasourceUid: __expr__
-            model:
-              type: threshold
-              refId: C
-              expression: B
-              datasource: { type: __expr__, uid: __expr__ }
-              conditions:
-                - evaluator:
-                    type: gt
-                    params: [95]
-
       # 11) ★ WARNING — a node's disk >90%. When disk fills, per-ticket git
       #     worktree creation fails and the scheduler can't dispatch new work on
       #     that node (hard, node-local blocker). Reads system_filesystem_usage_bytes
@@ -819,64 +694,6 @@ groups:
                     type: lt
                     params: [5]
 
-      # 12) WARNING — the recovery board-scan's OWN fleet-health check reports >0
-      #     failed invariants (dispatchLiveness / strandedNode / blockedTree / ...)
-      #     for 15m: the orchestrator says work is wedged. Recovery is shadow-mode
-      #     and the rollup can include flappier invariants, hence 15m `for` +
-      #     warning. Only the rollup is a metric (per-invariant booleans are Loki
-      #     structured metadata). Prometheus gauge, per host_name.
-      - uid: catalyst_recovery_invariants_failed
-        title: Recovery invariants failing (fleet wedge self-detected)
-        condition: C
-        for: 15m
-        noDataState: OK
-        execErrState: OK
-        labels:
-          team: catalyst
-          signal: recovery_invariants_failed
-          severity: warning
-        annotations:
-          summary: 'Recovery board-scan reports >0 failed fleet invariants for 15m'
-          description: >
-            catalyst_recovery_invariants_failed (0..7) has been nonzero for 15m — the
-            recovery pass's own fleet-health check (dispatchLiveness / strandedNode /
-            blockedTree / projectSilence / rateLimitHeadroom / cacheCoherence / workerAge)
-            says something is wedged. Only the rollup is a metric; drill the per-invariant
-            recovery_inv_*_failed booleans on the recovery.board-scan event to see which.
-            Recovery is shadow-mode today, so treat as advisory wedge detection.
-        data:
-          - refId: A
-            relativeTimeRange: { from: 900, to: 0 }
-            datasourceUid: prometheus
-            model:
-              datasource: { type: prometheus, uid: prometheus }
-              editorMode: code
-              instant: true
-              range: false
-              refId: A
-              expr: max by (host_name) (catalyst_recovery_invariants_failed)
-          - refId: B
-            relativeTimeRange: { from: 900, to: 0 }
-            datasourceUid: __expr__
-            model:
-              type: reduce
-              refId: B
-              expression: A
-              reducer: last
-              datasource: { type: __expr__, uid: __expr__ }
-          - refId: C
-            relativeTimeRange: { from: 900, to: 0 }
-            datasourceUid: __expr__
-            model:
-              type: threshold
-              refId: C
-              expression: B
-              datasource: { type: __expr__, uid: __expr__ }
-              conditions:
-                - evaluator:
-                    type: gt
-                    params: [0]
-
 # =====================================================================
 # WATCH-ONLY / DELIBERATELY-NOT-PROVISIONED (overlaps & no-signature signals).
 # Documented here so a future author does not re-add a noisy or unfireable rule.
@@ -892,7 +709,8 @@ groups:
 #     forward_failed rule already guards "the stack goes blind".
 #   - fleet.health.degraded: ~87/3h live and mini runs chronically hot on mem/swap
 #     => would page constantly. Its work-blocking content is rolled up by
-#     catalyst_recovery_invariants_failed — alert on that instead.
+#     catalyst_recovery_invariants_failed (that rule and its metric were retired
+#     in CTC-7104).
 #   - monitor.reconcile.failing / .recovered: self-heal pair on the secondary
 #     (monitor/webhook) loop, not the ticket-progression path; not a hard blocker.
 #   - monitor.ui.build_failed: the dashboard UI build, not orchestration workflow;
@@ -909,3 +727,14 @@ groups:
 #   - Host MEMORY pressure (catalyst_host_mem_used_pct): mini sits ~82% steady
 #     state => chronic noise. Disk is the genuinely work-blocking host resource.
 # =====================================================================
+
+# CTC-7104: retired. These rules read metrics with no series since Aug/Sep 2026 that no current
+# code emits, so they could never fire. Grafana keeps a provisioned rule whose file entry is
+# removed, so each uid is listed here and deleted on the next otel-grafana restart.
+deleteRules:
+  - orgId: 1
+    uid: catalyst_node_stale_commits_behind
+  - orgId: 1
+    uid: catalyst_account_ratelimit_saturated
+  - orgId: 1
+    uid: catalyst_recovery_invariants_failed
