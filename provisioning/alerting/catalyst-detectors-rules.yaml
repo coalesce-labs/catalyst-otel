@@ -105,59 +105,6 @@ groups:
           uid: __expr__
     noDataState: Alerting
     execErrState: Alerting
-  - uid: ctc2945_host_agent_silent
-    title: Host agent silent for 10 minutes
-    condition: FIRE
-    for: 2m
-    labels:
-      team: catalyst
-      severity: critical
-      catalyst_alert_class: silence
-      ticket: CTC-2945
-    annotations:
-      summary: '{{ $labels.host }}: no host-agent telemetry for {{ $values.AGENT.Value }}s'
-      description: 'The host agent on this host has written nothing for over 10 minutes. The host roster is every fleet host (host.name LIKE hetzner-%) seen in the last 7 days; laptops and workstations never count, because they are not required to send telemetry. If every host fires together, the telemetry path (collector, tunnel, ClickHouse) is the suspect, not the hosts. Do: check the host over the tailnet (ssh, power, disk). If it was decommissioned on purpose, silence this host until it leaves the 7-day roster.'
-    data:
-    - refId: A
-      relativeTimeRange:
-        from: 600
-        to: 0
-      datasourceUid: clickhouse-trial
-      model:
-        refId: A
-        datasource:
-          type: grafana-clickhouse-datasource
-          uid: clickhouse-trial
-        editorType: sql
-        format: 1
-        queryType: table
-        rawSql: SELECT ResourceAttributes['host.name'] AS host, toFloat64(dateDiff('second', max(Timestamp), now())) AS agent_age_s FROM otel.otel_logs WHERE ServiceName = 'catalyst-cloud.host-agent' AND Timestamp > now() - INTERVAL 7 DAY AND Timestamp <= now() AND ResourceAttributes['host.name'] LIKE 'hetzner-%' GROUP BY host
-    - refId: AGENT
-      relativeTimeRange:
-        from: 600
-        to: 0
-      datasourceUid: __expr__
-      model:
-        refId: AGENT
-        type: math
-        expression: $A
-        datasource:
-          type: __expr__
-          uid: __expr__
-    - refId: FIRE
-      relativeTimeRange:
-        from: 600
-        to: 0
-      datasourceUid: __expr__
-      model:
-        refId: FIRE
-        type: math
-        expression: $A > 600
-        datasource:
-          type: __expr__
-          uid: __expr__
-    noDataState: Alerting
-    execErrState: Alerting
   - uid: ctc3003_ready_work_stranded
     title: 'Ready work stranded: every acquire refused for capability, no phase running'
     condition: FIRE
@@ -343,3 +290,9 @@ groups:
     noDataState: Alerting
     execErrState: Alerting
 
+# CTC-7104: retired. Grafana keeps a provisioned rule whose file entry is removed, so each
+# retired uid is listed here and deleted on the next otel-grafana restart.
+deleteRules:
+  # no host has sent host-agent logs since 2026-10-13; a newer supervisor replaced it
+  - orgId: 1
+    uid: ctc2945_host_agent_silent
