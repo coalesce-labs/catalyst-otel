@@ -369,7 +369,7 @@ processors:
   # codex-app-server emits Rust `h2` HTTP/2 library internals as spans — one per
   # frame operation (`send_data`, `reserve_capacity`, `assign_connection_capacity`,
   # `Prioritize::queue_frame`, …). Measured cost: **$61.10/30d on Dash0 alone**
-  # (~102M spans), and Honeycomb receives a byte-identical stream, so roughly
+  # (~102M spans), and Honeycomb (removed 2026-11-01) received a byte-identical stream, so roughly
   # double that in reality. This is TRACE-level instrumentation that escaped to
   # production; nobody has ever wanted these spans in any backend.
   #
@@ -619,8 +619,10 @@ exporters:
     endpoint: http://otel-loki:3100/otlp
 
   # ---------------------------------------------------------------------------
-  # Fan-out exporters (CTL-812 / OTL-1). Honeycomb ENABLED 2026-06-07 — env vars
-  # live in /home/rozich/otel-stack/.env (gitignored).
+  # Fan-out exporters (CTL-812 / OTL-1). Honeycomb REMOVED 2026-11-01 (CTC-9074):
+  # the exporter block and every pipeline leg are gone, here and in the private
+  # overlay, so ClickHouse (through the private overlay), Loki, Tempo and
+  # Prometheus are the only sinks. Do not re-add it without an owner decision.
   #
   # Dash0 REMOVED FROM THE PUBLIC PIPELINES 2026-08-01 (OTL-64): the
   # metrics/logs/traces pipelines below shipped fully unsampled logs+metrics
@@ -648,7 +650,7 @@ exporters:
   # this collector runs processing/transforms (resource, transform/logs)
   # BEFORE storage, so a new destination is added ONLY by appending its
   # exporter to the exporters list of the EXISTING pipeline — NEVER by
-  # creating a parallel per-vendor pipeline (e.g. logs/honeycomb). A parallel
+  # creating a parallel per-vendor pipeline (e.g. logs/<vendor>). A parallel
   # pipeline lets the processor chains drift apart and the destinations
   # silently fall out of sync: every destination must receive the IDENTICAL
   # post-transform payload. Per-exporter FORMAT settings (e.g. prometheus
@@ -656,15 +658,6 @@ exporters:
   # post-PROCESSING is not. validate-dashboard.sh enforces the
   # one-pipeline-per-signal rule.
   # ---------------------------------------------------------------------------
-
-  # Honeycomb (logs). Endpoint is the standard ingest URL. The dataset header
-  # is required for non-tracing signals (logs/metrics); for traces Honeycomb
-  # routes by service.name and the dataset header is ignored.
-  otlp_http/honeycomb:
-    endpoint: https://api.honeycomb.io
-    headers:
-      x-honeycomb-team: ${env:HONEYCOMB_API_KEY}
-      x-honeycomb-dataset: ${env:HONEYCOMB_DATASET}
 
   # Dash0. Endpoint and bearer token both come from env. STAYS DECLARED even
   # though no PUBLIC pipeline below uses it anymore (OTL-64) — the private
@@ -1607,9 +1600,11 @@ service:
   #
   #   signal   | destination(s)          | change via
   #   ---------|-------------------------|-------------------------
-  #   metrics  | prometheus (+ honeycomb) | metrics.exporters list
-  #   logs     | otlp_http=Loki (+ honeycomb) | logs.exporters list
-  #   traces   | otlp/tempo (+ honeycomb) | traces.exporters list
+  #   metrics  | prometheus              | metrics.exporters list
+  #   logs     | otlp_http=Loki          | logs.exporters list
+  #   traces   | otlp/tempo              | traces.exporters list
+  #
+  # Honeycomb REMOVED from all three pipelines 2026-11-01 (CTC-9074).
   #
   # Dash0 REMOVED from all three PUBLIC pipelines 2026-08-01 (OTL-64) — it
   # duplicated Loki/Prometheus/Tempo (paid for the same data twice) with no
@@ -1618,14 +1613,13 @@ service:
   # (the private overlay's Cloudflare pipelines still use it) — re-enabling
   # here is just appending `otlp_http/dash0` back to a pipeline's exporters.
   #
-  # TRACES FAN OUT TO TEMPO + HONEYCOMB — and ONLY because this pipeline is
-  # POST-tail_sampling (keep errors + slow>1s + 20% of the rest, already wired
-  # below), so the per-span vendor bill is trimmed to the sampled stream rather
-  # than the full firehose. RULES that still hold:
+  # A vendor trace leg, if one is ever added, goes AFTER tail_sampling (keep
+  # errors + slow>1s + 20% of the rest, already wired below), so a per-span
+  # vendor bill covers the sampled stream rather than the full firehose. RULES:
   #   * Do NOT add a vendor trace leg to any pipeline that lacks tail_sampling
   #     ahead of it (e.g. never at 100% on a high-volume unsampled pipeline).
   #   * Never point a vendor leg at an empty/env-driven endpoint (crash-loops the
-  #     collector at boot) — HONEYCOMB_* must be set in .env first (or DASH0_*
+  #     collector at boot) — its env vars must be set in .env first (DASH0_*
   #     if re-enabling Dash0).
   #   * Loki still cannot ingest traces — never add otlp_http to traces.exporters.
   # ---------------------------------------------------------------------------
@@ -1642,7 +1636,7 @@ service:
       # To fan metrics out to another vendor as well, append the SAME exporter
       # id here, e.g.:
       #
-      #   exporters: [prometheus, otlp_http/honeycomb, otlp_http/dash0]
+      #   exporters: [prometheus, otlp_http/dash0]
       #
       # (One exporter definition can serve both pipelines.) Dash0 REMOVED
       # 2026-08-01 (OTL-64) — see the forwarding table above.
@@ -1652,7 +1646,7 @@ service:
       # production exporter — re-add it TEMPORARILY when debugging, then take it
       # back out. The exporter block itself stays DEFINED (the private
       # Cloudflare pipelines still reference it).
-      exporters: [prometheus, otlp_http/honeycomb]
+      exporters: [prometheus]
 
     logs:
       receivers: [otlp]
@@ -1681,11 +1675,11 @@ service:
       # OTL-54: `debug` REMOVED (see the metrics pipeline above). This was the
       # single largest contributor to the 314 GiB log — every catalyst log
       # record was serialized to stdout on top of being shipped to Loki.
-      exporters: [otlp_http, otlp_http/honeycomb, count, signal_to_metrics]
+      exporters: [otlp_http, count, signal_to_metrics]
 
     traces:
-      # OTL-25: spans -> Tempo + Honeycomb (Dash0 removed 2026-08-01, OTL-64 —
-      # see the forwarding table above). NO transform/logs here — that is a
+      # OTL-25: spans -> Tempo (Dash0 removed 2026-08-01, OTL-64; Honeycomb
+      # removed 2026-11-01, CTC-9074 — see the forwarding table above). NO transform/logs here — that is a
       # logs-only Loki-shaping step, wrong for traces. `resource` stamps
       # environment=production; `tail_sampling`
       # keeps slow ticks (>1s) + errors and samples the rest, and the vendor legs
@@ -1706,5 +1700,5 @@ service:
       # was pure waste.
       # OTL-99: signal_to_metrics is a DERIVATION exporter (spans -> metrics),
       # not a storage destination — identical to its role on the logs pipeline
-      # (OTL-20). Storage legs stay exactly {otlp/tempo, otlp_http/honeycomb}.
-      exporters: [otlp/tempo, otlp_http/honeycomb, signal_to_metrics]
+      # (OTL-20). The storage leg stays exactly {otlp/tempo}.
+      exporters: [otlp/tempo, signal_to_metrics]

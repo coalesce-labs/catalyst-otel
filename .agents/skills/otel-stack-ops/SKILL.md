@@ -13,7 +13,7 @@ Commands are self-documenting: `make help`. Generate test telemetry: `make setup
 Environment-specific values are env vars, not literals in this repo. Reference them by name; do not hardcode a host, URL, endpoint, or token in a skill or config.
 
 - **`OTEL_STACK_HOST`** — the deploy host (SSH). Ops commands that run remotely use `ssh "$OTEL_STACK_HOST" …`.
-- **Fan-out exporters (optional, off by default):** `HONEYCOMB_API_KEY` / `HONEYCOMB_DATASET`, `DASH0_OTLP_ENDPOINT` / `DASH0_AUTH_TOKEN`. Their exporter blocks stay commented until the vars are set — the collector **validates every declared exporter at boot and crash-loops loudly** if an enabled exporter's endpoint expands empty (that is the intended fail-loud, not a silent drop).
+- **Fan-out exporters (optional, off by default):** `DASH0_OTLP_ENDPOINT` / `DASH0_AUTH_TOKEN` (Honeycomb was removed 2026-11-01, CTC-9074). The exporter block stays commented until the vars are set — the collector **validates every declared exporter at boot and crash-loops loudly** if an enabled exporter's endpoint expands empty (that is the intended fail-loud, not a silent drop).
 - The private overlay adds its own (`CLOUDFLARE_TUNNEL_TOKEN`, `LANGFUSE_BASIC_AUTH`, …) — same rule.
 
 If a command here needs an env var that is unset, **fail loudly** (`: "${OTEL_STACK_HOST:?set OTEL_STACK_HOST to your deploy host}"`) and tell the operator what to set — never silently fall back to a hardcoded default.
