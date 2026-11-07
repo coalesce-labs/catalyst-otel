@@ -71,7 +71,8 @@ sum by (event_name) (count_over_time({service_name="claude-code"} [1h]))
 
 ⚠️ On the deploy host, a bare `:9090` is a **different** Prometheus (host infra — no `otelcol_`/`catalyst_`/`claude_code_` series). The stack's own Prometheus scrapes `otel-collector:8889` inside the docker network. To query it (or Loki) directly, go through the Grafana datasource proxy:
 ```bash
-docker exec otel-grafana curl -s \
+# Grafana requires a login: send a Viewer service account token.
+docker exec otel-grafana curl -s -H "Authorization: Bearer $OTEL_GRAFANA_TOKEN" \
   "http://localhost:3000/api/datasources/proxy/uid/prometheus/api/v1/query?query=<promql>"
 # uid/loki for LogQL; paths: /label/__name__/values, /label/<key>/values, /series?match[]=<metric>
 ```

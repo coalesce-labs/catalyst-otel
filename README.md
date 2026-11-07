@@ -99,7 +99,7 @@ claude
 ```
 
 ### 3. Access Dashboards
-- **Grafana**: http://localhost:3000 (admin/admin)
+- **Grafana**: http://localhost:3000 (user `admin`, password `GRAFANA_ADMIN_PASSWORD` from `.env`)
 - **Prometheus**: http://localhost:9090
 
 > 🖼️ **Visual Guide**: Check out the [Dashboard Screenshots](#-dashboard-screenshots) to see what your dashboards will look like!
