@@ -15,7 +15,7 @@ Thank you for your interest in contributing to the Claude Code Observability Sta
    - Canonical repository: `git clone https://github.com/coalesce-labs/catalyst-otel.git`
    - Original upstream project: `git clone https://github.com/ColeMurray/claude-code-otel.git`
 3. Start the development stack: `make up`
-4. Access Grafana at http://localhost:3000 (admin/admin)
+4. Access Grafana at http://localhost:3000 (user `admin`, password `GRAFANA_ADMIN_PASSWORD` from `.env`)
 
 ## 📊 How to Contribute
 

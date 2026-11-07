@@ -72,6 +72,9 @@ Claude Code → OpenTelemetry Collector → Prometheus (metrics) + Loki (events/
 
 ### 1. Start the Stack
 ```bash
+# Choose Grafana's admin password. Compose refuses to start without it.
+echo "GRAFANA_ADMIN_PASSWORD='choose-a-password'" >> .env
+
 # Start all services
 make up
 
@@ -99,7 +102,7 @@ claude
 ```
 
 ### 3. Access Dashboards
-- **Grafana**: http://localhost:3000 (admin/admin)
+- **Grafana**: http://localhost:3000 (user `admin`, password `GRAFANA_ADMIN_PASSWORD` from `.env`)
 - **Prometheus**: http://localhost:9090
 
 > 🖼️ **Visual Guide**: Check out the [Dashboard Screenshots](#-dashboard-screenshots) to see what your dashboards will look like!

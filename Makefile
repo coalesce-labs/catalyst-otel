@@ -16,7 +16,7 @@ up: pull ## Start the observability stack (pulls latest first)
 	@echo "🚀 Starting Claude Code observability stack..."
 	docker compose up -d
 	@echo "✅ Stack started!"
-	@echo "📊 Grafana: http://localhost:3000 (admin/admin)"
+	@echo "📊 Grafana: http://localhost:3000 (user admin, password GRAFANA_ADMIN_PASSWORD from .env)"
 	@echo "🔍 Prometheus: http://localhost:9099"
 	@echo "📄 Loki: http://localhost:3100"
 
