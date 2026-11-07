@@ -72,6 +72,9 @@ Claude Code → OpenTelemetry Collector → Prometheus (metrics) + Loki (events/
 
 ### 1. Start the Stack
 ```bash
+# Choose Grafana's admin password. Compose refuses to start without it.
+echo "GRAFANA_ADMIN_PASSWORD='choose-a-password'" >> .env
+
 # Start all services
 make up
 
