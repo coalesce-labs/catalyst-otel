@@ -1,0 +1,47 @@
+# Mergify merge queue for `catalyst-otel`, the same rules as catalyst-cloud-cli and catalyst-cloud-marketing.
+#
+# Entry is opt-OUT: any pull request against `main` that is green, non-draft, and has zero
+# unresolved review threads self-enqueues. To keep one OUT, apply the `hold` label.
+#
+# This repository has no GitHub Actions workflows of its own, so the only check that runs on every
+# pull request is CodeQL default setup's `Analyze (python)`. `Independent Agent Review` is not used
+# as a gate: it is missing from some pull requests (#228, #229), and gating on it would leave them
+# waiting forever. Branch protection is off on `main`, so nothing else is required.
+
+queue_rules:
+  - name: default
+    merge_method: squash
+    queue_conditions:
+      - base=main
+      - -draft
+      - label!=hold
+      - "#review-threads-unresolved=0"
+      - "check-success=Analyze (python)"
+    merge_conditions:
+      - base=main
+      - label!=hold
+      - "#review-threads-unresolved=0"
+      - "check-success=Analyze (python)"
+
+pull_request_rules:
+  # The trigger, not a second gate: its conditions mirror queue_conditions so a pull request that
+  # would be admitted is the one that gets enqueued.
+  - name: enqueue any green, thread-clean, non-held PR
+    conditions:
+      - base=main
+      - -draft
+      - label!=hold
+      - "#review-threads-unresolved=0"
+      - "check-success=Analyze (python)"
+    actions:
+      queue: {}
+
+merge_protections:
+  # Applies to every non-draft pull request against main regardless of merge path, so a hand-merge
+  # cannot skip what the queue enforces.
+  - name: no unresolved review threads before merge
+    if:
+      - base=main
+      - -draft
+    success_conditions:
+      - "#review-threads-unresolved=0"
