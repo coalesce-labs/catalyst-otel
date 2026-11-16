@@ -373,7 +373,7 @@ fi
 # --- collector: payload-parity invariant (OTL-1) — exactly ONE pipeline per
 #     signal type. Fan-out destinations append to the EXISTING pipeline's
 #     exporters (after the shared processors); a parallel per-vendor pipeline
-#     (logs/honeycomb, metrics/dash0, ...) would let processor chains drift and
+#     (logs/<vendor>, metrics/dash0, ...) would let processor chains drift and
 #     destinations fall out of sync. Comments are stripped before checking. ---
 STRIPPED=$(grep -v '^\s*#' "$COLLECTOR")
 if echo "$STRIPPED" | grep -qE '^\s+(logs|metrics|traces)/[A-Za-z0-9_]+:'; then
@@ -396,9 +396,9 @@ for sig in logs metrics traces; do
 done
 
 # --- collector: traces exporter allowlist. Must include otlp/tempo and stay a
-#     SUBSET of {otlp/tempo, otlp_http/honeycomb, otlp_http/dash0, debug,
+#     SUBSET of {otlp/tempo, otlp_http/dash0, debug,
 #     signal_to_metrics}.
-#     OTL-45 (#82) added the vendor legs (honeycomb/dash0) AFTER tail_sampling, so
+#     OTL-45 (#82) added the vendor legs AFTER tail_sampling (Honeycomb removed 2026-11-01, CTC-9074), so
 #     the per-span bill rides only the sampled stream — they are now allowed.
 #     OTL-99 added signal_to_metrics: a DERIVATION exporter (spans -> metrics),
 #     not a storage destination — the same role it already plays on the logs
@@ -412,16 +412,16 @@ HAVE_TEMPO=0
 for id in $TRACES_IDS; do
   case "$id" in
     otlp/tempo) HAVE_TEMPO=1 ;;
-    otlp_http/honeycomb|otlp_http/dash0) : ;;
+    otlp_http/dash0) : ;;
     signal_to_metrics) : ;;
     debug) : ;;
     *) BAD_TRACE_EXP="$BAD_TRACE_EXP $id" ;;
   esac
 done
 if [ -n "$BAD_TRACE_EXP" ]; then
-  fail "traces pipeline exports to a disallowed backend (allowed: otlp/tempo, otlp_http/honeycomb, otlp_http/dash0, debug, signal_to_metrics):$BAD_TRACE_EXP"
+  fail "traces pipeline exports to a disallowed backend (allowed: otlp/tempo, otlp_http/dash0, debug, signal_to_metrics):$BAD_TRACE_EXP"
 elif [ "$HAVE_TEMPO" -eq 1 ]; then
-  pass "traces pipeline exporters are within the allowlist {otlp/tempo, otlp_http/honeycomb, otlp_http/dash0, debug, signal_to_metrics}"
+  pass "traces pipeline exporters are within the allowlist {otlp/tempo, otlp_http/dash0, debug, signal_to_metrics}"
 else
   fail "traces pipeline is missing the otlp/tempo exporter (traces must always reach Tempo)"
 fi

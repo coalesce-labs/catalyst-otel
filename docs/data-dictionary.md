@@ -4,7 +4,7 @@
 >
 > **Last verified:** **2026-09-18** against the live home stack **and the live trial ClickHouse** (the ClickHouse sections are new this pass; the Prometheus/Loki/Tempo catalogs below still carry their 2026-06-29 verification and are NOT re-verified here — see [ClickHouse](#clickhouse-clickstack-trial--the-parallel-store)). **Owner:** OTL team. When you add/rename a signal or dimension, update this file (a CI governance check is planned — see [Data quality](#data-quality--desired-envelope)).
 >
-> **Managed backends:** all three signals also fan out to **Dash0** and **Honeycomb** (the `otlp_http/dash0` + `otlp_http/honeycomb` exporters) — metrics and logs since 2026-06-07, and **traces** since 2026-07-02 (added *after* `tail_sampling`, so the per-span vendor bill rides only the sampled stream).
+> **Managed backends:** none. Dash0 left the public pipelines on 2026-08-01 (OTL-64) and Honeycomb was removed everywhere on 2026-11-01 (CTC-9074). Loki, Tempo and Prometheus here, and ClickHouse through the private overlay, are the only sinks.
 >
 > **ClickHouse is not in this file.** The ClickStack store on the box `clickstack-hel1` (every log, span and metric since 2026-09-15, and the only store with `agent_tool_calls` and `claude_api_requests`) is catalogued in catalyst-cloud's `docs/data-dictionary-cloud.md` → "The ClickHouse store". The ClickHouse on `home` (`100.65.193.30`) stopped receiving data on 2026-09-19; never query it. The ClickHouse draft once planned for this file (branch `otl-data-dictionary-clickhouse`) was folded into that one (CTC-3036).
 
