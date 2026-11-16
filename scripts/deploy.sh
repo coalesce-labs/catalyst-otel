@@ -33,7 +33,7 @@ push_dashboards() {
     name=\$(basename \"\$f\")
     echo \"    \$name\"
     cat \"\$f\" | docker exec -i $GRAFANA_CONTAINER sh -c 'cat > /tmp/dash.json'
-    docker exec $GRAFANA_CONTAINER curl -sf -u admin:admin -X POST \
+    docker exec $GRAFANA_CONTAINER curl -sf -u \"admin:\$(cat \${GRAFANA_ADMIN_PASSWORD_FILE:-\$HOME/.config/grafana-admin-password})\" -X POST \
       -H 'Content-Type: application/json' \
       'http://localhost:3000/api/dashboards/db' \
       -d @- <<PAYLOAD > /dev/null

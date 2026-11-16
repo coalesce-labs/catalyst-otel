@@ -134,11 +134,10 @@ services:
     image: grafana/grafana-oss:latest
     container_name: otel-grafana
     environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:?set GRAFANA_ADMIN_PASSWORD in .env}
       - GF_USERS_ALLOW_SIGN_UP=false
       - GF_FEATURE_TOGGLES_ENABLE=logsSampleInExplore
-      - GF_AUTH_ANONYMOUS_ENABLED=true
-      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_AUTH_ANONYMOUS_ENABLED=false
       # OTL-15 survivability pager webhook. An EMPTY contact-point URL is FATAL
       # at Grafana startup (provisioning fails -> crash-loop), so when the host
       # env var is unset we pass a harmless localhost PLACEHOLDER. Grafana boots
